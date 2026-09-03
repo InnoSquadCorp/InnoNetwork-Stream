@@ -1,6 +1,6 @@
 # Contributor Covenant Code of Conduct
 
-InnoNetwork adopts the [Contributor Covenant v2.1][covenant] as its
+InnoStream adopts the [Contributor Covenant v2.1][covenant] as its
 community standard. The full text is summarized below for convenience;
 where the summary and the upstream text differ, the upstream text wins.
 

@@ -1,6 +1,6 @@
 # Support
 
-InnoNetwork is maintained under a lightweight maintainer model.
+InnoStream is maintained under a lightweight maintainer model.
 
 ## What to Expect
 
@@ -27,5 +27,5 @@ InnoNetwork is maintained under a lightweight maintainer model.
 
 - Small repros
 - Exact versions and platform info
-- failing requests or websocket/download lifecycle traces
-- benchmark diffs for performance claims
+- redacted playlist fixtures or download/live-DVR lifecycle traces
+- before/after measurements for performance claims

@@ -25,10 +25,12 @@ enum HLSHTTPDateParser {
     ) -> Date? {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
-        let normalized = trimmed
+        let normalized =
+            trimmed
             .split(whereSeparator: { $0 == " " || $0 == "\t" })
             .joined(separator: " ")
-        let candidates = normalized == trimmed
+        let candidates =
+            normalized == trimmed
             ? [trimmed]
             : [trimmed, normalized]
 

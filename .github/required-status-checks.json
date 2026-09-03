@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "checks": [
+    {
+      "context": "Dependency Review",
+      "integration_id": 15368
+    },
+    {
+      "context": "Lint (swift-format)",
+      "integration_id": 15368
+    },
+    {
+      "context": "Build and Test (SwiftPM) — Xcode 26.0.1",
+      "integration_id": 15368
+    },
+    {
+      "context": "Build and Test (SwiftPM) — Xcode 27.0",
+      "integration_id": 15368
+    },
+    {
+      "context": "Docs / API / HLS Contract",
+      "integration_id": 15368
+    },
+    {
+      "context": "Apple Platform Build (macOS)",
+      "integration_id": 15368
+    },
+    {
+      "context": "Apple Platform Build (iOS)",
+      "integration_id": 15368
+    },
+    {
+      "context": "Apple Platform Build (tvOS)",
+      "integration_id": 15368
+    },
+    {
+      "context": "Apple Platform Build (watchOS)",
+      "integration_id": 15368
+    },
+    {
+      "context": "Apple Platform Build (visionOS)",
+      "integration_id": 15368
+    },
+    {
+      "context": "CodeQL / Swift (swift)",
+      "integration_id": 15368
+    }
+  ]
+}

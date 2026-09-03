@@ -1,0 +1,25 @@
+name: Feature request
+description: Propose a bounded streaming capability or API refinement.
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Describe the consumer problem before proposing an API.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: bounds
+    attributes:
+      label: Resource, security, and compatibility constraints
+      description: Note relevant limits, URL/trust policy, cancellation, and migration impact.
+    validations:
+      required: true

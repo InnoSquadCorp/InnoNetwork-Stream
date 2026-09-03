@@ -1,0 +1,175 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  INNONETWORK_LOCAL_PATH: ${{ github.workspace }}/.dependencies/InnoNetwork
+
+jobs:
+  dependency-review:
+    name: Dependency Review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: low
+          fail-on-scopes: runtime, development, unknown
+
+  lint:
+    name: Lint (swift-format)
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - name: Checkout InnoStream
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Select Xcode 26.0.1
+        run: sudo xcode-select -s /Applications/Xcode_26.0.1.app
+      - name: Run swift-format lint
+        run: bash Scripts/format.sh --lint
+
+  build-and-test:
+    name: Build and Test (SwiftPM) — Xcode ${{ matrix.xcode.label }}
+    runs-on: ${{ matrix.xcode.runner }}
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        xcode:
+          - label: "26.0.1"
+            runner: macos-15
+            path: /Applications/Xcode_26.0.1.app
+          - label: "27.0"
+            runner: xcode-27
+            path: /Applications/Xcode.app
+    steps:
+      - name: Checkout InnoStream
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Checkout InnoNetwork main
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: InnoSquadCorp/InnoNetwork
+          ref: main
+          path: .dependencies/InnoNetwork
+          persist-credentials: false
+      - name: Select Xcode
+        run: sudo xcode-select -s ${{ matrix.xcode.path }}
+      - name: Show toolchain versions
+        run: |
+          xcodebuild -version
+          xcrun swift --version
+      - name: Resolve dependencies
+        run: xcrun swift package resolve
+      - name: Verify dependency lock did not drift
+        run: git diff --exit-code -- Package.resolved
+      - name: Run tests
+        run: xcrun swift test --parallel
+
+  contracts:
+    name: Docs / API / HLS Contract
+    runs-on: xcode-27
+    timeout-minutes: 60
+    steps:
+      - name: Checkout InnoStream
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Checkout InnoNetwork main
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: InnoSquadCorp/InnoNetwork
+          ref: main
+          path: .dependencies/InnoNetwork
+          persist-credentials: false
+      - name: Select Xcode 27
+        run: sudo xcode-select -s /Applications/Xcode.app
+      - name: Validate scripts and documentation
+        run: |
+          bash -n Scripts/*.sh Scripts/tests/*.sh
+          python3 -m py_compile Scripts/*.py
+          bash Scripts/tests/test_validate_docs_release_state.sh
+          bash Scripts/tests/test_validate_release_candidate.sh
+          bash Scripts/tests/test_validate_release_ref.sh
+          bash Scripts/tests/test_validate_hls_with_apple_tools.sh
+          bash Scripts/validate_docs_release_state.sh --expect draft
+      - name: Validate public API
+        run: bash Scripts/check_public_api_contract.sh
+      - name: Run HLS contract gates
+        run: bash Scripts/run_hls_quality_gates.sh
+
+  platform-build:
+    name: Apple Platform Build (${{ matrix.runtime }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runtime: macOS
+            runner: macos-15
+            builder: xcodebuild
+            destination: platform=macOS
+          - runtime: iOS
+            runner: macos-15
+            builder: xcodebuild
+            destination: generic/platform=iOS Simulator
+          - runtime: tvOS
+            runner: macos-15
+            builder: swiftpm-cross
+            sdk: appletvos
+            triple: arm64-apple-tvos16.0
+          - runtime: watchOS
+            runner: macos-15
+            builder: swiftpm-cross
+            sdk: watchos
+            triple: arm64_32-apple-watchos9.0
+          - runtime: visionOS
+            runner: macos-15
+            builder: swiftpm-cross
+            sdk: xros
+            triple: arm64-apple-xros1.0
+    steps:
+      - name: Checkout InnoStream
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Checkout InnoNetwork main
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: InnoSquadCorp/InnoNetwork
+          ref: main
+          path: .dependencies/InnoNetwork
+          persist-credentials: false
+      - name: Select Xcode 26.0.1
+        run: sudo xcode-select -s /Applications/Xcode_26.0.1.app
+      - name: Build with xcodebuild
+        if: matrix.builder == 'xcodebuild'
+        run: |
+          xcodebuild \
+            -scheme InnoStream-Package \
+            -destination '${{ matrix.destination }}' \
+            -derivedDataPath '.build/platform-${{ matrix.runtime }}' \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+      - name: Build with SwiftPM cross compilation
+        if: matrix.builder == 'swiftpm-cross'
+        run: |
+          bash Scripts/build_apple_platform_targets.sh \
+            '${{ matrix.runtime }}' \
+            '${{ matrix.sdk }}' \
+            '${{ matrix.triple }}' \
+            '.build/platform-${{ matrix.runtime }}'
