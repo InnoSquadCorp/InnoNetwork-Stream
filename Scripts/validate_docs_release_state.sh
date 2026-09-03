@@ -34,6 +34,7 @@ esac
 
 required_paths=(
   docs/releases/1.0.0.md
+  docs/ROADMAP.md
   API_STABILITY.md
   README.md
   CHANGELOG.md
@@ -68,10 +69,16 @@ api="$validation_root/API_STABILITY.md"
 readme="$validation_root/README.md"
 changelog="$validation_root/CHANGELOG.md"
 security="$validation_root/SECURITY.md"
+roadmap="$validation_root/docs/ROADMAP.md"
 
-for path in "$notes" "$api" "$readme" "$changelog" "$security"; do
+for path in "$notes" "$api" "$readme" "$changelog" "$security" "$roadmap"; do
   [[ -f "$path" ]] || { echo "docs-release-state: missing ${path#"$validation_root/"}" >&2; exit 1; }
 done
+
+grep -Fqx '## 1.0.0 Release Boundary' "$roadmap"
+grep -Fqx '## 1.1.0 Candidate Scope' "$roadmap"
+grep -Fq '[Roadmap](docs/ROADMAP.md)' "$readme"
+grep -Fq 'No 1.1 candidate below is a blocker for 1.0.' "$roadmap"
 
 marker_count="$(grep -Ec '<!-- release-status: (draft|ready) -->' "$notes")"
 [[ "$marker_count" == "1" ]] \
