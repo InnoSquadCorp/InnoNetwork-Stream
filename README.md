@@ -8,7 +8,7 @@ the existing module and product names so application imports do not change:
 
 ```swift
 .package(
-    url: "https://github.com/InnoSquad/InnoStream.git",
+    url: "https://github.com/InnoSquadCorp/InnoStream.git",
     .upToNextMajor(from: "1.0.0")
 )
 ```
@@ -23,9 +23,13 @@ Choose only the products the application needs:
 | `InnoNetworkHLSAudio` | Decoded-audio output and pacing |
 
 The package requires InnoNetwork 6 for bounded HTTP transfer, retry policy,
-request context, trust, redirect, metrics, and observability contracts. A
-checkout beside `InnoNetwork-6-roadmap` automatically uses that local package;
-other checkouts resolve the published InnoNetwork 6 dependency.
+request context, trust, redirect, metrics, and observability contracts. It
+resolves the published dependency by default. Before the 6.0 release, or while
+developing both packages together, select a local checkout explicitly:
+
+```bash
+INNONETWORK_LOCAL_PATH=/path/to/InnoNetwork swift test
+```
 
 ## Development
 

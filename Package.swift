@@ -7,18 +7,23 @@ let strictSettings: [SwiftSetting] = [
     .swiftLanguageMode(.v6)
 ]
 
-let localInnoNetworkPath = "../InnoNetwork-6-roadmap"
 let innoNetworkDependency: Package.Dependency
-if FileManager.default.fileExists(
-    atPath: localInnoNetworkPath + "/Package.swift"
-) {
+if let localInnoNetworkPath = ProcessInfo.processInfo.environment[
+    "INNONETWORK_LOCAL_PATH"
+] {
+    precondition(
+        FileManager.default.fileExists(
+            atPath: localInnoNetworkPath + "/Package.swift"
+        ),
+        "INNONETWORK_LOCAL_PATH must point to an InnoNetwork package checkout."
+    )
     innoNetworkDependency = .package(
         name: "InnoNetwork",
         path: localInnoNetworkPath
     )
 } else {
     innoNetworkDependency = .package(
-        url: "https://github.com/InnoSquad/InnoNetwork.git",
+        url: "https://github.com/InnoSquadCorp/InnoNetwork.git",
         .upToNextMajor(from: "6.0.0")
     )
 }
