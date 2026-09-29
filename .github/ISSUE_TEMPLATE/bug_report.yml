@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a reproducible InnoStream defect.
+description: Report a reproducible InnoNetwork-Stream defect.
 title: "[Bug]: "
 labels: [bug]
 body:
@@ -9,7 +9,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: InnoStream version or commit
+      label: InnoNetwork-Stream version or commit
     validations:
       required: true
   - type: input

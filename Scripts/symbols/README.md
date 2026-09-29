@@ -1,6 +1,6 @@
 # Public API snapshots
 
-The four allowlists record every public declaration owned by an InnoStream
+The four allowlists record every public declaration owned by an InnoNetwork-Stream
 module. `Scripts/check_public_api_contract.sh` regenerates Swift symbol graphs,
 compares them exactly, and enforces the ceilings in `budgets.tsv`.
 

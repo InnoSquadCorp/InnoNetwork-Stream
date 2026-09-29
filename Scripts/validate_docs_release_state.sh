@@ -103,7 +103,7 @@ if [[ "$state" == "draft" ]]; then
   grep -Fq '# API Stability (1.0 Draft)' "$api"
   grep -Fq '`1.0.0` is currently an unreleased draft.' "$readme"
   grep -Fq 'These changes have not been tagged.' "$changelog"
-  grep -Fq 'No stable InnoStream tag exists yet.' "$security"
+  grep -Eq 'No stable (InnoStream|InnoNetwork-Stream) tag exists yet\.' "$security"
   if grep -Eq '^## \[1\.0\.0\] - [0-9]{4}-[0-9]{2}-[0-9]{2}$' "$changelog"; then
     echo "docs-release-state: draft changelog must not claim a 1.0.0 release" >&2
     exit 1

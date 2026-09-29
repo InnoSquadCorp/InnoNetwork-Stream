@@ -31,7 +31,7 @@ KINDS = {
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Collect InnoStream public symbol-graph rows."
+        description="Collect InnoNetwork-Stream public symbol-graph rows."
     )
     parser.add_argument("repo_root", type=Path)
     args = parser.parse_args()

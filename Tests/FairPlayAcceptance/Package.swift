@@ -17,7 +17,7 @@ let package = Package(
             dependencies: [
                 .product(
                     name: "InnoNetworkHLSAVFoundation",
-                    package: "InnoStream"
+                    package: "InnoNetwork-Stream"
                 )
             ],
             path: "Tests/FairPlayAcceptanceTests",

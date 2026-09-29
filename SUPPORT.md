@@ -1,6 +1,6 @@
 # Support
 
-InnoStream is maintained under a lightweight maintainer model.
+InnoNetwork-Stream is maintained under a lightweight maintainer model.
 
 ## What to Expect
 

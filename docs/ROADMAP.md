@@ -2,20 +2,20 @@
 
 ## 1.0.0 Release Boundary
 
-InnoStream is independently versioned from InnoNetwork. Its first release is
+InnoNetwork-Stream is independently versioned from InnoNetwork. Its first release is
 therefore `1.0.0`, not `6.0.0`, and the follow-up minor is `1.1.0`, not
 `6.1.0`. The 1.0 draft preserves the four HLS product and module names while
 moving their package ownership out of InnoNetwork.
 
 No 1.1 candidate below is a blocker for 1.0. The 1.0 exit gate remains the
 documented clean remote resolution order: publish InnoNetwork 6.0.0, validate
-InnoStream without a local override, publish InnoStream 1.0.0, and then build a
+InnoNetwork-Stream without a local override, publish InnoNetwork-Stream 1.0.0, and then build a
 clean external consumer from both tags.
 
 ## 1.1.0 Candidate Scope
 
 The first minor should harden real playback and offline operations without
-turning InnoStream into a player UI, CDN, packager, or DRM credential owner.
+turning InnoNetwork-Stream into a player UI, CDN, packager, or DRM credential owner.
 Every candidate must be additive, independently releasable, and backed by a
 named adopter or a reproducible media fixture.
 

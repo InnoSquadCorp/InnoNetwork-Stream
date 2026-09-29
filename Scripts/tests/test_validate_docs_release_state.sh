@@ -4,6 +4,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 bash "$repo_root/Scripts/validate_docs_release_state.sh" --expect draft
+bash "$repo_root/Scripts/validate_docs_release_state.sh" --expect draft --ref HEAD
 
 if bash "$repo_root/Scripts/validate_docs_release_state.sh" --expect ready \
   >/dev/null 2>&1; then

@@ -12,9 +12,10 @@ fail() {
 }
 
 [[ -f "$budgets_file" ]] || fail "missing Scripts/symbols/budgets.tsv"
+bash Scripts/check_innonetwork_dependency.sh
 
 find .build -path '*/symbolgraph/*.symbols.json' -type f -delete 2>/dev/null || true
-xcrun swift package dump-symbol-graph \
+xcrun swift package --force-resolved-versions dump-symbol-graph \
   --minimum-access-level public \
   --skip-synthesized-members >/dev/null
 

@@ -31,27 +31,20 @@ jobs:
       fail-fast: false
       matrix:
         language: [swift]
-    env:
-      INNONETWORK_LOCAL_PATH: ${{ github.workspace }}/.dependencies/InnoNetwork
     steps:
-      - name: Checkout InnoStream
+      - name: Checkout InnoNetwork-Stream
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Checkout InnoNetwork main
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          repository: InnoSquadCorp/InnoNetwork
-          ref: main
-          path: .dependencies/InnoNetwork
-          persist-credentials: false
       - name: Select Xcode 26.0.1
         run: sudo xcode-select -s /Applications/Xcode_26.0.1.app
+      - name: Verify published InnoNetwork dependency
+        run: bash Scripts/check_innonetwork_dependency.sh
       - name: Initialize CodeQL
         uses: github/codeql-action/init@9e0d7b8d25671d64c341c19c0152d693099fb5ba # v4.35.5
         with:
           languages: ${{ matrix.language }}
           queries: security-extended,security-and-quality
       - name: Build
-        run: xcrun swift build
+        run: xcrun swift build --force-resolved-versions
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@9e0d7b8d25671d64c341c19c0152d693099fb5ba # v4.35.5
         with:

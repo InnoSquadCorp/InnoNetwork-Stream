@@ -29,10 +29,12 @@ jobs:
         run: |
           bash -n Scripts/*.sh Scripts/tests/*.sh
           python3 -m py_compile Scripts/*.py
+          bash Scripts/tests/test_check_innonetwork_dependency.sh
           bash Scripts/tests/test_validate_docs_release_state.sh
           bash Scripts/tests/test_validate_release_candidate.sh
           bash Scripts/tests/test_validate_release_ref.sh
           bash Scripts/tests/test_validate_hls_with_apple_tools.sh
+          bash Scripts/tests/test_package_identity.sh
       - name: Validate tagged release ref
         if: github.event_name == 'push'
         env:
@@ -58,10 +60,10 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           mkdir -p .build/release-artifacts
-          archive=".build/release-artifacts/InnoStream-$RELEASE_TAG.tar.gz"
+          archive=".build/release-artifacts/InnoNetwork-Stream-$RELEASE_TAG.tar.gz"
           git archive \
             --format=tar.gz \
-            --prefix="InnoStream-$RELEASE_TAG/" \
+            --prefix="InnoNetwork-Stream-$RELEASE_TAG/" \
             --output="$archive" \
             "$RELEASE_TAG"
           (cd .build/release-artifacts && shasum -a 256 "$(basename "$archive")" > SHA256SUMS)
@@ -69,9 +71,9 @@ jobs:
         if: github.event_name == 'push'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: InnoStream-${{ github.ref_name }}-release-artifacts
+          name: InnoNetwork-Stream-${{ github.ref_name }}-release-artifacts
           path: |
-            .build/release-artifacts/InnoStream-${{ github.ref_name }}.tar.gz
+            .build/release-artifacts/InnoNetwork-Stream-${{ github.ref_name }}.tar.gz
             .build/release-artifacts/SHA256SUMS
             .build/local-release-preflight/apple-hls/
           if-no-files-found: error
@@ -83,7 +85,7 @@ jobs:
         run: |
           gh release create "$RELEASE_TAG" \
             --verify-tag \
-            --title "InnoStream $RELEASE_TAG" \
+            --title "InnoNetwork-Stream $RELEASE_TAG" \
             --notes-file "docs/releases/$RELEASE_TAG.md" \
-            ".build/release-artifacts/InnoStream-$RELEASE_TAG.tar.gz" \
+            ".build/release-artifacts/InnoNetwork-Stream-$RELEASE_TAG.tar.gz" \
             .build/release-artifacts/SHA256SUMS

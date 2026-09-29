@@ -29,7 +29,7 @@ if let localInnoNetworkPath = ProcessInfo.processInfo.environment[
 }
 
 let package = Package(
-    name: "InnoStream",
+    name: "InnoNetwork-Stream",
     defaultLocalization: "en",
     platforms: [
         .iOS(.v16),
@@ -39,6 +39,15 @@ let package = Package(
         .visionOS(.v1),
     ],
     products: [
+        .library(
+            name: "InnoNetwork-Stream",
+            targets: [
+                "InnoNetworkHLS",
+                "InnoNetworkHLSLive",
+                "InnoNetworkHLSAVFoundation",
+                "InnoNetworkHLSAudio",
+            ]
+        ),
         .library(name: "InnoNetworkHLS", targets: ["InnoNetworkHLS"]),
         .library(name: "InnoNetworkHLSLive", targets: ["InnoNetworkHLSLive"]),
         .library(

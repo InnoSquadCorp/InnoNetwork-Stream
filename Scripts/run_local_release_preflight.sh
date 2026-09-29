@@ -15,6 +15,11 @@ case "${1:-}" in
     ;;
 esac
 
+if [[ "${INNONETWORK_LOCAL_PATH+x}" == "x" ]]; then
+  echo "local-release-preflight: unset INNONETWORK_LOCAL_PATH to validate the published dependency" >&2
+  exit 64
+fi
+
 swift_version="$(xcrun swift --version | sed -nE 's/^Apple Swift version ([0-9]+)\.([0-9]+).*/\1.\2/p' | head -n 1)"
 swift_major="${swift_version%%.*}"
 swift_minor="${swift_version##*.}"
@@ -24,14 +29,18 @@ if [[ -z "$swift_version" ]] \
   exit 69
 fi
 
+resolved_before="$(shasum -a 256 Package.resolved)"
+bash Scripts/check_innonetwork_dependency.sh
+[[ "$(shasum -a 256 Package.resolved)" == "$resolved_before" ]] \
+  || { echo "local-release-preflight: dependency lock drifted" >&2; exit 1; }
+
 bash Scripts/format.sh --lint
 bash Scripts/validate_docs_release_state.sh
 bash Scripts/check_public_api_contract.sh
+bash Scripts/tests/test_package_identity.sh
 bash -n Scripts/*.sh
 python3 -m py_compile Scripts/*.py
-xcrun swift package resolve
-git diff --exit-code -- Package.resolved
-xcrun swift test --parallel
+xcrun swift test --force-resolved-versions --parallel
 
 if [[ "$mode" == "full" ]]; then
   bash Scripts/run_hls_quality_gates.sh \
@@ -41,13 +50,13 @@ if [[ "$mode" == "full" ]]; then
     --apple-report-root .build/local-release-preflight/apple-hls
 
   xcodebuild \
-    -scheme InnoStream-Package \
+    -scheme InnoNetwork-Stream-Package \
     -destination 'platform=macOS' \
     -derivedDataPath .build/local-release-preflight/macos \
     CODE_SIGNING_ALLOWED=NO \
     build
   xcodebuild \
-    -scheme InnoStream-Package \
+    -scheme InnoNetwork-Stream-Package \
     -destination 'generic/platform=iOS Simulator' \
     -derivedDataPath .build/local-release-preflight/ios-simulator \
     CODE_SIGNING_ALLOWED=NO \
@@ -64,5 +73,8 @@ if [[ "$mode" == "full" ]]; then
 else
   bash Scripts/run_hls_quality_gates.sh --skip-build
 fi
+
+[[ "$(shasum -a 256 Package.resolved)" == "$resolved_before" ]] \
+  || { echo "local-release-preflight: dependency lock drifted" >&2; exit 1; }
 
 echo "local-release-preflight: OK ($mode)"

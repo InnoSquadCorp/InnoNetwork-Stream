@@ -8,7 +8,7 @@ request before the maintainers have acknowledged the report.
 
 1. **Preferred — GitHub Private Vulnerability Reporting (GHSA).**
    Open a private advisory at
-   <https://github.com/InnoSquadCorp/InnoStream/security/advisories/new>.
+   <https://github.com/InnoSquadCorp/InnoNetwork-Stream/security/advisories/new>.
    This routes directly to the maintainers and creates a tracking
    advisory that we can publish alongside the fix.
 2. **Fallback — direct contact.** If GHSA reporting is unavailable or
@@ -29,11 +29,11 @@ Whichever channel you use, please include:
 
 ## Supported Versions
 
-- No stable InnoStream tag exists yet. Reports against `main` are assessed as
+- No stable InnoNetwork-Stream tag exists yet. Reports against `main` are assessed as
   prerelease findings.
 - After `1.0.0`, the latest `1.x` minor is the actively supported line.
 - HLS code previously published by InnoNetwork follows InnoNetwork's support
-  policy until applications migrate to InnoStream.
+  policy until applications migrate to InnoNetwork-Stream.
 
 ## Disclosure
 

@@ -1,4 +1,4 @@
-# InnoStream repository instructions
+# InnoNetwork-Stream repository instructions
 
 - Support Apple platforms only and use Swift 6 language mode with strict
   concurrency.

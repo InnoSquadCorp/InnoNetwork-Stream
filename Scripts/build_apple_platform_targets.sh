@@ -24,6 +24,7 @@ esac
 
 command -v jq >/dev/null 2>&1 \
   || { echo "jq is required to discover library targets" >&2; exit 69; }
+bash "$repo_root/Scripts/check_innonetwork_dependency.sh"
 sdk_path="$(xcrun --sdk "$sdk" --show-sdk-path)"
 
 targets=()
@@ -38,6 +39,7 @@ done < <(
 for target in "${targets[@]}"; do
   xcrun swift build \
     --package-path "$repo_root" \
+    --force-resolved-versions \
     --scratch-path "$scratch_path" \
     --triple "$target_triple" \
     --sdk "$sdk_path" \

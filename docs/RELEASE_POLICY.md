@@ -4,7 +4,7 @@
 
 - Public releases follow semantic versioning.
 - Product or module removal, deployment-floor increases, and dependency moves
-  to a new InnoNetwork major require an InnoStream major release.
+  to a new InnoNetwork major require an InnoNetwork-Stream major release.
 - Public declaration removals or renames require a major release.
 - Minor releases may add Provisionally Stable declarations or enum cases when
   the changelog documents the migration impact.
@@ -12,15 +12,24 @@
 
 ## Dependency order
 
-InnoStream 1.0 depends on InnoNetwork 6.0. The publication order is therefore:
+InnoNetwork-Stream 1.0 depends on InnoNetwork 6.0. The publication order is therefore:
 
 1. publish and verify InnoNetwork `6.0.0`
-2. resolve InnoStream without `INNONETWORK_LOCAL_PATH`
-3. publish and verify InnoStream `1.0.0`
+2. resolve InnoNetwork-Stream without `INNONETWORK_LOCAL_PATH`
+3. publish and verify InnoNetwork-Stream `1.0.0`
 4. migrate downstream applications only after both tags are available
 
 Local-path builds are useful integration evidence but cannot replace a clean
 remote-tag consumer build.
+
+CI and CodeQL use the checked-in remote dependency lock. Release preflight
+requires `INNONETWORK_LOCAL_PATH` to be unset and rejects automatic dependency
+resolution or lock changes. Update the lock intentionally when validating a
+new supported InnoNetwork release.
+
+`Scripts/check_innonetwork_dependency.sh` verifies the remote InnoNetwork 6
+pin and every active remote dependency's resolved graph and checkout revision. A
+cached SwiftPM workspace does not substitute for a valid checked-in pin.
 
 ## Release process
 

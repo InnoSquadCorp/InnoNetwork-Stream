@@ -1,6 +1,6 @@
 # API Stability (1.0 Draft)
 
-InnoStream preserves the HLS product and module names that previously shipped
+InnoNetwork-Stream preserves the HLS product and module names that previously shipped
 from InnoNetwork. No `1.0.0` tag exists yet, so `main` is a development
 snapshot rather than a released dependency.
 
@@ -8,7 +8,8 @@ snapshot rather than a released dependency.
 
 The following package-level decisions are intended to become Stable at 1.0.0:
 
-- the `InnoStream` package identity
+- the `innonetwork-stream` package identity and `InnoNetwork-Stream` display
+  name, repository name, and all-in-one library product
 - the `InnoNetworkHLS`, `InnoNetworkHLSLive`,
   `InnoNetworkHLSAVFoundation`, and `InnoNetworkHLSAudio` product and module
   names
@@ -18,7 +19,12 @@ The following package-level decisions are intended to become Stable at 1.0.0:
   admission, retry, trust, and observability contracts
 
 Removing a product, renaming a module, raising a deployment floor, or moving
-to a new InnoNetwork major requires an InnoStream major release.
+to a new InnoNetwork major requires an InnoNetwork-Stream major release.
+
+The package was called `InnoStream` before its first release. Local consumers
+must change their package path/URL and `package:` argument; the four module
+imports remain unchanged. The all-in-one product groups those modules but does
+not introduce a hyphenated Swift module or re-export wrapper.
 
 ## Provisionally Stable declarations
 
@@ -57,7 +63,7 @@ should prefer a minor-bound range:
 
 ```swift
 .package(
-    url: "https://github.com/InnoSquadCorp/InnoStream.git",
+    url: "https://github.com/InnoSquadCorp/InnoNetwork-Stream.git",
     .upToNextMinor(from: "1.0.0")
 )
 ```

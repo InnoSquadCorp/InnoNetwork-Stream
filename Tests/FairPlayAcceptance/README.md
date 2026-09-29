@@ -1,7 +1,7 @@
 # FairPlay acceptance gate
 
 This isolated test package is an opt-in, physical-iOS-device acceptance harness for
-`InnoNetworkHLSAVFoundation` from InnoStream. It deliberately contains no FairPlay
+`InnoNetworkHLSAVFoundation` from InnoNetwork-Stream. It deliberately contains no FairPlay
 certificate, content identifier, authorization value, key material, or KSM
 policy. The harness requires iOS 17 or newer because it executes through the
 Swift Testing runtime; the shipping library retains its iOS 16 deployment
