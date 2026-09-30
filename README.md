@@ -58,13 +58,13 @@ Resolve and test the published dependency with:
 
 ```bash
 env -u INNONETWORK_LOCAL_PATH bash Scripts/check_innonetwork_dependency.sh
-env -u INNONETWORK_LOCAL_PATH swift test --force-resolved-versions --parallel
+env -u INNONETWORK_LOCAL_PATH bash Scripts/swiftpm.sh test --force-resolved-versions --parallel
 ```
 
 When developing both packages together, select a local checkout explicitly:
 
 ```bash
-INNONETWORK_LOCAL_PATH=/path/to/InnoNetwork swift test
+INNONETWORK_LOCAL_PATH=/path/to/InnoNetwork bash Scripts/swiftpm.sh test
 ```
 
 Unset `INNONETWORK_LOCAL_PATH` before release preflight. Local-path testing is
@@ -83,10 +83,10 @@ with `--dry-run`. This does not replace full CI/release preflight; final candida
 still require `bash Scripts/run_local_release_preflight.sh --full`.
 
 ```bash
-swift test --filter InnoNetworkHLSTests
-swift test --filter InnoNetworkHLSLiveTests
-swift test --filter InnoNetworkHLSAVFoundationTests
-swift test --filter InnoNetworkHLSAudioTests
+bash Scripts/swiftpm.sh test --filter InnoNetworkHLSTests
+bash Scripts/swiftpm.sh test --filter InnoNetworkHLSLiveTests
+bash Scripts/swiftpm.sh test --filter InnoNetworkHLSAVFoundationTests
+bash Scripts/swiftpm.sh test --filter InnoNetworkHLSAudioTests
 ```
 
 Strict Swift 6 concurrency is enabled for every target. The package is

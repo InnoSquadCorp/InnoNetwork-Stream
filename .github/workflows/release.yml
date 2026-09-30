@@ -54,6 +54,13 @@ jobs:
         run: bash Scripts/validate_release_candidate.sh
       - name: Run full release preflight
         run: bash Scripts/run_local_release_preflight.sh --full
+      - name: Preserve HLS startup and runtime failures
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-hls-runtime-diagnostics
+          path: .build/hls-runtime-diagnostics/
+          if-no-files-found: ignore
       - name: Prepare tagged source archive
         if: github.event_name == 'push'
         env:
