@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import InnoNetwork
 import InnoNetworkHLS
@@ -20,6 +21,58 @@ enum ConsumerDVR {}
 enum ConsumerPlayback {}
 @HLSCatalogDefinition(maximumEntries: 3, maximumSnapshotBytes: 2048)
 enum ConsumerCatalog {}
+
+// Exact README backend examples: compile effects, invoke settings only below.
+@HLSLiveDefinition
+enum ChannelWatch {}
+@HLSDVRDefinition(maximumDurationSeconds: 1800, maximumSegmentCount: 900)
+enum ChannelArchive {}
+@HLSPlaybackDefinition(maximumPeakBitRate: 10_000_000, maximumWidth: 1920, maximumHeight: 1080)
+enum PlaybackProfile {}
+@HLSCatalogDefinition(maximumEntries: 128, maximumSnapshotBytes: 65_536)
+enum MediaLibrary {}
+
+func watchChannel(source: URL, session: URLSession) throws -> HLSLiveWatching {
+    try ChannelWatch.watch(from: source, session: session)
+}
+func recordChannel(source: URL, destination: URL, client: HLSLivePlaylistClient) throws -> HLSLiveDVRRecording {
+    try ChannelArchive.startRecording(from: source, to: destination, client: client)
+}
+@MainActor
+func configurePlayback(item: AVPlayerItem) async throws -> HLSPlaybackConfigurationResult {
+    try await PlaybackProfile.apply(to: item)
+}
+func makeMediaLibrary(store: any HLSMediaCatalogPersisting) throws -> HLSMediaCatalog {
+    try MediaLibrary.makeCatalog(persistence: store)
+}
+@InnoNetworkHLSLive.HLSLiveDefinition
+enum QualifiedLive {}
+
+// Compile-time isolation control: configuration generation is pure.
+@MainActor
+@HLSDownloadDefinition
+enum IsolatedDownload {}
+@MainActor
+@HLSLiveDefinition
+enum IsolatedLive {}
+@MainActor
+@HLSDVRDefinition
+enum IsolatedDVR {}
+@MainActor
+@HLSPlaybackDefinition
+enum IsolatedPlayback {}
+@MainActor
+@HLSCatalogDefinition
+enum IsolatedCatalog {}
+
+struct ManualLive: HLSLiveDefining { static func configuration() throws -> HLSLiveConfiguration { try .validated() } }
+struct ManualDVR: HLSDVRDefining { static func configuration() throws -> HLSLiveDVRConfiguration { try .validated() } }
+struct ManualPlayback: HLSPlaybackDefining {
+    static func configuration() throws -> HLSPlaybackConfiguration { try .validated() }
+}
+struct ManualCatalog: HLSCatalogDefining {
+    static func configuration() throws -> HLSMediaCatalogConfiguration { try .validated() }
+}
 
 // Compile backend-specific entry points without initiating external effects.
 func observeLive(source: URL, session: URLSession) throws -> HLSLiveWatching {
@@ -77,6 +130,19 @@ let catalogRecord = try HLSMediaRecord(id: HLSMediaID(), ownership: .application
 try await catalog.upsert(catalogRecord)
 let catalogSnapshot = await catalog.snapshot()
 precondition(catalogSnapshot.count == 1)
+_ = try ManualLive.makeClient()
+_ = try ManualDVR.configuration()
+_ = try ManualPlayback.configuration()
+_ = try ManualCatalog.makeCatalog()
+_ = try QualifiedLive.configuration()
+// All five pure generated configuration factories work across actor boundaries.
+_ = try await Task.detached {
+    _ = try IsolatedDownload.makeDownloader()
+    _ = try IsolatedLive.makeClient()
+    _ = try IsolatedDVR.configuration()
+    _ = try IsolatedPlayback.configuration()
+    _ = try IsolatedCatalog.makeCatalog()
+}.value
 precondition(ConsumerEndpoint().path == "/fixture")
 
 let parsedDocument = try HLSPlaylistParser().parse(

@@ -60,6 +60,16 @@ selector overloads share name rows and require the semantic signature gate. The 
 now includes `swift.macro`, so the primary declarative surface is gated too.
 
 `Scripts/check_public_api_contract.sh` regenerates Swift symbol graphs and
+checks `public-signatures.tsv` with 2,131 distinct signatures as well as 2,126
+name rows. Signatures include overload USRs, typed declaration fragments,
+async/throws, actor attributes, generics, availability and explicit conformance
+relationships. Locations/comments do not affect the snapshot. Regenerate only
+after intentional semantic review; drift is never automatically accepted.
+The initial snapshot is generated on Xcode 27/Swift 6.4. Xcode 26 parity is an
+external gate, not inferred from a declaration count. Fixture controls verify
+that removing semantic fields changes the result without source-location noise.
+
+The name-based allowlist also
 rejects undeclared additions, removals, and renames. An intentional public API
 change must update the owning allowlist, its budget, this document, and the
 changelog in the same commit.

@@ -14,8 +14,10 @@ Storage is opt-in and app-owned. `read(maximumBytes:)` must bound allocation
 before reading. `stage` creates metadata staging without touching existing
 metadata. `commit` must atomically publish or throw without changing existing
 metadata; successful publication wins late cancellation. `discard` is idempotent
-and removes staging only. One store must serialize all writers across catalog
-instances/processes. The coordinator rejects reentrant mutations, and exposes
+and removes staging only. Use one active coordinator per store. App adapters
+must enforce exclusive writer ownership (or a revision/CAS protocol) across
+instances/processes: serialized renames alone cannot prevent stale snapshots
+overwriting another coordinator's changes. The coordinator rejects reentrant mutations, and exposes
 old metadata until successful commit.
 
 No default filesystem adapter, native asset deletion or persistent-key access

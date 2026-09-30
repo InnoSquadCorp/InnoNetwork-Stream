@@ -27,8 +27,8 @@ LL-HLS skip allocation, finite duration conversion trap, intermediate variable
 expansion, shared steering activation cancellation, and persistent FairPlay
 stage cancellation. Normal passing controls and failure evidence remain in
 `.build/code-quality-review-2026-09-30/`. Earlier full tests/TSAN are baseline
-evidence, not validation of new code. Current remote CI fails; a local redesign
-does not close remote release gates.
+evidence, not validation of new code. The baseline remote CI failure was not
+closed by this local request; a local redesign does not close remote release gates.
 
 No push, PR, branch-protection change, automation, tag, publication, consumer
 source migration, platform removal or deployment-floor increase is authorized
@@ -69,14 +69,14 @@ controls; the final status must distinguish local completion from release gates.
 | --- | --- | --- | --- |
 | 1 | Guard skip history before allocation, checked authoring comparison, budget variable expansion before append | Huge skip, huge finite duration, repeated/Unicode URI and attribute expansion; normal/boundary controls | Locally complete |
 | 2 | Shared activation waiter lifetime; FairPlay stage admission and persistent-write commit semantics | One/all cancelled waiters, surviving waiter, native completion after cancellation, each DRM stage and once-only completion | Locally complete; provider acceptance excluded |
-| 3 | Validated immutable limits/configuration and effective settings | Invalid dynamic values typed failures, exact accepted boundaries, existing normalized compatibility path explicit | Initial VOD configuration locally complete; other backend settings in step 7 |
-| 4 | Dedicated macro target and initial download definition; compile-time bounds/collision diagnostics | Exact expansions, invalid declarations, no conditional DEBUG surface, actual external macro consumer | Initial VOD macro locally complete, Draft |
+| 3 | Validated immutable limits/configuration and effective settings | Invalid dynamic values typed failures, exact accepted boundaries, existing normalized compatibility path explicit | Locally complete for VOD, Live, DVR, playback and catalog workflows; advanced normalized paths explicit |
+| 4 | Dedicated macro target and initial download definition; compile-time bounds/collision diagnostics | Exact expansions, invalid declarations, no conditional DEBUG surface, actual external macro consumer | Five macro workflows locally complete, Draft; pure generated configuration is nonisolated |
 | 5 | Explicit foreground download operation handle, independent bounded subscriptions, awaitable receipt and terminal ownership | Zero/slow/multiple observers; result waiter vs operation cancel; late commit; cleanup and limits | VOD lifetime locally complete, Draft |
 | 6 | Discriminated parser-produced model views, pure parser/loader effect separation and macro-first advisory preparation | Kind invariants, complete metadata preservation, lenient inspection vs unsupported execution, trust/redirect boundaries | Locally complete; flat authoring constructor internal, typed backend planning and migration documented |
 | 7 | Generalize coherent lifetime APIs to live/DVR/native adapters and stage transitions | Existing DVR intent/native background behavior retained; observation cannot cancel background work | Locally complete; backend-specific macros, watch owner and independent DVR results/observations |
 | 8 | Optional bounded/versioned media metadata coordinator and explicit reconciliation | No implicit deletion/move of app/native/key resources, atomic persistence, migration/corruption limits | Locally complete; opt-in macro/catalog, staged app persistence, v0/v1 validation and ownership-specific reconciliation |
 | 9 | Structured parse/config/operation failures, capability/recovery and bounded redacted incidents | Preserve error codes/security redaction, drop/sequence semantics and backend-specific support | Locally complete; export-safe reports, backend-aware advisory recovery and bounded scalar incident composition |
-| 10 | Macro-first examples/migration, semantic API checks and affected fast/full CI contract | External macro/manual consumers, exact counts, trust/readiness diagnostics; final full regression/runtime/API/format | Consumer/docs/count-based gate prepared; semantic API/selection/remote gates pending |
+| 10 | Macro-first examples/migration, semantic API checks and affected fast/full CI contract | External macro/manual consumers, exact counts, trust/readiness diagnostics; final full regression/runtime/API/format | Locally complete; consolidated full preflight, full TSAN and Debug/Release consumers pass; remote/adopter gates remain |
 
 The first macro is a focused download definition rather than an umbrella
 service. It validates declaration shape and constant limits, and generates
@@ -85,10 +85,10 @@ owner as the manual equivalent. Expansion tests alone do not prove runtime
 semantics. Add live/native definitions only when their distinct ownership
 contracts are verified, not by generating one generic method for every backend.
 
-### Remaining implementation order
+### Approved execution order (historical)
 
-This is the first coherent local candidate, not completion of all ten slices.
-It adds migration paths before destructive public-surface removal. The pure
+These slices were executed sequentially with local commits. The final local
+validation record is separate from release readiness. The pure
 parser stays in the existing HLS module; no independent, dependency-free parser
 product or measured binary/build-size improvement is claimed.
 
@@ -206,3 +206,35 @@ gates. Tests passing locally are not release-ready proof.
   internal test construction now explicitly uses that boundary. Name rows stay
   1,942 (one constructor removed, loader added), while typed overload semantics
   remain a step 10 gate. Migration is in `docs/MACRO_FIRST_MIGRATION.md`.
+- Steps 7-9 were committed sequentially as `d424ec5`, `6a99fa4` and `501a294`:
+  Live/DVR/playback macros and distinct lifetimes; bounded opt-in metadata
+  transactions; structured recovery and export-safe incidents. The capability
+  correction `c9ca39d` retains actual VOD/offline durable checkpoint support,
+  verified by 24 focused resume/download/failure controls. No native ownership,
+  persisted checkpoint schema or published Network API was rewritten.
+- Step 10 adds semantic overload/isolation/conformance snapshots, versioned
+  wire fixtures and a fail-closed reverse-dependency local test selector.
+  Three semantic mutation controls and eight selection controls pass. Complete
+  CI/release gates remain mandatory; no remote execution was started here.
+- Preserved failing controls identified a shared test transport registry race,
+  actor-isolated generated configuration and an implicit package scheme shadowed
+  by the generated project. The new network test now shares the existing
+  serialized suite; pure macro configuration is explicitly `nonisolated` while
+  native apply remains MainActor; exact SwiftPM SDK library targets avoid the
+  preserved project without deleting it. Corrected actual-path controls pass.
+- Closing report controls exposed an optional `.none` ambiguity that suggested
+  retry/restoration for non-transient URL errors. The preserved control fails
+  24 expectations across all eight backends; explicit `HLSRecoveryAction.none`
+  fixes it without changing policy or existing transient/cancellation behavior.
+  Source validation was rerun after this correction.
+- Closing local source candidate: `final-consolidated-preflight-v2.log` exits 0
+  with 630 registered methods, 622 ordinary passes and eight deferred fixture
+  cases separately executed successfully. Apple runtime/conformance gates and
+  all four library targets on macOS/iOS/tvOS/watchOS/visionOS SDKs pass. Full
+  TSAN exits 0 with actual sanitizer linking/instrumentation checked; aggregate
+  and individual Debug consumers and the final aggregate Release consumer pass.
+  Format covers 303 files; API gates cover 2,126 name rows and 2,131 semantic
+  signatures. InnoNetwork 6.0.0/SwiftSyntax locks and all nine original generated
+  files are unchanged. See [the local validation record](MACRO_FIRST_LOCAL_VALIDATION.md)
+  for failures, corrections, logs and remaining external gates. This is local
+  implementation completion, not Ready, remote CI success or publication.

@@ -103,7 +103,7 @@ public struct HLSFailureReport: Error, Codable, Equatable, Sendable {
             category = error.code == .cancelled ? .cancelled : .transport
             recovery =
                 [.timedOut, .networkConnectionLost, .notConnectedToInternet, .cannotConnectToHost, .cannotFindHost]
-                    .contains(error.code) ? .retrySubjectToRequestPolicy : .none
+                    .contains(error.code) ? .retrySubjectToRequestPolicy : HLSRecoveryAction.none
         } else if let error = error as? any HLSFailureCategorizing {
             category = error.hlsFailureCategory
             recovery = error.hlsRecoveryAction

@@ -94,6 +94,8 @@ jobs:
           bash Scripts/tests/test_validate_release_ref.sh
           bash Scripts/tests/test_validate_hls_with_apple_tools.sh
           bash Scripts/tests/test_package_identity.sh
+          bash Scripts/tests/test_run_affected_tests.sh
+          python3 Scripts/tests/test_public_signatures.py
           bash Scripts/validate_docs_release_state.sh --expect draft
       - name: Validate public API
         run: bash Scripts/check_public_api_contract.sh

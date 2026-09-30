@@ -6,6 +6,13 @@ events.
 
 ## Overview
 
+Prefer ``HLSPlaybackDefinition`` for a declarative playback profile. It applies
+to a caller-owned item on MainActor without creating, retaining or playing a
+player. `HLSPlaybackConfiguration.validated(...)` is its dynamic equivalent.
+This foreground configuration contract does not replace system-managed
+background task IDs or session restoration. Background download event
+observation remains independent from explicit native task cancellation.
+
 ``HLSAssetDownloadSession`` is the system-backed companion to the raw
 single-file assembler in `InnoNetworkHLS`. It owns one
 `AVAssetDownloadURLSession`, reconnects by background-session identifier, and

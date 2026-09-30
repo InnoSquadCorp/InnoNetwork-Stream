@@ -1,5 +1,13 @@
 # ``InnoNetworkHLS``
 
+The macro-first surface includes ``HLSDownloadDefinition`` and the opt-in
+``HLSCatalogDefinition``. Both delegate to validated immutable runtime settings;
+expansion/construction starts no effects. ``HLSMediaCatalog`` stores bounded,
+versioned metadata through an explicit app-owned staging/atomic-commit contract,
+never automatically moving/deleting media or acquiring keys. ``HLSFailureReport``
+and ``HLSIncidentBuffer`` compose typed export-safe diagnostics separately from
+raw progress. Parsed metadata does not imply backend execution support.
+
 Resolve and download non-DRM HLS VOD streams with bounded transfers.
 
 ## Overview

@@ -65,3 +65,5 @@ total_budget="$(awk -F '\t' '$1 == "TOTAL" { print $2 }' "$budgets_file")"
   || fail "all modules export $total declarations (budget: $total_budget)"
 
 echo "public-api-contract: OK ($total/$total_budget)"
+python3 Scripts/collect_public_signatures.py . \
+  --check Scripts/symbols/public-signatures.tsv

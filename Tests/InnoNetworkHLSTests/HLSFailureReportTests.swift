@@ -29,6 +29,17 @@ struct HLSFailureReportTests {
         #expect(
             HLSFailureReport.classify(URLError(.timedOut), backend: .nativeBackgroundDownload).recovery
                 == .restoreNativeTasks)
+        let backends: [HLSOperationBackend] = [
+            .playlistInspection, .singleFileDownload, .offlinePackage, .liveWatch,
+            .liveDVR, .nativeBackgroundDownload, .nativePlayback, .decodedAudio,
+        ]
+        for backend in backends {
+            for code: URLError.Code in [.badURL, .unsupportedURL, .serverCertificateUntrusted, .cancelled] {
+                let failure = HLSFailureReport.classify(URLError(code), backend: backend)
+                #expect(failure.recovery == .none)
+                #expect(failure.category == (code == .cancelled ? .cancelled : .transport))
+            }
+        }
         let legacy = HLSDownloadError.byteRangePlaylistUnsupported
         #expect(HLSFailureReport.classify(legacy, backend: .singleFileDownload).legacyHLSCode == legacy.errorCode)
     }

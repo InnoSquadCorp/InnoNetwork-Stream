@@ -121,7 +121,7 @@ package final class HLSOperationChannel<Event: Sendable, Output: Sendable>: Send
         }
     }
 
-    private func removeSubscriber(_ id: UUID) { storage.withLock { $0.subscribers.removeValue(forKey: id) } }
+    private func removeSubscriber(_ id: UUID) { _ = storage.withLock { $0.subscribers.removeValue(forKey: id) } }
     private func complete(
         _ continuation: AsyncThrowingStream<HLSOperationObservation<Event>, Error>.Continuation,
         _ result: Result<Output, Error>

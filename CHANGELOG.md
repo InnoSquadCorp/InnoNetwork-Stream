@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Add distinct semantic API signature gates, persisted-format fixtures and
+  fail-closed reverse-dependent local test selection; keep full CI/release
+  validation mandatory. Compile all five macro workflows and manual equivalents
+  in actual Debug/Release consumers, including actor-isolated definitions.
+- Make generated pure configuration explicitly nonisolated while preserving
+  MainActor native playback effects. Isolate the new Live network fixture with
+  the existing shared-registry suite, and build exact SwiftPM SDK library
+  targets without modifying the preserved generated Xcode project. Close the
+  ten-slice local validation record; remote/adopter release gates remain open.
+- Keep non-transient URL errors out of automatic retry/checkpoint-restoration
+  advice. Distinguish explicit no-recovery from an unspecified optional recovery
+  action, with all-backend controls and retained transient/cancellation cases.
+
 - Add structured parse/operation failure reports, backend lifetime/recovery
   capabilities and explicit bounded export-safe incidents. Preserve existing
   NSError codes and suppress underlying descriptions, URLs and credentials.

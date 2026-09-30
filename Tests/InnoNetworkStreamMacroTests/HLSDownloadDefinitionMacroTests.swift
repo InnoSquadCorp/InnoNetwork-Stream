@@ -18,7 +18,7 @@ struct HLSDownloadDefinitionMacroTests {
             expandedSource: """
                 public enum MovieDownload {
 
-                    public static func configuration() throws -> InnoNetworkHLS.HLSDownloadConfiguration {
+                    public nonisolated static func configuration() throws -> InnoNetworkHLS.HLSDownloadConfiguration {
                         try InnoNetworkHLS.HLSDownloadConfiguration.validated(
                             maximumMediaResourceBytes: 1024,
                             maximumTotalDownloadBytes: 4096,
@@ -44,7 +44,7 @@ struct HLSDownloadDefinitionMacroTests {
             expandedSource: """
                 struct Download {
 
-                    static func configuration() throws -> InnoNetworkHLS.HLSDownloadConfiguration {
+                    nonisolated static func configuration() throws -> InnoNetworkHLS.HLSDownloadConfiguration {
                         try InnoNetworkHLS.HLSDownloadConfiguration.validated(
                             maximumMediaResourceBytes: 134217728,
                             maximumTotalDownloadBytes: 8589934592,

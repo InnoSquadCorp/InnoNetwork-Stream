@@ -77,6 +77,11 @@ unchanged. No old public tag or GitHub redirect is assumed to exist.
 
 ## Development
 
+For incremental local feedback, select reverse-dependent suites from an explicit
+baseline: `bash Scripts/run_affected_tests.sh --base <commit>`. Inspect the plan
+with `--dry-run`. This does not replace full CI/release preflight; final candidates
+still require `bash Scripts/run_local_release_preflight.sh --full`.
+
 ```bash
 swift test --filter InnoNetworkHLSTests
 swift test --filter InnoNetworkHLSLiveTests
@@ -140,7 +145,58 @@ setting or package-plugin bypass. Both macro expansion diagnostics and actual
 external consumer compilation are required before stabilizing this Draft API.
 
 See [the ordered implementation plan](docs/MACRO_FIRST_REDESIGN.md) for
-remaining model, live/native, storage, diagnostic and semantic CI work.
+local execution evidence and the remaining external release gates.
+
+## Live, DVR, native playback and metadata (Draft)
+
+```swift
+import AVFoundation
+import Foundation
+import InnoNetworkHLS
+import InnoNetworkHLSLive
+import InnoNetworkHLSAVFoundation
+
+@HLSLiveDefinition
+enum ChannelWatch {}
+@HLSDVRDefinition(maximumDurationSeconds: 1800, maximumSegmentCount: 900)
+enum ChannelArchive {}
+@HLSPlaybackDefinition(maximumPeakBitRate: 10_000_000, maximumWidth: 1920, maximumHeight: 1080)
+enum PlaybackProfile {}
+@HLSCatalogDefinition(maximumEntries: 128, maximumSnapshotBytes: 65_536)
+enum MediaLibrary {}
+
+func watchChannel(source: URL, session: URLSession) throws -> HLSLiveWatching {
+    try ChannelWatch.watch(from: source, session: session)
+}
+func recordChannel(source: URL, destination: URL, client: HLSLivePlaylistClient) throws -> HLSLiveDVRRecording {
+    try ChannelArchive.startRecording(from: source, to: destination, client: client)
+}
+@MainActor
+func configurePlayback(item: AVPlayerItem) async throws -> HLSPlaybackConfigurationResult {
+    try await PlaybackProfile.apply(to: item)
+}
+func makeMediaLibrary(store: any HLSMediaCatalogPersisting) throws -> HLSMediaCatalog {
+    try MediaLibrary.makeCatalog(persistence: store)
+}
+```
+
+Retain the foreground watch/recording until completion and issue explicit stop
+or cancellation when the application scope ends. Observations are independent;
+`finalSnapshot()` waits for ENDLIST, and `receipt()` observes DVR's committed
+result without issuing stop/discard. DVR still uses the caller's configured Live
+client for transport, steering and key policy. Native playback remains MainActor
+and caller-owned. System background task restoration and realtime audio are
+not converted into foreground handle ownership.
+
+All five definitions delegate to throwing immutable `validated()` factories.
+The corresponding `*Defining` protocols are the dynamic/manual compiler-plugin
+recovery equivalent, not a different network or storage implementation.
+Generated pure `configuration()` factories are nonisolated even on a global-actor
+declaration. Native `apply(to:)` remains MainActor. Complete local preflight
+uses Xcode 27/Swift 6.4; the separate Swift 6.2 core test lane remains supported.
+Decoded-audio declarations are compiler-6.4-gated, not an identical 6.2 surface.
+See [migration](docs/MACRO_FIRST_MIGRATION.md), [optional metadata storage](docs/MEDIA_CATALOG.md)
+and [failure/incident contracts](docs/FAILURE_AND_INCIDENT_CONTRACT.md).
 
 ## Release documentation
 

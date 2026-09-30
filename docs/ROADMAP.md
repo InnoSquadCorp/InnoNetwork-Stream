@@ -12,6 +12,12 @@ documented clean remote resolution order: publish InnoNetwork 6.0.0, validate
 InnoNetwork-Stream without a local override, publish InnoNetwork-Stream 1.0.0, and then build a
 clean external consumer from both tags.
 
+The authorized pre-release macro-first redesign implements some foundations
+listed below in the 1.0 Draft. Local implementation and validation are recorded
+in [the redesign plan](MACRO_FIRST_REDESIGN.md) and
+[local evidence](MACRO_FIRST_LOCAL_VALIDATION.md); they are not Stable promotion,
+native device acceptance or remote release evidence.
+
 ## 1.1.0 Candidate Scope
 
 The first minor should harden real playback and offline operations without
@@ -22,21 +28,31 @@ named adopter or a reproducible media fixture.
 ### Priority 0 — adoption and durable offline state
 
 1. **Promote only adopter-proven declarations.** Use Capto plus at least one
-   additional media consumer to identify the subset of the 1,867 provisional
-   declarations that applications use directly and without SPI. Promotion is
+   additional media consumer to identify the declarations that applications
+   use directly and without SPI. Of the initial 1,867 inherited name rows,
+   1,866 remain; 260 new rows are Draft (2,126 total, 2,131 distinct signatures).
+   Promotion is
    per coherent workflow—playlist parsing, live reload, playback, asset
    download, FairPlay, or decoded audio—not a bulk declaration-count goal.
 2. **Managed asset-catalog persistence.** The current
    `HLSAssetDownloadLibrary` is a bounded Codable value and deliberately leaves
-   file persistence to the application. Evaluate an actor-owned coordinator
-   for atomic catalog checkpoints, schema migration, and reconciliation with
-   `HLSAssetDownloadStorage`. It must never delete a system-managed asset
-   implicitly; pruning and eviction remain explicit, observable caller
-   decisions.
+   file persistence to the application. The 1.0 Draft now provides optional
+   `@HLSCatalogDefinition`/`HLSMediaCatalog` bounded metadata transactions,
+   version migration and caller-reported reconciliation for app files, offline
+   packages and native assets. Actual atomic durability and exclusive-writer/CAS
+   enforcement remain app-adapter responsibilities. Future native-library
+   integration and cross-store inventory need adopter evidence; no default
+   filesystem durability adapter or automatic pruning has been implemented.
+   It must never delete a system-managed asset implicitly; pruning and eviction
+   remain explicit, observable caller decisions.
 
 ### Priority 1 — bounded operational insight
 
-1. **Playback incident snapshots.** Compose the existing typed AVMetric event
+1. **Playback incident snapshots.** The 1.0 Draft's `HLSIncidentBuffer` already
+   offers bounded, correlated typed-scalar composition with drop/truncation
+   accounting; `HLSFailureReport` excludes arbitrary descriptions/URLs/payloads.
+   Automatic native event ingestion and exporter integration remain future work.
+   Compose the existing typed AVMetric event
    streams, playback health snapshots, content-steering decisions, and live
    reload health into a bounded, exporter-neutral incident report. Reports
    need stable correlation, truncation counts, and URL/header redaction; they

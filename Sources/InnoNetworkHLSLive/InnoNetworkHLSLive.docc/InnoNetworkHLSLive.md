@@ -12,6 +12,34 @@ body limit. The live client accepts either a media-playlist URL or a
 multivariant entry URL and resolves the latter with the configured selection
 policy.
 
+## Macro-first foreground workflows (Draft)
+
+```swift
+import Foundation
+import InnoNetworkHLSLive
+
+@HLSLiveDefinition
+enum ChannelWatch {}
+@HLSDVRDefinition(maximumDurationSeconds: 1800, maximumSegmentCount: 900)
+enum ChannelArchive {}
+
+func watchChannel(source: URL, session: URLSession) throws -> HLSLiveWatching {
+    try ChannelWatch.watch(from: source, session: session)
+}
+func recordChannel(source: URL, destination: URL, client: HLSLivePlaylistClient) throws -> HLSLiveDVRRecording {
+    try ChannelArchive.startRecording(from: source, to: destination, client: client)
+}
+```
+
+Retain the returned handle. ``HLSLiveWatching/observations()`` and
+``HLSLiveDVRRecording/observations()`` are independent bounded subscriptions;
+cancelled observers do not stop work. A watch ends at ENDLIST or explicit
+cancellation. DVR's first ``HLSLiveDVRRecording/stopAndCommit()`` or
+``HLSLiveDVRRecording/cancelAndDiscard()`` intent wins. ``HLSLiveDVRRecording/receipt()``
+is observation, not a lifecycle command. Throwing `validated()` settings and
+the `*Defining` protocols are dynamic/manual equivalents. Use the advanced packs
+below for additional policy, preload and recovery tuning.
+
 ```swift
 import InnoNetworkHLSLive
 

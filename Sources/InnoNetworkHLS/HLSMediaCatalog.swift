@@ -73,8 +73,8 @@ public struct HLSMediaCatalogConfiguration: Sendable {
     }
 }
 
-/// A staged metadata replacement. App implementations must serialize access
-/// to the same store and atomically publish on commit. Successful commit wins
+/// A staged metadata replacement. App implementations must enforce exclusive
+/// writer ownership (or revision/CAS) and atomically publish on commit. Successful commit wins
 /// late cancellation; discard removes staging only, never the existing store.
 public protocol HLSMediaCatalogCommit: Sendable {
     func commit() async throws

@@ -46,6 +46,11 @@ struct HLSWorkflowTests {
         }
     }
 
+}
+
+// Every user of the shared response/request registry belongs to the same
+// serialized suite, not merely a different suite also marked serialized.
+extension HLSLivePlaylistClientTests {
     @Test("watch finishes with zero observers and independently replays to two late observers")
     func watch() async throws {
         let url = try #require(URL(string: "https://workflow.example/end.m3u8"))

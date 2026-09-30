@@ -19,7 +19,7 @@ public struct HLSDownloadDefinitionMacro: MemberMacro, ExtensionMacro {
                 ? "package " : ""
         return [
             """
-            \(raw: access)static func configuration() throws -> InnoNetworkHLS.HLSDownloadConfiguration {
+            \(raw: access)nonisolated static func configuration() throws -> InnoNetworkHLS.HLSDownloadConfiguration {
                 try InnoNetworkHLS.HLSDownloadConfiguration.validated(
                     maximumMediaResourceBytes: \(raw: String(values.resource)),
                     maximumTotalDownloadBytes: \(raw: String(values.output)),

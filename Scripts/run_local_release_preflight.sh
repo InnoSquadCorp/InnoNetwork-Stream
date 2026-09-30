@@ -24,8 +24,8 @@ swift_version="$(xcrun swift --version | sed -nE 's/^Apple Swift version ([0-9]+
 swift_major="${swift_version%%.*}"
 swift_minor="${swift_version##*.}"
 if [[ -z "$swift_version" ]] \
-  || (( swift_major < 6 || (swift_major == 6 && swift_minor < 2) )); then
-  echo "local-release-preflight: Swift 6.2 or newer is required" >&2
+  || (( swift_major < 6 || (swift_major == 6 && swift_minor < 4) )); then
+  echo "local-release-preflight: complete API/audio/HLS contracts require Xcode 27 / Swift 6.4; use swift test for the Swift 6.2 core lane" >&2
   exit 69
 fi
 
@@ -38,6 +38,8 @@ bash Scripts/format.sh --lint
 bash Scripts/validate_docs_release_state.sh
 bash Scripts/check_public_api_contract.sh
 bash Scripts/tests/test_package_identity.sh
+bash Scripts/tests/test_run_affected_tests.sh
+python3 Scripts/tests/test_public_signatures.py
 bash -n Scripts/*.sh
 python3 -m py_compile Scripts/*.py
 xcrun swift test --force-resolved-versions --parallel
@@ -49,18 +51,15 @@ if [[ "$mode" == "full" ]]; then
     --require-runtime-smoke \
     --apple-report-root .build/local-release-preflight/apple-hls
 
-  xcodebuild \
-    -scheme InnoNetwork-Stream-Package \
-    -destination 'platform=macOS' \
-    -derivedDataPath .build/local-release-preflight/macos \
-    CODE_SIGNING_ALLOWED=NO \
-    build
-  xcodebuild \
-    -scheme InnoNetwork-Stream-Package \
-    -destination 'generic/platform=iOS Simulator' \
-    -derivedDataPath .build/local-release-preflight/ios-simulator \
-    CODE_SIGNING_ALLOWED=NO \
-    build
+  # An app-owned/generated .xcodeproj can shadow SwiftPM's implicit Xcode
+  # package scheme. Compile exact package library targets against each SDK
+  # without modifying that project or pretending to validate an app/signing.
+  bash Scripts/build_apple_platform_targets.sh \
+    macOS macosx arm64-apple-macos14.0 \
+    .build/local-release-preflight/swiftpm-macos
+  bash Scripts/build_apple_platform_targets.sh \
+    iOS iphonesimulator arm64-apple-ios16.0-simulator \
+    .build/local-release-preflight/swiftpm-ios-simulator
   bash Scripts/build_apple_platform_targets.sh \
     tvOS appletvos arm64-apple-tvos16.0 \
     .build/local-release-preflight/tvos

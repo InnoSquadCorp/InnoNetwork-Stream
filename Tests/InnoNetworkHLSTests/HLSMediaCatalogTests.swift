@@ -31,9 +31,9 @@ struct HLSMediaCatalogTests {
 
     @Test("known v0 migrates without automatically rewriting storage")
     func migration() async throws {
-        let legacy = Data(
-            "{\"version\":0,\"entries\":[{\"id\":{\"rawValue\":\"00000000-0000-0000-0000-000000000001\"},\"ownership\":\"offlinePackage\",\"reference\":\"app-asset-1\"}]}"
-                .utf8)
+        let fixture = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("ContractFixtures/catalog-v0.json")
+        let legacy = try Data(contentsOf: fixture)
         let store = CatalogStore(data: legacy)
         let catalog = try TestCatalog.makeCatalog(persistence: store)
         try await catalog.restore()

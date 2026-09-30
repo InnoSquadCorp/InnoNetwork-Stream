@@ -115,7 +115,7 @@ public struct HLSWorkflowDefinitionMacro: MemberMacro, ExtensionMacro {
         let arguments = spec.fields.map { "\($0.name): \($0.value)" }.joined(separator: ", ")
         return [
             """
-            \(raw: access)static func configuration() throws -> \(raw: spec.module).\(raw: spec.configuration) {
+            \(raw: access)nonisolated static func configuration() throws -> \(raw: spec.module).\(raw: spec.configuration) {
                 try \(raw: spec.module).\(raw: spec.configuration).validated(\(raw: arguments))
             }
             """

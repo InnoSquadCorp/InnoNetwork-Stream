@@ -31,7 +31,7 @@ struct HLSWorkflowDefinitionMacroTests {
             expandedSource: """
                 public enum Workflow {
 
-                    public static func configuration() throws -> \(module).\(configuration) {
+                    public nonisolated static func configuration() throws -> \(module).\(configuration) {
                         try \(module).\(configuration).validated(\(arguments))
                     }
                 }

@@ -13,6 +13,8 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 scratch_path="${4:-$repo_root/.build/platform-$runtime}"
 
 case "$runtime:$sdk:$target_triple" in
+  'macOS:macosx:arm64-apple-macos14.0'|\
+  'iOS:iphonesimulator:arm64-apple-ios16.0-simulator'|\
   'tvOS:appletvos:arm64-apple-tvos16.0'|\
   'watchOS:watchos:arm64_32-apple-watchos9.0'|\
   'visionOS:xros:arm64-apple-xros1.0') ;;
