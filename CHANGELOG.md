@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Preserve typed core cancellation in HLS request policies, persistent and
+  streaming FairPlay workflows, and redacted content-key failure diagnostics.
+  Diagnose escaped and conditional reserved configuration members in all five
+  Stream macros. Verify macro-first cancellation with published core 6.0 and
+  the separate local core 6.1 candidate; do not raise the public dependency yet.
 - Add distinct semantic API signature gates, persisted-format fixtures and
   fail-closed reverse-dependent local test selection; keep full CI/release
   validation mandatory. Compile all five macro workflows and manual equivalents
