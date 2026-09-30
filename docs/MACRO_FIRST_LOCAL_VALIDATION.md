@@ -102,15 +102,85 @@ are recorded after the closing commit in `final-git-state.log` and
 `final-preservation.log`. No source-candidate result is presented as a new
 remote-SHA CI or device acceptance result.
 
+## Ordered post-review hardening
+
+The subsequent authorized local work starts at
+`158a92675bd7d5c7a0502f28cc3b3c088400fb81`. Diagnostic failures and controls
+are retained in `.build/review-158a926/`, separately from the earlier redesign
+logs. Production source candidate
+`69a53a1ad07fab968aec75cf36733c0be2a29ce7` contains these changes:
+
+- Failure reports preserve known wrapped URL causes, including typed core
+  wrappers, and do not offer resume/restoration for non-transient errors.
+  Core trust/admission/cancellation use their safe categories. The direct/wrapped
+  repro fails 45 assertions before the first correction; the typed core control
+  fails nine before its follow-up. The real URLProtocol macro transport path is
+  retained as a passing control. All 135 related methods then pass. Stable HLS
+  codes and export redaction remain unchanged. An initial diagnostic test build
+  failure was an invalid fixture helper/case, not another production defect.
+- Decoded audio separates prompt client cancellation from ownership of the one
+  pending native read. Cancellation does not detach the caller's item or permit
+  a concurrent native read; late samples are discarded. The queued-before-entry
+  cancellation control fails 50 iterations without the native-entry guard.
+  Detachment, lifetime and once-only completion have passing controls. The Apple
+  concurrency/test-triage guidance informed this ownership boundary; a task group
+  that waits for a non-cooperative SDK read on scope exit would not meet it.
+- Dependabot groups coupled CodeQL version and security updates. Eight structural
+  controls enforce matching immutable init/analyze pins without upgrading actions
+  or bypassing the existing gates. No bot PR or repository setting is changed.
+- The loopback fixture binds without hostname resolution. Three startup controls
+  cover DNS avoidance, ready/dead/timeout paths and bounded retained diagnostics.
+  The five-second readiness budget and media assertions are not relaxed. CI and
+  manual Release failures can retain fixture diagnostics without changing publish
+  conditions. This does not establish the cause of the historical hosted timeout.
+- Controlled SwiftPM entry points reuse root/toolchain/SDK-scoped caches, verify
+  dependency object connectivity and collect only selected-context symbol graphs.
+  Rename/SDK/toolchain/CLI-forwarding and broken-alternate/restored controls pass.
+  Original caches and other diagnostic symbol graphs are not deleted or repaired.
+
+`final-hardening-preflight-v2.log` exits 0 (`local-release-preflight: OK (full)`):
+642 registered methods, 634 ordinary passes, six fixture skips and two
+unset-audio-fixture cancellations. All eight deferred cases execute in the
+separate loopback runtime gate (nine runtime methods in total). Three Apple HLS
+playlist validations, four library targets against each of five SDKs, Debug
+aggregate/individual macro consumers, format (305 files) and unchanged API
+contracts (2,126 rows / 2,131 signatures) pass.
+
+`final-hardening-tsan-v2.log` also exits 0 with all 642 methods and the same eight
+fixture dispositions. The audio test binary links the TSAN runtime and coordinator
+objects contain `__tsan` calls; no sanitizer report is observed. Runtime media
+fixtures remain a separate unsanitized acceptance gate. All 20 independent runs
+of the eight decoded-audio cancellation methods pass, including the actual
+unplayed native output and queued-entry/completion races.
+
+`final-release-consumer-aggregate.log` and
+`final-release-consumer-individual.log` exit 0 after optimized builds and execute
+`package-identity-consumer: OK` with unchanged imports, both Stream/Network macros
+and the README example. The closing commit changes only this record and the
+failure-contract explanation; source candidate validation is not relabeled as
+a new hosted run. `closing-hardening-contracts.log` records the subsequent
+documentation, fixture, format and public-contract checks.
+
 ## Remaining boundaries
 
 Xcode 26/Swift 6.2 remote core tests and final-SHA CI are not run in this local
 request. Decoded audio is compiler-6.4-gated. Physical-device native background
 restoration, real FairPlay server/entitlements/key store, realtime audio deadlines,
 actual app persistence durability/multi-process ownership and first published
-Stream tag adoption are not established by these tests. Existing AVFoundation
-unbalanced-listener and renamed-cache alternate/stale-output diagnostics remain
-visible; their framework/cache origins are not proven by passing tests or TSAN.
+Stream tag adoption are not established by these tests. The connected/paired
+physical iPhone has a developer disk image mount failure; opt-in FairPlay inputs
+are absent from the checked process environment. No device repair, credential
+search, provider contact or app adapter migration was performed.
+
+SDK-only integrated-timeline teardown reproduces the observed AVFoundation
+unbalanced-listener warning without Stream; this does not prove general absence
+of native leaks. The original renamed cache has missing alternate stores/stale
+metadata, and independent exact-revision caches pass their controls. The scoped
+entry point avoids reuse, not repairs or deletes, of those original caches.
+Dependency graph was disabled at the investigation's read-only observation;
+activation and exact-final-SHA remote CI still require a separately authorized
+remote step. Grouped bot updates and new workflow failure artifacts have structural
+local controls, not observed hosted acceptance.
 
 InnoNetwork remains pinned to published 6.0.0; Stream remains independently
 versioned 1.0.0 Draft. The preserved generated project and Derived files are

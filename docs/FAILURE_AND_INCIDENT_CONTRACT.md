@@ -8,6 +8,12 @@ path claims line-level information the parser does not produce.
 
 Recovery advice never executes work. Transient status/URL errors remain subject
 to caller request policy. Authorization failures require application action.
+Wrapping a known URL cause, including typed InnoNetwork transport wrappers,
+preserves its cancellation/non-transient classification. Invalid URL and
+untrusted-certificate URL errors do not acquire retry, checkpoint or native
+restoration advice just because they are wrapped. Core trust failures require
+security handling without retry advice; invalid core admission/configuration
+requires reconfiguration. Unknown error chains are not recursively unwrapped.
 Checkpoint recovery covers automatic VOD/single-file and offline-package
 resource plans, plus opt-in DVR recovery. It still requires an enabled policy
 and a matching durable checkpoint; the capability is not a guarantee that a
