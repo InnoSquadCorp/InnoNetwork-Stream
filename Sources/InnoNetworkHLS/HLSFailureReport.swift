@@ -84,7 +84,15 @@ public struct HLSFailureReport: Error, Codable, Equatable, Sendable {
                 category = .unsupported
             case .diskCapacityUnavailable, .destinationAlreadyExists, .destinationInUse: category = .storage
             case .invalidDestination, .noVariantMatchesSelectionPolicy: category = .configuration
-            case .transferFailed: category = .transport
+            case .transferFailed(let underlying):
+                category =
+                    underlying.domain == NSURLErrorDomain && underlying.code == NSURLErrorCancelled
+                    ? .cancelled : .transport
+                if underlying.domain == NSURLErrorDomain {
+                    recovery =
+                        HLSDownloadError.isTransientURLFailure(underlying.code)
+                        ? .retrySubjectToRequestPolicy : HLSRecoveryAction.none
+                }
             case .invalidAES128Key, .aes128DecryptionFailed: category = .security
             default: category = .invalidInput
             }
@@ -102,8 +110,8 @@ public struct HLSFailureReport: Error, Codable, Equatable, Sendable {
         } else if let error = error as? URLError {
             category = error.code == .cancelled ? .cancelled : .transport
             recovery =
-                [.timedOut, .networkConnectionLost, .notConnectedToInternet, .cannotConnectToHost, .cannotFindHost]
-                    .contains(error.code) ? .retrySubjectToRequestPolicy : HLSRecoveryAction.none
+                HLSDownloadError.isTransientURLFailure(error.code.rawValue)
+                ? .retrySubjectToRequestPolicy : HLSRecoveryAction.none
         } else if let error = error as? any HLSFailureCategorizing {
             category = error.hlsFailureCategory
             recovery = error.hlsRecoveryAction

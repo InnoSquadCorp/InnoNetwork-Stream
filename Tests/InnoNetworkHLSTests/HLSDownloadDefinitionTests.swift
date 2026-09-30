@@ -12,6 +12,29 @@ private enum FixtureDownload {}
 
 @Suite("Macro-first download configuration")
 struct HLSDownloadDefinitionTests {
+    @Test("Macro operation reports non-transient admission failures without resume advice")
+    func macroFailureRecovery() async throws {
+        let source = try #require(URL(string: "https://review.invalid/recovery.m3u8"))
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.invalidateAndCancel() }
+        for code: URLError.Code in [.badURL, .serverCertificateUntrusted, .timedOut, .cancelled] {
+            let operation = try FixtureDownload.start(
+                sourceURL: source, destinationURL: directory.appendingPathComponent("\(code.rawValue).ts"),
+                session: session,
+                requestPolicy: HLSRequestPolicy { _, _ in throw URLError(code) }
+            )
+            do {
+                _ = try await operation.receipt()
+                Issue.record("Expected admission failure")
+            } catch {}
+            let report = try #require(operation.failureReport)
+            #expect(report.category == (code == .cancelled ? .cancelled : .transport))
+            #expect(report.recovery == (code == .timedOut ? .resumeSubjectToCheckpoint : .none))
+        }
+    }
+
     @Test("generated workflow delegates to validated immutable settings")
     func generatedConfiguration() throws {
         let settings = try FixtureDownload.configuration()

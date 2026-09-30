@@ -404,7 +404,8 @@ extension HLSDownloadError {
             .invalidAES128KeyResponseStatus(let statusCode):
             return Self.isRetriableStatus(statusCode)
         case .transferFailed(let underlying):
-            return !Self.isCancellation(underlying)
+            return underlying.domain == NSURLErrorDomain
+                ? Self.isTransientURLFailure(underlying.code) : !Self.isCancellation(underlying)
         case .destinationInUse:
             return true
         case .invalidPlaylist,
@@ -494,6 +495,13 @@ extension HLSDownloadError {
         statusCode == 408
             || statusCode == 429
             || (500...599).contains(statusCode)
+    }
+
+    /// Known URL failures only. Unknown domains retain the legacy hint without
+    /// exporting their domain, code or userInfo in structured recovery reports.
+    static func isTransientURLFailure(_ code: Int) -> Bool {
+        [URLError.timedOut, .networkConnectionLost, .notConnectedToInternet, .cannotConnectToHost, .cannotFindHost]
+            .contains(URLError.Code(rawValue: code))
     }
 
     private static func isCancellation(

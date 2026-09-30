@@ -5,6 +5,32 @@ import Testing
 
 @Suite("Structured failures and export-safe incidents")
 struct HLSFailureReportTests {
+    @Test("Wrapped URL failures preserve safe direct classification across backends")
+    func wrappedURLFailures() throws {
+        let codes: [URLError.Code] = [
+            .badURL, .unsupportedURL, .serverCertificateUntrusted, .cancelled,
+            .timedOut, .networkConnectionLost, .notConnectedToInternet,
+        ]
+        let backends: [HLSOperationBackend] = [
+            .playlistInspection, .singleFileDownload, .offlinePackage, .liveWatch,
+            .liveDVR, .nativeBackgroundDownload, .nativePlayback, .decodedAudio,
+        ]
+        for code in codes {
+            let error = URLError(code, userInfo: [NSLocalizedDescriptionKey: "secret-message"])
+            let wrapped = HLSDownloadError.wrappingTransferFailure(error)
+            for backend in backends {
+                let direct = HLSFailureReport.classify(error, backend: backend)
+                let report = HLSFailureReport.classify(wrapped, backend: backend)
+                #expect(report.category == direct.category)
+                #expect(report.recovery == direct.recovery)
+                #expect(report.legacyHLSCode == wrapped.errorCode)
+                #expect(!String(decoding: try JSONEncoder().encode(report), as: UTF8.self).contains("secret-message"))
+            }
+            #expect(
+                wrapped.isRetriableHint == [.timedOut, .networkConnectionLost, .notConnectedToInternet].contains(code))
+        }
+    }
+
     @Test("HTTP recovery remains subject to caller policy and stable error codes")
     func recovery() {
         let unauthorized = HLSDownloadError.invalidResponseStatus(401)
