@@ -1,6 +1,7 @@
 #if canImport(AVFoundation) && !os(tvOS)
 import AVFoundation
 import Foundation
+import InnoNetworkHLS
 
 /// Fulfills initial and renewing FairPlay streaming-key requests.
 ///
@@ -214,12 +215,7 @@ public struct HLSFairPlayStreamingKeyWorkflow: Sendable {
     }
 
     private static func isCancellation(_ error: Error) -> Bool {
-        if error is CancellationError || Task.isCancelled {
-            return true
-        }
-        let cocoaError = error as NSError
-        return cocoaError.domain == NSURLErrorDomain
-            && cocoaError.code == NSURLErrorCancelled
+        HLSHTTPClient.isCancellation(error)
     }
 
     private static func errorCode(

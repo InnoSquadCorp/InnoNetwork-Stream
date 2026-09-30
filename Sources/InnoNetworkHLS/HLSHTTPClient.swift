@@ -137,6 +137,9 @@ package struct HLSHTTPClient: Sendable {
         if error is CancellationError || Task.isCancelled {
             return true
         }
+        if case .cancelled = error as? NetworkError {
+            return true
+        }
         let cocoaError = error as NSError
         return cocoaError.domain == NSURLErrorDomain
             && cocoaError.code == NSURLErrorCancelled

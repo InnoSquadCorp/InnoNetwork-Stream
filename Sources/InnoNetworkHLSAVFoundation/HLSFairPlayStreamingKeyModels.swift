@@ -1,6 +1,7 @@
 #if canImport(AVFoundation) && !os(tvOS)
 import AVFoundation
 import Foundation
+import InnoNetwork
 
 /// Why an application exchanges one FairPlay SPC for a CKC.
 public enum HLSFairPlayLicenseRequestPurpose: Equatable, Sendable {
@@ -188,6 +189,10 @@ public enum HLSFairPlayContentKeyFailureReason: Equatable, Sendable {
     /// Maps an arbitrary failure without retaining its payload.
     public init(_ error: any Error) {
         if error is CancellationError {
+            self = .cancelled
+            return
+        }
+        if case .cancelled = error as? NetworkError {
             self = .cancelled
             return
         }

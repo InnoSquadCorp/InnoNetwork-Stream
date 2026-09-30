@@ -1,9 +1,32 @@
 import Foundation
+import InnoNetwork
 import Testing
 
 @testable import InnoNetworkHLS
 
 extension HLSDownloaderTests {
+    @Test("Core cancellation remains cancellation in playlist failures and redacted events")
+    func coreRequestPolicyCancellation() async throws {
+        let source = try #require(URL(string: "https://media.example/cancellation.m3u8"))
+        let session = makeRequestPolicySession()
+        defer {
+            session.invalidateAndCancel()
+            HLSURLProtocol.reset()
+        }
+        for error: any Error in [CancellationError(), URLError(.cancelled), NetworkError.cancelled] {
+            let recorder = HLSRequestEventRecorder()
+            let policy = HLSRequestPolicy(eventObservers: [recorder]) { _, _ in throw error }
+            do {
+                _ = try await PlaylistResolver(session: session, requestPolicy: policy).load(from: source)
+                Issue.record("Expected cancellation")
+            } catch { #expect(error is CancellationError) }
+            guard case .requestFailed(_, failure: .cancellation) = await recorder.events().last else {
+                Issue.record("Expected a cancellation event")
+                continue
+            }
+            #expect(HLSURLProtocol.capturedRequests().isEmpty)
+        }
+    }
     @Test("entry playlist adaptation is typed and observation is redacted")
     func adaptsEntryPlaylistWithRedactedEvents() async throws {
         let playlistURL = try #require(

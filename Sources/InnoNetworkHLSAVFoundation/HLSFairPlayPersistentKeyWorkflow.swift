@@ -1,6 +1,7 @@
 #if canImport(AVFoundation) && !os(tvOS)
 import AVFoundation
 import Foundation
+import InnoNetworkHLS
 
 /// Coordinates restore-or-create FairPlay persistent-key requests.
 ///
@@ -318,12 +319,7 @@ public struct HLSFairPlayPersistentKeyWorkflow: Sendable {
     }
 
     private static func isCancellation(_ error: Error) -> Bool {
-        if error is CancellationError || Task.isCancelled {
-            return true
-        }
-        let cocoaError = error as NSError
-        return cocoaError.domain == NSURLErrorDomain
-            && cocoaError.code == NSURLErrorCancelled
+        HLSHTTPClient.isCancellation(error)
     }
 
     private static func errorCode(

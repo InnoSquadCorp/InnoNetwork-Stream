@@ -1,6 +1,7 @@
 #if canImport(AVFoundation) && !os(tvOS)
 import AVFoundation
 import Foundation
+import InnoNetwork
 import Testing
 
 @testable import InnoNetworkHLSAVFoundation
@@ -259,13 +260,13 @@ struct HLSFairPlayStreamingKeyWorkflowTests {
         #expect(responseRequest.snapshot().failureCodes == [19])
     }
 
-    @Test("URL cancellation remains caller cancellation")
-    func preservesCancellation() async throws {
+    @Test("URL and typed core cancellation remain caller cancellation", arguments: [false, true])
+    func preservesCancellation(typed: Bool) async throws {
         let request = StreamingKeyRequestDouble()
         let workflow = HLSFairPlayStreamingKeyWorkflow(
             transport: StreamingLicenseTransportDouble(
                 response: Data(),
-                failure: URLError(.cancelled)
+                failure: typed ? NetworkError.cancelled : URLError(.cancelled)
             )
         )
 
@@ -287,6 +288,7 @@ struct HLSFairPlayStreamingKeyWorkflowTests {
 
     @Test("retry and failure callbacks map to stable redacted events")
     func mapsLifecycleEvents() {
+        #expect(HLSFairPlayContentKeyFailureReason(NetworkError.cancelled) == .cancelled)
         #expect(
             HLSFairPlayContentKeyRetryReason(.timedOut) == .timedOut
         )
