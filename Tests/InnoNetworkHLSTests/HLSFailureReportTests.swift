@@ -1,10 +1,34 @@
 import Foundation
+import InnoNetwork
 import Testing
 
 @testable import InnoNetworkHLS
 
 @Suite("Structured failures and export-safe incidents")
 struct HLSFailureReportTests {
+    @Test("Core transport wrappers retain safe URL causes and reject trust/admission recovery")
+    func coreWrappedFailures() {
+        for code: URLError.Code in [
+            .badURL, .serverCertificateUntrusted, .timedOut, .networkConnectionLost, .cancelled,
+        ] {
+            let wrapped = HLSDownloadError.wrappingTransferFailure(NetworkError.mapTransportError(URLError(code)))
+            let direct = HLSFailureReport.classify(URLError(code), backend: .singleFileDownload)
+            let actual = HLSFailureReport.classify(wrapped, backend: .singleFileDownload)
+            #expect(actual.category == direct.category)
+            #expect(actual.recovery == direct.recovery)
+            #expect(actual.legacyHLSCode == wrapped.errorCode)
+        }
+        let denied = HLSDownloadError.wrappingTransferFailure(NetworkError.trustEvaluationFailed(.missingServerTrust))
+        #expect(!denied.isRetriableHint)
+        let report = HLSFailureReport.classify(denied, backend: .nativeBackgroundDownload)
+        #expect(report.category == .security)
+        #expect(report.recovery == .none)
+        let invalid = HLSDownloadError.wrappingTransferFailure(
+            NetworkError.configuration(reason: .invalidRequest("secret request")))
+        #expect(!invalid.isRetriableHint)
+        #expect(HLSFailureReport.classify(invalid, backend: .singleFileDownload).category == .configuration)
+    }
+
     @Test("Wrapped URL failures preserve safe direct classification across backends")
     func wrappedURLFailures() throws {
         let codes: [URLError.Code] = [

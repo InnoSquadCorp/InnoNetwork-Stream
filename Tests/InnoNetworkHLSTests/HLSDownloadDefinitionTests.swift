@@ -73,6 +73,33 @@ struct HLSDownloadDefinitionTests {
 }
 
 extension HLSDownloaderTests {
+    @Test("Macro workflow preserves recovery advice through real core transport errors")
+    func macroCoreTransportFailures() async throws {
+        let source = try #require(URL(string: "https://media.example/core-failure.m3u8"))
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [HLSURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer {
+            session.invalidateAndCancel()
+            HLSURLProtocol.reset()
+            try? FileManager.default.removeItem(at: directory)
+        }
+        for code: URLError.Code in [.badURL, .serverCertificateUntrusted] {
+            HLSURLProtocol.register(
+                .failingResponse(statusCode: 200, data: Data(), headers: [:], errorCode: code), for: source)
+            let operation = try FixtureDownload.start(
+                sourceURL: source, destinationURL: directory.appendingPathComponent("\(code.rawValue).ts"),
+                session: session)
+            do {
+                _ = try await operation.receipt()
+                Issue.record("Expected core transport failure")
+            } catch {}
+            #expect(operation.failureReport?.category == .transport)
+            #expect(operation.failureReport?.recovery == HLSRecoveryAction.none)
+        }
+    }
+
     @Test("releasing the last handle cancels work even with an event subscription")
     func macroOperationLastOwnerRelease() async throws {
         let source = try #require(URL(string: "https://media.example/released.m3u8"))

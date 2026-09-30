@@ -404,6 +404,7 @@ extension HLSDownloadError {
             .invalidAES128KeyResponseStatus(let statusCode):
             return Self.isRetriableStatus(statusCode)
         case .transferFailed(let underlying):
+            if Self.nonTransientCoreFailureCategory(underlying) != nil { return false }
             return underlying.domain == NSURLErrorDomain
                 ? Self.isTransientURLFailure(underlying.code) : !Self.isCancellation(underlying)
         case .destinationInUse:
@@ -475,6 +476,17 @@ extension HLSDownloadError {
         if let hlsError = error as? HLSDownloadError {
             return hlsError
         }
+        // Preserve the typed URL cause before NSError bridging hides it behind
+        // the core error domain. Do not unwrap arbitrary error chains.
+        if let networkError = error as? NetworkError {
+            let cause: SendableUnderlyingError?
+            switch networkError {
+            case .underlying(let underlying, _), .reachability(_, let underlying, _): cause = underlying
+            case .timeout(_, let underlying): cause = underlying
+            default: cause = nil
+            }
+            if let cause, cause.domain == NSURLErrorDomain { return .transferFailed(cause) }
+        }
         return .transferFailed(SendableUnderlyingError(error))
     }
 
@@ -502,6 +514,16 @@ extension HLSDownloadError {
     static func isTransientURLFailure(_ code: Int) -> Bool {
         [URLError.timedOut, .networkConnectionLost, .notConnectedToInternet, .cannotConnectToHost, .cannotFindHost]
             .contains(URLError.Code(rawValue: code))
+    }
+
+    static func nonTransientCoreFailureCategory(_ error: SendableUnderlyingError) -> HLSFailureCategory? {
+        guard error.domain == NetworkError.errorDomain else { return nil }
+        switch NetworkErrorCode(rawValue: error.code) {
+        case .cancelled: return .cancelled
+        case .trustEvaluationFailed: return .security
+        case .configurationInvalidBaseURL, .configurationInvalidRequest: return .configuration
+        default: return nil
+        }
     }
 
     private static func isCancellation(
