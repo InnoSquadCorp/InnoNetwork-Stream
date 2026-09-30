@@ -29,9 +29,15 @@ final class HLSDecodedAudioReadCoordinator {
         // and defeat client cancellation. This single owned task never captures
         // the wrapper or caller's player and cannot admit a second SDK read.
         let worker = Task { [weak self] in
+            defer {
+                self?.worker = nil
+                self?.completion = nil
+            }
+            guard !Task.isCancelled else {
+                completion.finish(.failure(CancellationError()))
+                return
+            }
             let sample = await read()
-            self?.worker = nil
-            self?.completion = nil
             completion.finish(.success(sample))
         }
         self.worker = worker

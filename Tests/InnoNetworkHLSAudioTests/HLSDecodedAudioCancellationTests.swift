@@ -114,6 +114,23 @@ struct HLSDecodedAudioCancellationTests {
         }
     }
 
+    @Test("Cancellation queued before native entry prevents starting cancelled work")
+    @available(macOS 27, iOS 27, tvOS 27, watchOS 27, visionOS 27, *)
+    func cancellationBeforeWorkerEntry() async {
+        for _ in 0..<50 {
+            let reads = HLSDecodedAudioReadCoordinator()
+            let waiter = Task {
+                try await reads.next {
+                    #expect(!Task.isCancelled)
+                    return nil
+                }
+            }
+            let cancel = Task { waiter.cancel() }
+            await cancel.value
+            _ = await waiter.result
+        }
+    }
+
     @Test("Actual unplayed output cancellation completes without detaching the caller item")
     @available(macOS 27, iOS 27, tvOS 27, watchOS 27, visionOS 27, *)
     func nativePendingRead() async throws {
