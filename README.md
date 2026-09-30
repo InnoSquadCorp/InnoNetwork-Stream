@@ -87,6 +87,61 @@ swift test --filter InnoNetworkHLSAudioTests
 Strict Swift 6 concurrency is enabled for every target. The package is
 intentionally Apple-only and keeps the same deployment floors as InnoNetwork.
 
+## Macro-first download workflows (Draft)
+
+Declare a workflow with checked constant limits, then start its explicitly
+owned operation. No requests start during macro expansion or configuration.
+
+```swift
+import Foundation
+import InnoNetworkHLS
+
+@HLSDownloadDefinition(
+    maximumMediaResourceBytes: 8_388_608,
+    maximumTotalDownloadBytes: 268_435_456,
+    maximumConcurrentResourceTransfers: 3
+)
+enum MovieDownload {}
+
+func saveMovie(source: URL, destination: URL) async throws -> HLSDownloadReceipt {
+    let operation = try MovieDownload.start(
+        sourceURL: source,
+        destinationURL: destination
+    )
+    return try await withTaskCancellationHandler {
+        try await operation.receipt()
+    } onCancel: {
+        operation.cancel()
+    }
+}
+```
+
+The handle owns work; cancelling an event subscription or a receipt waiter does
+not cancel another consumer's operation. Use `operation.cancel()` explicitly,
+or propagate foreground scope cancellation as above. Retain the handle until
+completion. `events()` admits up to 64 independent subscriptions, each with a
+newest-16 buffer and sequence/drop metadata. `receipt()` is the authoritative
+terminal result, even if progress was coalesced. Completed output wins late
+cancellation and is never implicitly deleted.
+
+Pass caller-owned `session`, `requestContext` and `requestPolicy` to `start` or
+`makeDownloader` for trust/authentication/observation. `configuration()` only
+constructs settings. For dynamic settings or compiler-plugin recovery, use
+`HLSDownloadConfiguration.validated(...)` / `HLSDownloadDefining` as the
+advanced equivalent; the older `advanced(...)` API retains documented clamping.
+
+The compiler plugin shares SwiftSyntax 603.0.x with InnoNetwork 6. Runtime
+targets never import SwiftSyntax. Macro expressions accept positive decimal
+integer literals; resource limits fit every supported platform's signed
+32-bit `Int`, output limits use `Int64`, and concurrency is `1...8`.
+Keep Xcode's package/plugin trust approval for local development; reviewed,
+locked CI may use the narrow `-skipMacroValidation` flag, not a global trust
+setting or package-plugin bypass. Both macro expansion diagnostics and actual
+external consumer compilation are required before stabilizing this Draft API.
+
+See [the ordered implementation plan](docs/MACRO_FIRST_REDESIGN.md) for
+remaining model, live/native, storage, diagnostic and semantic CI work.
+
 ## Release documentation
 
 - [API stability](API_STABILITY.md)

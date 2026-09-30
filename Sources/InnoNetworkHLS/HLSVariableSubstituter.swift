@@ -98,27 +98,37 @@ enum HLSVariableSubstituter {
                 continue
             }
 
+            // Include the newline in the reservation, before building a line.
+            // The final-output bound alone cannot stop multiplicative variable
+            // references from allocating a huge intermediate string.
+            guard outputByteCount < maximumBytes else {
+                throw HLSDownloadError.playlistTooLarge(limit: maximumBytes)
+            }
+            let remainingBytes = maximumBytes - outputByteCount - 1
             let expandedLine: String
             if !line.isEmpty, !line.hasPrefix("#") {
                 expandedLine = try substituteReferences(
                     in: line,
-                    variables: variables
+                    variables: variables,
+                    maximumBytes: remainingBytes,
+                    reportedLimit: maximumBytes
                 )
             } else if line.hasPrefix("#EXT-X-"), line.contains(":") {
                 expandedLine = try substituteAttributeValues(
                     in: line,
-                    variables: variables
+                    variables: variables,
+                    maximumBytes: remainingBytes,
+                    reportedLimit: maximumBytes
                 )
             } else {
                 expandedLine = line
             }
-            let (nextByteCount, overflow) =
-                outputByteCount
-                .addingReportingOverflow(expandedLine.utf8.count + 1)
-            guard !overflow, nextByteCount <= maximumBytes else {
+            let expandedByteCount = expandedLine.utf8.count
+            guard expandedByteCount <= remainingBytes else {
                 throw HLSDownloadError.playlistTooLarge(limit: maximumBytes)
             }
-            outputByteCount = nextByteCount
+            // The reservation proves both additions fit before arithmetic.
+            outputByteCount += expandedByteCount + 1
             output.append(expandedLine)
         }
 
@@ -136,14 +146,20 @@ enum HLSVariableSubstituter {
 
     private static func substituteAttributeValues(
         in line: String,
-        variables: [String: String]
+        variables: [String: String],
+        maximumBytes: Int,
+        reportedLimit: Int
     ) throws -> String {
         guard let colon = line.firstIndex(of: ":") else {
             return line
         }
         let prefix = line[...colon]
         let value = line[line.index(after: colon)...]
-        var output = String(prefix)
+        var output = BoundedOutput(
+            maximumBytes: maximumBytes,
+            reportedLimit: reportedLimit
+        )
+        try output.append(prefix)
         var index = value.startIndex
         var fieldStart = index
         var isQuoted = false
@@ -155,12 +171,15 @@ enum HLSVariableSubstituter {
             }
             if isAtEnd || (!isQuoted && value[index] == ",") {
                 let field = String(value[fieldStart..<index])
-                output += try substituteAttributeField(
+                let expandedField = try substituteAttributeField(
                     field,
-                    variables: variables
+                    variables: variables,
+                    maximumBytes: output.remainingBytes,
+                    reportedLimit: reportedLimit
                 )
+                try output.append(expandedField)
                 if !isAtEnd {
-                    output.append(",")
+                    try output.append(",")
                     index = value.index(after: index)
                     fieldStart = index
                     continue
@@ -172,12 +191,14 @@ enum HLSVariableSubstituter {
         guard !isQuoted else {
             throw HLSDownloadError.invalidPlaylist
         }
-        return output
+        return output.value
     }
 
     private static func substituteAttributeField(
         _ field: String,
-        variables: [String: String]
+        variables: [String: String],
+        maximumBytes: Int,
+        reportedLimit: Int
     ) throws -> String {
         guard let equals = field.firstIndex(of: "=") else {
             return field
@@ -204,15 +225,24 @@ enum HLSVariableSubstituter {
             trimmedValue.count >= 2
         {
             let interior = String(trimmedValue.dropFirst().dropLast())
-            return String(name)
-                + leadingWhitespace
-                + "\""
-                + (try substituteReferences(
+            var output = BoundedOutput(
+                maximumBytes: maximumBytes,
+                reportedLimit: reportedLimit
+            )
+            try output.append(name)
+            try output.append(leadingWhitespace)
+            try output.append("\"")
+            try output.append(
+                substituteReferences(
                     in: interior,
-                    variables: variables
-                ))
-                + "\""
-                + trailingWhitespace
+                    variables: variables,
+                    maximumBytes: output.remainingBytes,
+                    reportedLimit: reportedLimit
+                )
+            )
+            try output.append("\"")
+            try output.append(trailingWhitespace)
+            return output.value
         }
 
         if trimmedValue.lowercased().hasPrefix("0x")
@@ -220,7 +250,9 @@ enum HLSVariableSubstituter {
         {
             let expanded = try substituteReferences(
                 in: trimmedValue,
-                variables: variables
+                variables: variables,
+                maximumBytes: maximumBytes,
+                reportedLimit: reportedLimit
             )
             guard
                 expanded.lowercased().hasPrefix("0x"),
@@ -229,25 +261,34 @@ enum HLSVariableSubstituter {
             else {
                 throw HLSDownloadError.invalidPlaylist
             }
-            return String(name)
-                + leadingWhitespace
-                + expanded
-                + trailingWhitespace
+            var output = BoundedOutput(
+                maximumBytes: maximumBytes,
+                reportedLimit: reportedLimit
+            )
+            try output.append(name)
+            try output.append(leadingWhitespace)
+            try output.append(expanded)
+            try output.append(trailingWhitespace)
+            return output.value
         }
         return field
     }
 
     private static func substituteReferences(
         in value: String,
-        variables: [String: String]
+        variables: [String: String],
+        maximumBytes: Int,
+        reportedLimit: Int
     ) throws -> String {
-        var output = ""
-        output.reserveCapacity(value.count)
+        var output = BoundedOutput(
+            maximumBytes: maximumBytes,
+            reportedLimit: reportedLimit
+        )
         var index = value.startIndex
 
         while index < value.endIndex {
             guard value[index...].hasPrefix("{$") else {
-                output.append(value[index])
+                try output.append(String(value[index]))
                 index = value.index(after: index)
                 continue
             }
@@ -264,10 +305,28 @@ enum HLSVariableSubstituter {
             else {
                 throw HLSDownloadError.invalidPlaylist
             }
-            output += replacement
+            try output.append(replacement)
             index = value.index(after: closingBrace)
         }
-        return output
+        return output.value
+    }
+
+    private struct BoundedOutput {
+        let maximumBytes: Int
+        let reportedLimit: Int
+        private(set) var value = ""
+        private var byteCount = 0
+
+        var remainingBytes: Int { maximumBytes - byteCount }
+
+        mutating func append(_ text: some StringProtocol) throws {
+            let count = text.utf8.count
+            guard count <= remainingBytes else {
+                throw HLSDownloadError.playlistTooLarge(limit: reportedLimit)
+            }
+            byteCount += count
+            value.append(contentsOf: text)
+        }
     }
 
     private static func isValidVariableName(_ value: String) -> Bool {

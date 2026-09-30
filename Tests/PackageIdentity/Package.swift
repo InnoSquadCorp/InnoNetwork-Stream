@@ -22,13 +22,19 @@ let products =
 let package = Package(
     name: "StreamPackageIdentityConsumer",
     platforms: [.macOS(.v14)],
-    dependencies: [.package(path: "../..")],
+    dependencies: [
+        .package(path: "../.."),
+        .package(
+            url: "https://github.com/InnoSquadCorp/InnoNetwork.git",
+            .upToNextMajor(from: "6.0.0")
+        ),
+    ],
     targets: [
         .executableTarget(
             name: "PackageIdentityConsumer",
             dependencies: products.map {
                 .product(name: $0, package: "InnoNetwork-Stream")
-            }
+            } + [.product(name: "InnoNetwork", package: "InnoNetwork")]
         )
     ],
     swiftLanguageModes: [.v6]

@@ -113,6 +113,19 @@ public struct HLSDownloader: Sendable {
         try await operation.prepare(sourceURL: sourceURL)
     }
 
+    /// Starts a foreground operation whose lifetime belongs to its handle,
+    /// not to a progress subscriber. Macro-generated definitions use this entry.
+    public func start(
+        sourceURL: URL,
+        destinationURL: URL
+    ) -> HLSDownloadTask {
+        HLSDownloadTask(
+            operation: operation,
+            sourceURL: sourceURL,
+            destinationURL: destinationURL
+        )
+    }
+
     /// Starts downloading an HLS VOD stream to a requested file.
     ///
     /// Use the playlist's ``HLSPlaylist/mediaContainer`` file extension for

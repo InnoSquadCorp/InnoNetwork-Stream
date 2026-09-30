@@ -7,7 +7,7 @@ InnoNetwork-Stream's `1.0.0` draft consumes the published InnoNetwork `6.0.0` ta
 the InnoNetwork 6 major line. `Package.resolved` records the release revision
 and retains the five previously selected transitive dependency versions.
 
-The four HLS products, deployment floors, and 1,867 public declarations are
+At the original compatibility baseline, the four HLS products, deployment floors, and 1,867 public declarations were
 unchanged. The existing bounded HTTP transfer, retry executor, request context,
 URL admission, cancellation, and observability integrations compile and pass
 their tests against the published dependency.
@@ -36,14 +36,14 @@ env -u INNONETWORK_LOCAL_PATH bash Scripts/check_innonetwork_dependency.sh
 env -u INNONETWORK_LOCAL_PATH bash Scripts/run_local_release_preflight.sh --quick
 ```
 
-## Fresh local evidence
+## Original compatibility evidence (before macro-first redesign)
 
 Toolchain: Xcode 27.0 / Swift 6.4 on macOS 27.0.1.
 
 | Check | Result |
 | --- | --- |
 | Remote InnoNetwork pin | Exact `6.0.0` release revision in root and separate consumer |
-| Full Swift tests | 587 registered: 581 ordinary passes, six runtime-fixture skips |
+| Full Swift tests | 587 registered: 579 ordinary passes, six runtime-fixture skips, two Audio fixture cancellations |
 | Public API | 1,867 declarations match all four checked symbol contracts |
 | Supported-runtime smoke | Six AVPlayer/offline/DVR integration tests passed with loopback fixtures; decoded-audio and audio-mix paths also passed |
 | Apple HLS tools | Three playlists passed Media Stream Validator and HLS Report |
@@ -55,10 +55,14 @@ Toolchain: Xcode 27.0 / Swift 6.4 on macOS 27.0.1.
 | External consumer | Four products imported; a public playlist request passed through InnoNetwork bounded transfer |
 | Operational contracts | Dependency and release-script fixtures, Swift formatting and actionlint passed; local override rejected before build |
 
-The six runtime-fixture skips in the general suite were exercised separately
+The six skips and two Audio fixture cancellations in the general suite were exercised separately
 by `Scripts/run_hls_runtime_smoke.sh` using the local HLS fixture server.
 Apple-tool reports and logs are retained under
 `.build/innonetwork-6-compatibility/` in the validation checkout.
+
+Later macro-first changes have separate fresh validation in
+[the redesign execution record](MACRO_FIRST_REDESIGN.md). The original platform
+builds above do not validate the added macro target or new operation contracts.
 
 ## Remaining publication evidence
 

@@ -20,6 +20,7 @@ KINDS = {
     "swift.func",
     "swift.init",
     "swift.method",
+    "swift.macro",
     "swift.property",
     "swift.protocol",
     "swift.struct",

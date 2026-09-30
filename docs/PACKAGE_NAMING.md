@@ -50,12 +50,13 @@ Post-rename build/API/test and naming evidence is retained under
 `.build/package-rename-evidence/`. Earlier five-platform and HLS-tool evidence
 is distinguished in [the dependency compatibility record](INNONETWORK_6_COMPATIBILITY.md).
 
-Fresh post-rename checks on Xcode 27 / Swift 6.4, 2026-09-30:
+Original post-rename checks on Xcode 27 / Swift 6.4, 2026-09-30 (before macro-first redesign):
 
 - Both consumer modes built and ran; the resolved local package identity was
   `innonetwork-stream` with display name `InnoNetwork-Stream`.
-- Full Swift tests passed: 587 registered, 581 ordinary passes, six runtime
-  skips subsequently exercised successfully with loopback HLS fixtures.
+- Full Swift tests passed: 587 registered, 579 ordinary passes, six runtime
+  skips and two Audio fixture cancellations, all eight subsequently exercised
+  successfully with loopback HLS fixtures.
 - Four module symbol contracts remained unchanged at 1,867 declarations.
 - Runtime smoke and three Apple HLS playlist conformance reports passed.
 - Package/dependency/release-script fixtures, formatting, workflow lint, and

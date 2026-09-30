@@ -1,6 +1,7 @@
 // swift-tools-version: 6.2
 
 import Foundation
+import CompilerPluginSupport
 import PackageDescription
 
 let strictSettings: [SwiftSetting] = [
@@ -59,12 +60,30 @@ let package = Package(
             targets: ["InnoNetworkHLSAudio"]
         ),
     ],
-    dependencies: [innoNetworkDependency],
+    dependencies: [
+        innoNetworkDependency,
+        .package(
+            url: "https://github.com/swiftlang/swift-syntax.git",
+            .upToNextMinor(from: "603.0.0")
+        ),
+    ],
     targets: [
+        .macro(
+            name: "InnoNetworkStreamMacros",
+            dependencies: [
+                .product(name: "SwiftCompilerPlugin", package: "swift-syntax"),
+                .product(name: "SwiftSyntax", package: "swift-syntax"),
+                .product(name: "SwiftSyntaxBuilder", package: "swift-syntax"),
+                .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
+                .product(name: "SwiftDiagnostics", package: "swift-syntax"),
+            ],
+            swiftSettings: strictSettings
+        ),
         .target(
             name: "InnoNetworkHLS",
             dependencies: [
-                .product(name: "InnoNetwork", package: "InnoNetwork")
+                .product(name: "InnoNetwork", package: "InnoNetwork"),
+                "InnoNetworkStreamMacros",
             ],
             resources: [.process("Resources")],
             swiftSettings: strictSettings
@@ -88,6 +107,14 @@ let package = Package(
         ),
         .target(
             name: "InnoNetworkHLSAudio",
+            swiftSettings: strictSettings
+        ),
+        .testTarget(
+            name: "InnoNetworkStreamMacroTests",
+            dependencies: [
+                "InnoNetworkStreamMacros",
+                .product(name: "SwiftSyntaxMacrosTestSupport", package: "swift-syntax"),
+            ],
             swiftSettings: strictSettings
         ),
         .testTarget(

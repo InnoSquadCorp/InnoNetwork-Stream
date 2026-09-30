@@ -75,7 +75,13 @@ enum HLSLivePlaylistMerger {
         skippedSegmentCount: Int,
         previous: HLSLivePlaylistSnapshot
     ) throws -> [HLSLiveSegment] {
-        guard let skippedCount64 = Int64(exactly: skippedSegmentCount) else {
+        // A delta can omit only history we actually retain. Check the server's
+        // count before using it for either allocation or iteration.
+        guard
+            skippedSegmentCount >= 0,
+            skippedSegmentCount <= previous.segments.count,
+            let skippedCount64 = Int64(exactly: skippedSegmentCount)
+        else {
             throw HLSLiveError.deltaBaseUnavailable
         }
         var previousBySequence: [Int64: HLSLiveSegment] = [:]

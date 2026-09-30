@@ -67,6 +67,7 @@ public struct HLSFairPlayPersistentKeyWorkflow: Sendable {
         _ data: Data,
         for keyID: HLSFairPlayKeyID
     ) async throws {
+        try Task.checkCancellation()
         guard isValidPersistableKey(data) else {
             throw HLSFairPlayPersistentKeyError.invalidPersistableKey
         }
@@ -131,6 +132,7 @@ public struct HLSFairPlayPersistentKeyWorkflow: Sendable {
         keyID: HLSFairPlayKeyID,
         acquisition: HLSFairPlayPersistentKeyAcquisition?
     ) async throws -> HLSFairPlayPersistentKeyDisposition {
+        try Task.checkCancellation()
         let storedKey: Data?
         do {
             storedKey = try await storage.persistableContentKey(
@@ -142,6 +144,7 @@ public struct HLSFairPlayPersistentKeyWorkflow: Sendable {
             }
             throw HLSFairPlayPersistentKeyError.storageReadFailed
         }
+        try Task.checkCancellation()
         if let storedKey {
             guard isValidPersistableKey(storedKey) else {
                 throw HLSFairPlayPersistentKeyError
@@ -157,6 +160,7 @@ public struct HLSFairPlayPersistentKeyWorkflow: Sendable {
                 .persistableKeyUnavailable
         }
         try validate(acquisition)
+        try Task.checkCancellation()
         let spc: Data
         do {
             spc = try await request.makeSPC(
@@ -176,6 +180,7 @@ public struct HLSFairPlayPersistentKeyWorkflow: Sendable {
             throw HLSFairPlayPersistentKeyError
                 .spcGenerationFailed
         }
+        try Task.checkCancellation()
         guard
             !spc.isEmpty,
             spc.count <= configuration.limits.maximumSPCBytes
@@ -199,6 +204,7 @@ public struct HLSFairPlayPersistentKeyWorkflow: Sendable {
             throw HLSFairPlayPersistentKeyError
                 .licenseExchangeFailed
         }
+        try Task.checkCancellation()
         guard
             !licenseResponse.isEmpty,
             licenseResponse.count
@@ -218,10 +224,12 @@ public struct HLSFairPlayPersistentKeyWorkflow: Sendable {
             throw HLSFairPlayPersistentKeyError
                 .persistableKeyCreationFailed
         }
+        try Task.checkCancellation()
         guard isValidPersistableKey(persistableKey) else {
             throw HLSFairPlayPersistentKeyError
                 .invalidPersistableKey
         }
+        try Task.checkCancellation()
         do {
             try await storage.storePersistableContentKey(
                 persistableKey,
@@ -233,7 +241,8 @@ public struct HLSFairPlayPersistentKeyWorkflow: Sendable {
             }
             throw HLSFairPlayPersistentKeyError.storageWriteFailed
         }
-        try Task.checkCancellation()
+        // A successful app-owned store is the commit point. A late cancellation
+        // must not report that no key exists, nor delete an already stored key.
         request.processPersistableKey(persistableKey)
         return .created
     }

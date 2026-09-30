@@ -8,6 +8,43 @@ Resolve and download non-DRM HLS VOD streams with bounded transfers.
 playlists, chooses a deterministic stream, and downloads media resources in
 playlist order without launching a browser or external process.
 
+Prefer ``HLSDownloadDefinition`` for foreground VOD workflows. The macro checks
+constant limits and generates a validated configuration; network and disk
+effects start only at the explicit runtime entry point. Observation does not
+own the download. Cancelling a receipt waiter cancels only that wait; a
+foreground convenience can explicitly propagate cancellation to its owner.
+
+```swift
+import Foundation
+import InnoNetworkHLS
+
+@HLSDownloadDefinition(
+    maximumMediaResourceBytes: 8_388_608,
+    maximumTotalDownloadBytes: 268_435_456,
+    maximumConcurrentResourceTransfers: 3
+)
+enum MovieDownload {}
+
+func saveMovie(source: URL, destination: URL) async throws -> HLSDownloadReceipt {
+    let operation = try MovieDownload.start(
+        sourceURL: source,
+        destinationURL: destination
+    )
+    return try await withTaskCancellationHandler {
+        try await operation.receipt()
+    } onCancel: {
+        operation.cancel()
+    }
+}
+```
+
+For pure document parsing, ``HLSPlaylistParser`` produces a discriminated
+``HLSPlaylistDocument`` without requests, keys or files. Switch over media and
+multivariant payloads rather than interpreting contradictory optional fields.
+Media parsing remains distinct from ``HLSMediaDocument/validateSingleFileDownload()``:
+a live or unsupported document can still be inspected. Validation is advisory;
+a future start always resolves and admits resources again.
+
 Use ``PlaylistResolver`` and ``VariantSelector`` when an application wants a
 deterministic variant URL and output container. Pass either a media playlist
 or multivariant playlist to ``HLSDownloader`` for VOD assembly. Playlist
@@ -19,6 +56,10 @@ through InnoNetwork's core retry policy, persists durable resource-boundary
 checkpoints, and uses bounded parallel prefetch while preserving playlist
 assembly order. Initial and adapter-rewritten URLs pass through the same secure
 network-URL admission as core requests.
+
+The following legacy stream-owned convenience remains an advanced/manual
+alternative. Unlike the explicit operation above, its stream termination
+cancels foreground work.
 
 ```swift
 import Foundation

@@ -5,6 +5,29 @@
 These changes have not been tagged. `1.0.0` remains a draft until the release
 state, remote dependency, Apple-platform, and HLS conformance gates pass.
 
+- Add a pure bounded `HLSPlaylistParser` and parser-produced discriminated
+  multivariant/media documents, with a lossless legacy projection.
+- Add the generated workflow's advisory `prepare` phase. Execution still
+  re-resolves metadata and preserves transport admission and freshness.
+- Clarify that observation drop counts describe losses observed before enqueue,
+  not a post-delivery final-channel total. Retain independent terminal receipts.
+
+- Begin the authorized macro-first redesign with `@HLSDownloadDefinition`,
+  compile-time limit diagnostics and the same validated immutable runtime
+  settings used by the advanced manual equivalent.
+- Add explicit foreground download handles with independent bounded events,
+  cancellation and awaitable committed receipts. Keep new contracts Draft.
+- Reject unavailable LL-HLS skip history before allocation, compare huge finite
+  authoring durations without integer traps, and bound variable expansion
+  before intermediate append.
+- Propagate shared Content Steering cancellation according to waiter ownership;
+  preserve active survivors and cancel activation when all waiters leave.
+- Check persistent FairPlay cancellation between stages; successful app-owned
+  key storage is the commit point and is not undone by late cancellation.
+- Gate public macro declarations in the symbol contract, test actual aggregate
+  and individual macro consumers, and use narrow locked-graph macro validation
+  handling for Xcode CI. Correct historical test disposition reporting.
+
 - Split the four HLS products from InnoNetwork 6 into an independently
   versioned package while preserving their module names.
 - Depend on InnoNetwork's public bounded-transfer and retry-execution

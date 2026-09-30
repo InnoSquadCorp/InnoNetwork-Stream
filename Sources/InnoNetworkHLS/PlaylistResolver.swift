@@ -188,18 +188,8 @@ public struct PlaylistResolver: Sendable {
         _ playlist: String,
         relativeTo sourceURL: URL
     ) throws -> HLSPlaylist {
-        try validateRawPlaylistSize(playlist)
-        let expansion = try HLSVariableSubstituter.expand(
-            playlist,
-            sourceURL: sourceURL,
-            multivariantVariables: nil,
-            maximumBytes: maximumPlaylistBytes
-        )
-        return try HLSPlaylistDocumentParser.parse(
-            expansion.contents,
-            relativeTo: sourceURL,
-            expansion: expansion
-        )
+        try HLSPlaylistParser(maximumPlaylistBytes: maximumPlaylistBytes)
+            .parse(playlist, relativeTo: sourceURL).legacyPlaylist
     }
 
     func validateRawPlaylistSize(

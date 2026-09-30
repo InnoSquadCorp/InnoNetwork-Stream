@@ -142,6 +142,7 @@ jobs:
         if: matrix.builder == 'xcodebuild'
         run: |
           xcodebuild \
+            -skipMacroValidation \
             -scheme InnoNetwork-Stream-Package \
             -destination '${{ matrix.destination }}' \
             -derivedDataPath '.build/platform-${{ matrix.runtime }}' \
