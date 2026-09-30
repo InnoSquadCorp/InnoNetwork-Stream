@@ -8,6 +8,23 @@ import Testing
 struct HLSDownloadDefinitionMacroTests {
     private let macros: [String: Macro.Type] = ["HLSDownloadDefinition": HLSDownloadDefinitionMacro.self]
 
+    @Test(
+        "Escaped and conditional configuration collisions diagnose at the macro",
+        arguments: [
+            "static func `configuration`() {}",
+            "#if DEBUG\n    static func configuration() {}\n    #endif",
+        ])
+    func hiddenConfigurationCollision(member: String) {
+        let body = "enum Download {\n    \(member)\n}"
+        assertMacroExpansion(
+            "@HLSDownloadDefinition\n\(body)", expandedSource: body,
+            diagnostics: [
+                DiagnosticSpec(
+                    message: "@HLSDownloadDefinition owns configuration(); remove the conflicting member.",
+                    line: 1, column: 1)
+            ], macros: macros)
+    }
+
     @Test("public declarations produce validated runtime configuration and conformance")
     func publicExpansion() {
         assertMacroExpansion(

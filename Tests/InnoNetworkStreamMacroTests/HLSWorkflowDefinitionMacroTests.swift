@@ -6,8 +6,28 @@ import Testing
 
 @Suite("Workflow definition expansion")
 struct HLSWorkflowDefinitionMacroTests {
-    @Test(arguments: ["HLSLiveDefinition", "HLSDVRDefinition", "HLSPlaybackDefinition", "HLSCatalogDefinition"])
-    func defaultExpansion(_ name: String) {
+    @Test(
+        "Escaped and conditional configuration collisions diagnose at the macro",
+        arguments: [
+            "static let `configuration` = 1",
+            "#if DEBUG\n    static let configuration = 1\n    #endif",
+        ])
+    func hiddenConfigurationCollision(member: String) {
+        let body = "enum Workflow {\n    \(member)\n}"
+        assertMacroExpansion(
+            "@HLSPlaybackDefinition\n\(body)", expandedSource: body,
+            diagnostics: [
+                DiagnosticSpec(
+                    message: "@HLSPlaybackDefinition owns configuration(); remove the conflicting member.",
+                    line: 1, column: 1)
+            ],
+            macros: ["HLSPlaybackDefinition": HLSWorkflowDefinitionMacro.self])
+    }
+
+    @Test(
+        arguments: ["HLSLiveDefinition", "HLSDVRDefinition", "HLSPlaybackDefinition", "HLSCatalogDefinition"],
+        [false, true])
+    func defaultExpansion(_ name: String, conditionalHelper: Bool) {
         let live = name == "HLSLiveDefinition"
         let dvr = name == "HLSDVRDefinition"
         let catalog = name == "HLSCatalogDefinition"
@@ -26,10 +46,12 @@ struct HLSWorkflowDefinitionMacroTests {
                 : dvr
                     ? "maximumDurationSeconds: 1800, maximumSegmentCount: 900, maximumMediaResourceBytes: 134217728, maximumTotalMediaBytes: 8589934592"
                     : "maximumPeakBitRate: 10000000, maximumWidth: 1920, maximumHeight: 1080"
+        let helper = conditionalHelper ? "\n#if DEBUG\nstatic let debugLabel = 1\n#endif\n" : ""
+        let expandedHelper = conditionalHelper ? "\n#if DEBUG\nstatic let debugLabel = 1\n#endif" : ""
         assertMacroExpansion(
-            "@\(name)\npublic enum Workflow {}",
+            "@\(name)\npublic enum Workflow {\(helper)}",
             expandedSource: """
-                public enum Workflow {
+                public enum Workflow {\(expandedHelper)
 
                     public nonisolated static func configuration() throws -> \(module).\(configuration) {
                         try \(module).\(configuration).validated(\(arguments))

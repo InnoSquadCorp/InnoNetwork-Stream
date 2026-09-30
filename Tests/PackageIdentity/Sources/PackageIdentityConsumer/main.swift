@@ -13,6 +13,15 @@ import InnoNetworkHLSLive
 )
 enum ConsumerDownload {}
 
+@HLSDownloadDefinition
+enum ConditionalDownload {
+    #if DEBUG
+    static let debugLabel = "debug"
+    #else
+    static let debugLabel = "release"
+    #endif
+}
+
 @HLSLiveDefinition(minimumPollingMilliseconds: 50, maximumPollingMilliseconds: 100)
 enum ConsumerLive {}
 @HLSDVRDefinition(maximumDurationSeconds: 60, maximumSegmentCount: 10)
@@ -114,6 +123,7 @@ func saveMovie(source: URL, destination: URL) async throws -> HLSDownloadReceipt
 }
 
 let macroConfiguration = try ConsumerDownload.configuration()
+_ = try ConditionalDownload.configuration()
 precondition(macroConfiguration.maximumMediaResourceBytes == 4_096)
 precondition(macroConfiguration.maximumTotalDownloadBytes == 16_384)
 precondition(macroConfiguration.maximumConcurrentResourceTransfers == 2)

@@ -56,14 +56,8 @@ public struct HLSDownloadDefinitionMacro: MemberMacro, ExtensionMacro {
         guard declaration.is(StructDeclSyntax.self) || declaration.is(EnumDeclSyntax.self) else {
             throw Failure("@HLSDownloadDefinition requires a struct or enum declaration.")
         }
-        for member in declaration.memberBlock.members {
-            if member.decl.as(FunctionDeclSyntax.self)?.name.text == "configuration"
-                || member.decl.as(VariableDeclSyntax.self)?.bindings.contains(where: {
-                    $0.pattern.as(IdentifierPatternSyntax.self)?.identifier.text == "configuration"
-                }) == true
-            {
-                throw Failure("@HLSDownloadDefinition owns configuration(); remove the conflicting member.")
-            }
+        if ConfigurationMemberValidation.hasCollision(in: declaration.memberBlock.members) {
+            throw Failure("@HLSDownloadDefinition owns configuration(); remove the conflicting member.")
         }
         if declaration.inheritanceClause?.inheritedTypes.contains(where: {
             ["HLSDownloadDefining", "InnoNetworkHLS.HLSDownloadDefining"].contains($0.type.trimmedDescription)

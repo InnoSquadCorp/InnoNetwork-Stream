@@ -58,14 +58,8 @@ public struct HLSWorkflowDefinitionMacro: MemberMacro, ExtensionMacro {
         guard declaration.is(StructDeclSyntax.self) || declaration.is(EnumDeclSyntax.self) else {
             throw Failure("@\(name) requires a struct or enum declaration.")
         }
-        for member in declaration.memberBlock.members {
-            if member.decl.as(FunctionDeclSyntax.self)?.name.text == "configuration"
-                || member.decl.as(VariableDeclSyntax.self)?.bindings.contains(where: {
-                    $0.pattern.as(IdentifierPatternSyntax.self)?.identifier.text == "configuration"
-                }) == true
-            {
-                throw Failure("@\(name) owns configuration(); remove the conflicting member.")
-            }
+        if ConfigurationMemberValidation.hasCollision(in: declaration.memberBlock.members) {
+            throw Failure("@\(name) owns configuration(); remove the conflicting member.")
         }
         if declaration.inheritanceClause?.inheritedTypes.contains(where: {
             [spec.conformance, "\(spec.module).\(spec.conformance)"].contains($0.type.trimmedDescription)
