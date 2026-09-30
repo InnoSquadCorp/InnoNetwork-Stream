@@ -66,6 +66,15 @@ public struct VariantSelector: Sendable {
     /// Creates an HLS variant selector.
     public init() {}
 
+    /// Selects only from a parser-produced multivariant document.
+    public func select(in document: HLSMultivariantDocument, policy: HLSVariantSelectionPolicy) -> HLSVariant? {
+        select(in: document.variants, policy: policy)
+    }
+
+    public func highestQuality(in document: HLSMultivariantDocument) -> HLSVariant? {
+        select(in: document, policy: .highestQuality)
+    }
+
     /// Returns the variant selected by `policy`, or `nil` when no advertised
     /// variant satisfies a constrained policy.
     public func select(

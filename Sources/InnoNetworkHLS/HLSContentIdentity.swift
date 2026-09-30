@@ -46,7 +46,8 @@ struct HLSContentIdentity: Codable, Equatable, Sendable {
 }
 
 struct HLSResolvedPlaylistDocument: Sendable {
-    let playlist: HLSPlaylist
+    let document: HLSPlaylistDocument
+    var playlist: HLSPlaylist { document.legacyPlaylist }
     let identity: HLSContentIdentity
     let responseFreshness: HLSHTTPResponseFreshness
     let contents: String

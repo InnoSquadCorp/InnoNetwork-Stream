@@ -31,10 +31,7 @@ public struct HLSPlaylistParser: Sendable {
         let playlist = try HLSPlaylistDocumentParser.parse(
             expansion.contents, relativeTo: sourceURL, expansion: expansion
         )
-        switch playlist.kind {
-        case .multivariant: return .multivariant(HLSMultivariantDocument(playlist: playlist))
-        case .media: return .media(HLSMediaDocument(playlist: playlist))
-        }
+        return try HLSPlaylistDocument(parsed: playlist)
     }
 }
 
@@ -43,6 +40,24 @@ public struct HLSPlaylistParser: Sendable {
 public enum HLSPlaylistDocument: Equatable, Sendable {
     case multivariant(HLSMultivariantDocument)
     case media(HLSMediaDocument)
+
+    init(parsed playlist: HLSPlaylist) throws {
+        switch playlist.kind {
+        case .multivariant:
+            guard !playlist.variants.isEmpty, playlist.media == nil,
+                playlist.mediaContainer == nil, playlist.programDateTimes.isEmpty,
+                playlist.dateRanges.isEmpty, playlist.lowLatency == nil
+            else { throw HLSDownloadError.invalidPlaylist }
+            self = .multivariant(HLSMultivariantDocument(playlist: playlist))
+        case .media:
+            guard playlist.media != nil, playlist.variants.isEmpty,
+                playlist.iFrameVariants.isEmpty, playlist.renditions.isEmpty,
+                playlist.contentSteering == nil, playlist.sessionData.isEmpty,
+                playlist.sessionKeys.isEmpty
+            else { throw HLSDownloadError.invalidPlaylist }
+            self = .media(HLSMediaDocument(playlist: playlist))
+        }
+    }
 
     /// Lossless interoperability with inspection APIs during migration.
     /// Unlike legacy construction, these values originate in the parser.

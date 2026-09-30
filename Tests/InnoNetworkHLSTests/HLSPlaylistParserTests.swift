@@ -27,8 +27,17 @@ struct HLSPlaylistParserTests {
         #expect(master.sessionData.count == 1)
         #expect(master.hasIndependentSegments)
         #expect(master.preferredStartPosition != nil)
+        #expect(VariantSelector().highestQuality(in: master) == master.variants.first)
         #expect(document.legacyPlaylist == (try PlaylistResolver().resolve(text, relativeTo: source)))
         #expect(document.sourceURL == source)
+    }
+
+    @Test("contradictory internal fixtures cannot enter validated planning")
+    func contradictoryLegacyValue() throws {
+        let invalid = HLSPlaylist(sourceURL: source, kind: .multivariant, variants: [], mediaContainer: .fragmentedMP4)
+        #expect(throws: HLSDownloadError.invalidPlaylist) { try HLSPlaylistDocument(parsed: invalid) }
+        let mediaWithoutTimeline = HLSPlaylist(sourceURL: source, kind: .media, variants: [])
+        #expect(throws: HLSDownloadError.invalidPlaylist) { try HLSPlaylistDocument(parsed: mediaWithoutTimeline) }
     }
 
     @Test("media inspection does not assert execution support", arguments: [false, true])

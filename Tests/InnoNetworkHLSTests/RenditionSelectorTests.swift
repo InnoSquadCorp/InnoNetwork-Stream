@@ -1,6 +1,6 @@
 import Foundation
-import InnoNetworkHLS
 import Testing
+@testable import InnoNetworkHLS
 
 @Suite("HLS rendition selection")
 struct RenditionSelectorTests {

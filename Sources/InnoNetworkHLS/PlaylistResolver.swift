@@ -82,6 +82,12 @@ public struct PlaylistResolver: Sendable {
         try await resolveDocument(from: sourceURL).playlist
     }
 
+    /// Loads a typed document through the existing bounded, caller-owned
+    /// transport policy. Parsing alone is available from HLSPlaylistParser.
+    public func load(from sourceURL: URL) async throws -> HLSPlaylistDocument {
+        try await resolveDocument(from: sourceURL).document
+    }
+
     func resolveDocument(
         from sourceURL: URL,
         multivariantVariables: [String: String]? = nil,
@@ -166,7 +172,7 @@ public struct PlaylistResolver: Sendable {
             expansion: expansion
         )
         return HLSResolvedPlaylistDocument(
-            playlist: resolvedPlaylist,
+            document: try HLSPlaylistDocument(parsed: resolvedPlaylist),
             identity: HLSContentIdentity(
                 finalURL: transfer.finalURL,
                 playlistData: data,

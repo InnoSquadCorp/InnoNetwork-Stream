@@ -28,7 +28,7 @@ not introduce a hyphenated Swift module or re-export wrapper.
 
 ## Provisionally Stable declarations
 
-The 1,867 inherited declarations are Provisionally Stable candidates for the
+The initial baseline's 1,867 inherited declarations are Provisionally Stable candidates for the
 initial 1.x line. There is no published Stream 1.0 contract yet: the authorized
 macro-first redesign may change pre-release APIs with explicit migration
 evidence. After stabilization, minor releases may add declarations, add cases
@@ -46,7 +46,7 @@ The checked snapshots in `Scripts/symbols/*.allowlist` are the source of truth:
 | `InnoNetworkHLSAudio` | 65 |
 | **Total** | **1,942** |
 
-The 75 new HLS declarations (macro, validated settings, workflow protocol,
+The 76 new HLS name rows (macro, validated settings, workflow protocol,
 download task/observation contracts and pure discriminated documents) are
 **Draft**, not automatically promoted
 to Provisionally Stable by an allowlist update. Macro expansion/diagnostics,
@@ -54,8 +54,9 @@ external Debug/Release consumers, runtime ownership controls and the final
 supported-toolchain/platform gates must pass before promotion. See
 [the macro-first execution plan](docs/MACRO_FIRST_REDESIGN.md).
 
-The explicit 75-declaration increase reflects reviewed families rather than an
-arbitrary budget relaxation; existing declarations are retained. The collector
+The net increase of 75 name rows reflects documented families. One inherited
+flat playlist constructor is internal; 1,866 inherited rows remain. Typed
+selector overloads share name rows and require the semantic signature gate. The collector
 now includes `swift.macro`, so the primary declarative surface is gated too.
 
 `Scripts/check_public_api_contract.sh` regenerates Swift symbol graphs and

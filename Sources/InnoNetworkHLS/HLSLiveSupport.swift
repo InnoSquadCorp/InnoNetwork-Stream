@@ -113,7 +113,7 @@ package extension PlaylistResolver {
         }
         return HLSLiveResolvedPresentation(
             document: try Self.liveDocument(
-                from: selection.playlist,
+                from: selection.document,
                 responseFreshness: selection.responseFreshness
             ),
             selectedVariant: selection.selectedVariant,
@@ -138,7 +138,7 @@ package extension PlaylistResolver {
             disablesCaching: true
         )
         return try Self.liveDocument(
-            from: document.playlist,
+            from: document.document,
             responseFreshness: document.responseFreshness
         )
     }
@@ -157,21 +157,21 @@ package extension PlaylistResolver {
             disablesCaching: true
         )
         return try Self.liveDocument(
-            from: document.playlist,
+            from: document.document,
             responseFreshness: document.responseFreshness
         )
     }
 
     private static func liveDocument(
-        from playlist: HLSPlaylist,
+        from document: HLSPlaylistDocument,
         responseFreshness: HLSHTTPResponseFreshness
     ) throws -> HLSLiveResolvedDocument {
-        guard
-            playlist.kind == .media,
-            let media = playlist.media
+        guard case .media(let value) = document,
+            let media = value.playlist.media
         else {
             throw HLSLiveBridgeError.mediaPlaylistRequired
         }
+        let playlist = value.playlist
 
         let skippedCount =
             playlist.lowLatency?.deltaUpdate?

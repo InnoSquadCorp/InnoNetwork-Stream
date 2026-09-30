@@ -72,7 +72,7 @@ controls; the final status must distinguish local completion from release gates.
 | 3 | Validated immutable limits/configuration and effective settings | Invalid dynamic values typed failures, exact accepted boundaries, existing normalized compatibility path explicit | Initial VOD configuration locally complete; other backend settings in step 7 |
 | 4 | Dedicated macro target and initial download definition; compile-time bounds/collision diagnostics | Exact expansions, invalid declarations, no conditional DEBUG surface, actual external macro consumer | Initial VOD macro locally complete, Draft |
 | 5 | Explicit foreground download operation handle, independent bounded subscriptions, awaitable receipt and terminal ownership | Zero/slow/multiple observers; result waiter vs operation cancel; late commit; cleanup and limits | VOD lifetime locally complete, Draft |
-| 6 | Discriminated parser-produced model views, pure parser/loader effect separation and macro-first advisory preparation | Kind invariants, complete metadata preservation, lenient inspection vs unsupported execution, trust/redirect boundaries | Initial typed parse/prepare path implemented; full legacy/model migration remains |
+| 6 | Discriminated parser-produced model views, pure parser/loader effect separation and macro-first advisory preparation | Kind invariants, complete metadata preservation, lenient inspection vs unsupported execution, trust/redirect boundaries | Locally complete; flat authoring constructor internal, typed backend planning and migration documented |
 | 7 | Generalize coherent lifetime APIs to live/DVR/native adapters and stage transitions | Existing DVR intent/native background behavior retained; observation cannot cancel background work | Pending |
 | 8 | Optional bounded/versioned media metadata coordinator and explicit reconciliation | No implicit deletion/move of app/native/key resources, atomic persistence, migration/corruption limits | Pending |
 | 9 | Structured parse/config/operation failures, capability/recovery and bounded redacted incidents | Preserve error codes/security redaction, drop/sequence semantics and backend-specific support | Pending |
@@ -195,3 +195,14 @@ gates. Tests passing locally are not release-ready proof.
   Formatting passed for 285 files; public API passed 1,942/1,942; release docs
   correctly remain Draft. These are uncommitted working-candidate results on
   the recorded baseline, not evidence for unchanged HEAD or remote CI.
+- Owner subsequently authorized completion with local commits. Plan and initial
+  implementation were committed as `3e02821` / `cd58b2f`. The step 6 migration
+  removes only contradictory public construction, uses text as validated
+  authoring input, adds typed selectors/loader and carries typed documents into
+  VOD/offline/Live planning. Persisted formats and transport policy are unchanged.
+  `model-migration-tests-fixed.log`: 607 registered / 599 ordinary pass / eight
+  deferred fixture cases; external consumers pass. The first test build failed
+  because two legacy fixture suites still imported without `@testable`; their
+  internal test construction now explicitly uses that boundary. Name rows stay
+  1,942 (one constructor removed, loader added), while typed overload semantics
+  remain a step 10 gate. Migration is in `docs/MACRO_FIRST_MIGRATION.md`.

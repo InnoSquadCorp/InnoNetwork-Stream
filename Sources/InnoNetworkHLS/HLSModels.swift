@@ -105,8 +105,9 @@ public struct HLSPlaylist: Equatable, Sendable {
     let media: HLSMediaPlaylist?
     let separateAudioGroupIDs: Set<String>
 
-    /// Creates a parsed HLS playlist value.
-    public init(
+    // Legacy programmatic fixtures are internal. Public parsed documents must
+    // come from HLSPlaylistParser so kind and timeline cannot contradict.
+    init(
         sourceURL: URL,
         kind: Kind,
         variants: [HLSVariant],

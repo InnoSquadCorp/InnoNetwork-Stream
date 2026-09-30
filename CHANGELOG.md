@@ -5,6 +5,10 @@
 These changes have not been tagged. `1.0.0` remains a draft until the release
 state, remote dependency, Apple-platform, and HLS conformance gates pass.
 
+- Breaking pre-release change: make contradictory flat playlist construction
+  internal. Parse into typed documents, then select and plan from those
+  documents; retain lossless inspection and unchanged persisted formats.
+
 - Add a pure bounded `HLSPlaylistParser` and parser-produced discriminated
   multivariant/media documents, with a lossless legacy projection.
 - Add the generated workflow's advisory `prepare` phase. Execution still
