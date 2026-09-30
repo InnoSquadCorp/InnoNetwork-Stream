@@ -319,7 +319,7 @@ struct HLSDecodedAudioTests {
         )
         #expect(
             error.recoverySuggestion
-                == "Wait for or cancel the active read before starting another one."
+                == "Wait for the native read to finish, or detach this output and create a new one."
         )
         #expect(String(describing: error) == "readAlreadyInProgress")
     }

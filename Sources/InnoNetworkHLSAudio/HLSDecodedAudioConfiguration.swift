@@ -21,7 +21,7 @@ public enum HLSDecodedAudioError: Error, Equatable, Sendable {
     /// The output has already been detached from its player item.
     case outputDetached
 
-    /// Another read is already waiting for the next sample.
+    /// A native read is still pending, even if its client wait was cancelled.
     case readAlreadyInProgress
 }
 
@@ -56,7 +56,7 @@ extension HLSDecodedAudioError: LocalizedError {
         case .outputDetached:
             "Create a new HLSDecodedAudioOutput for the player item."
         case .readAlreadyInProgress:
-            "Wait for or cancel the active read before starting another one."
+            "Wait for the native read to finish, or detach this output and create a new one."
         }
     }
 }
