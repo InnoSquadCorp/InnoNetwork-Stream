@@ -179,4 +179,66 @@ if #available(macOS 27, *) {
 }
 #endif
 
-print("package-identity-consumer: OK (four unchanged imports, Stream/Network macros, README example)")
+struct CancellationEntryInterceptor: RequestInterceptor {
+    let entered: AsyncStream<Void>.Continuation
+    func adapt(_ request: URLRequest) async throws -> URLRequest {
+        entered.yield(())
+        try await Task.sleep(for: .seconds(60))
+        return request
+    }
+}
+actor CancellationRecorder: HLSRequestEventObserving {
+    private var last: HLSRequestEvent?
+    func hlsRequestDidEmit(_ event: HLSRequestEvent) async { last = event }
+    func endedWithCancellation() -> Bool {
+        if case .requestFailed(_, failure: .cancellation) = last { return true }
+        return false
+    }
+}
+// An actual Core cancellation crosses both macro-first entry points. The
+// interceptor holds before transport; this control contacts no origin server.
+let (coreEntered, coreEntry) = AsyncStream<Void>.makeStream()
+let cancellationSession = URLSession(configuration: .ephemeral)
+defer {
+    cancellationSession.invalidateAndCancel()
+    coreEntry.finish()
+}
+let cancellationClient = DefaultNetworkClient(
+    configuration: .advanced(
+        baseURL: URL(string: "https://media.example")!,
+        auth: .init(additionalRequestInterceptors: [CancellationEntryInterceptor(entered: coreEntry)])),
+    session: cancellationSession)
+let cancellationRecorder = CancellationRecorder()
+let cancellationTag: CancellationTag = "package-identity-cancellation"
+let cancellationPolicy = HLSRequestPolicy(eventObservers: [cancellationRecorder]) { request, _ in
+    _ = try await cancellationClient.request(ConsumerEndpoint(), tag: cancellationTag)
+    return request
+}
+let cancelledPreparation = Task {
+    try await ConsumerDownload.prepare(
+        sourceURL: URL(string: "https://media.example/cancelled.m3u8")!,
+        session: cancellationSession, requestPolicy: cancellationPolicy)
+}
+enum ConsumerCancellationError: Error { case entryTimeout }
+let reachedCoreEntry = try await withThrowingTaskGroup(of: Bool.self) { group in
+    group.addTask {
+        var iterator = coreEntered.makeAsyncIterator()
+        return await iterator.next() != nil
+    }
+    group.addTask {
+        try await Task.sleep(for: .seconds(5))
+        throw ConsumerCancellationError.entryTimeout
+    }
+    defer { group.cancelAll() }
+    return try await group.next()!
+}
+precondition(reachedCoreEntry)
+await cancellationClient.cancelAll(matching: cancellationTag)
+do {
+    _ = try await cancelledPreparation.value
+    fatalError("Core cancellation unexpectedly completed Stream preparation")
+} catch { precondition(error is CancellationError) }
+let observedCancellation = await cancellationRecorder.endedWithCancellation()
+precondition(observedCancellation)
+
+print("package-identity-consumer: OK (four unchanged imports, Stream/Network macros, README, Core cancellation)")
