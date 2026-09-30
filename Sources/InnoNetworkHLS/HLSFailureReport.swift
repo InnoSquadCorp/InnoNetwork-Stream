@@ -17,9 +17,10 @@ public struct HLSBackendCapabilities: Equatable, Sendable {
         switch backend {
         case .playlistInspection:
             Self(ownership: .none, supportsCheckpointRecovery: false, supportsSystemRestoration: false)
-        case .singleFileDownload, .offlinePackage, .liveWatch:
+        case .liveWatch:
             Self(ownership: .foreground, supportsCheckpointRecovery: false, supportsSystemRestoration: false)
-        case .liveDVR: Self(ownership: .foreground, supportsCheckpointRecovery: true, supportsSystemRestoration: false)
+        case .singleFileDownload, .offlinePackage, .liveDVR:
+            Self(ownership: .foreground, supportsCheckpointRecovery: true, supportsSystemRestoration: false)
         case .nativeBackgroundDownload:
             Self(ownership: .systemManaged, supportsCheckpointRecovery: false, supportsSystemRestoration: true)
         case .nativePlayback:
@@ -120,7 +121,9 @@ public struct HLSFailureReport: Error, Codable, Equatable, Sendable {
         }
         var advice = recovery ?? fallback
         if category == .transport, advice == .retrySubjectToRequestPolicy {
-            if backend == .liveDVR { advice = .resumeSubjectToCheckpoint }
+            if backend == .liveDVR || backend == .singleFileDownload || backend == .offlinePackage {
+                advice = .resumeSubjectToCheckpoint
+            }
             if backend == .nativeBackgroundDownload { advice = .restoreNativeTasks }
         }
         return Self(

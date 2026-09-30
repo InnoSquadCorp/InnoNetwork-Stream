@@ -8,8 +8,10 @@ path claims line-level information the parser does not produce.
 
 Recovery advice never executes work. Transient status/URL errors remain subject
 to caller request policy. Authorization failures require application action.
-Checkpoint recovery is opt-in DVR behavior, not single-file/offline-package
-resumption. Native restoration uses system task IDs/session restoration, not
+Checkpoint recovery covers automatic VOD/single-file and offline-package
+resource plans, plus opt-in DVR recovery. It still requires an enabled policy
+and a matching durable checkpoint; the capability is not a guarantee that a
+checkpoint exists. Native restoration uses system task IDs/session restoration, not
 foreground checkpoint ownership. Capabilities describe backend lifetime and
 recovery only; parsing a feature does not authorize executing it.
 
