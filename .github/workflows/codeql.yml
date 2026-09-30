@@ -36,6 +36,8 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Select Xcode 26.0.1
         run: sudo xcode-select -s /Applications/Xcode_26.0.1.app
+      - name: Verify coupled CodeQL action pins
+        run: ruby Scripts/check_codeql_contract.rb
       - name: Verify published InnoNetwork dependency
         run: bash Scripts/check_innonetwork_dependency.sh
       - name: Initialize CodeQL

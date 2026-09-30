@@ -88,6 +88,8 @@ jobs:
         run: |
           bash -n Scripts/*.sh Scripts/tests/*.sh
           python3 -m py_compile Scripts/*.py
+          ruby Scripts/check_codeql_contract.rb
+          ruby Scripts/tests/test_codeql_contract.rb
           bash Scripts/tests/test_check_innonetwork_dependency.sh
           bash Scripts/tests/test_validate_docs_release_state.sh
           bash Scripts/tests/test_validate_release_candidate.sh
