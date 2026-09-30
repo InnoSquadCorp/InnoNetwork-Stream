@@ -14,8 +14,9 @@ fail() {
 [[ -f "$budgets_file" ]] || fail "missing Scripts/symbols/budgets.tsv"
 bash Scripts/check_innonetwork_dependency.sh
 
-find .build -path '*/symbolgraph/*.symbols.json' -type f -delete 2>/dev/null || true
-xcrun swift package --force-resolved-versions dump-symbol-graph \
+# Select only this build context; never delete diagnostic or other-context graphs.
+scratch_path="$(python3 Scripts/swiftpm_scratch_path.py "$repo_root")"
+bash Scripts/swiftpm.sh package --force-resolved-versions dump-symbol-graph \
   --minimum-access-level public \
   --skip-synthesized-members >/dev/null
 
@@ -24,7 +25,7 @@ cleanup() {
   rm -f "$actual"
 }
 trap cleanup EXIT
-python3 Scripts/collect_public_symbols.py . > "$actual"
+python3 Scripts/collect_public_symbols.py . --build-root "$scratch_path" > "$actual"
 
 declare -a contracts=(
   "InnoNetworkHLS:hls.allowlist"
@@ -66,4 +67,5 @@ total_budget="$(awk -F '\t' '$1 == "TOTAL" { print $2 }' "$budgets_file")"
 
 echo "public-api-contract: OK ($total/$total_budget)"
 python3 Scripts/collect_public_signatures.py . \
+  --build-root "$scratch_path" \
   --check Scripts/symbols/public-signatures.tsv

@@ -44,8 +44,8 @@ def signature_rows(graph):
     return sorted(set(rows))
 
 
-def collect(root):
-    candidates = [path for path in (root / ".build").glob("*/symbolgraph") if path.is_dir()]
+def collect(root, build_root=None):
+    candidates = [path for path in (build_root or root / ".build").glob("*/symbolgraph") if path.is_dir()]
     if not candidates:
         raise SystemExit("No generated symbol graphs; run the public API gate first.")
     directory = max(candidates, key=lambda path: path.stat().st_mtime)
@@ -66,12 +66,13 @@ def collect(root):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("repo_root", type=Path)
+    parser.add_argument("--build-root", type=Path)
     parser.add_argument("--check", type=Path)
     parser.add_argument("--write-snapshot", type=Path, help="Explicit mechanical regeneration after semantic API review")
     args = parser.parse_args()
     if args.check and args.write_snapshot:
         parser.error("check and regeneration are mutually exclusive")
-    observed = collect(args.repo_root)
+    observed = collect(args.repo_root, args.build_root)
     if args.check:
         expected = args.check.read_text(encoding="utf-8")
         if expected != observed:

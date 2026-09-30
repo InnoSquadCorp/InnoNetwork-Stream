@@ -35,11 +35,12 @@ def main() -> None:
         description="Collect InnoNetwork-Stream public symbol-graph rows."
     )
     parser.add_argument("repo_root", type=Path)
+    parser.add_argument("--build-root", type=Path)
     args = parser.parse_args()
 
     candidates = [
         path
-        for path in (args.repo_root / ".build").glob("*/symbolgraph")
+        for path in (args.build_root or args.repo_root / ".build").glob("*/symbolgraph")
         if path.is_dir()
     ]
     if not candidates:

@@ -39,13 +39,14 @@ bash Scripts/validate_docs_release_state.sh
 ruby Scripts/check_codeql_contract.rb
 ruby Scripts/tests/test_codeql_contract.rb
 python3 Scripts/tests/test_hls_fixture_readiness.py
+python3 Scripts/tests/test_swiftpm_scratch.py
 bash Scripts/check_public_api_contract.sh
 bash Scripts/tests/test_package_identity.sh
 bash Scripts/tests/test_run_affected_tests.sh
 python3 Scripts/tests/test_public_signatures.py
 bash -n Scripts/*.sh
 python3 -m py_compile Scripts/*.py
-xcrun swift test --force-resolved-versions --parallel
+bash Scripts/swiftpm.sh test --force-resolved-versions --parallel
 
 if [[ "$mode" == "full" ]]; then
   bash Scripts/run_hls_quality_gates.sh \

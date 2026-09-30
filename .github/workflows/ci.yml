@@ -71,7 +71,7 @@ jobs:
       - name: Verify dependency lock did not drift
         run: git diff --exit-code -- Package.resolved
       - name: Run tests
-        run: xcrun swift test --force-resolved-versions --parallel
+        run: bash Scripts/swiftpm.sh test --force-resolved-versions --parallel
 
   contracts:
     name: Docs / API / HLS Contract
@@ -91,6 +91,7 @@ jobs:
           ruby Scripts/check_codeql_contract.rb
           ruby Scripts/tests/test_codeql_contract.rb
           python3 Scripts/tests/test_hls_fixture_readiness.py
+          python3 Scripts/tests/test_swiftpm_scratch.py
           bash Scripts/tests/test_check_innonetwork_dependency.sh
           bash Scripts/tests/test_validate_docs_release_state.sh
           bash Scripts/tests/test_validate_release_candidate.sh

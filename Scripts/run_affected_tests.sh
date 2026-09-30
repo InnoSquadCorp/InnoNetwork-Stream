@@ -60,8 +60,8 @@ fi
 echo "affected-tests: selection=$selection consumer=$consumer (local feedback only)"
 (( dry_run )) && exit 0
 if (( full )); then
-  xcrun swift test --force-resolved-versions --parallel
+  bash Scripts/swiftpm.sh test --force-resolved-versions --parallel
 elif [[ -n "$filter" ]]; then
-  xcrun swift test --force-resolved-versions --filter "$filter"
+  bash Scripts/swiftpm.sh test --force-resolved-versions --filter "$filter"
 fi
 if (( consumer )); then bash Scripts/tests/test_package_identity.sh; fi

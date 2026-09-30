@@ -55,11 +55,11 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ "$skip_build" == true ]]; then
-  xcrun swift test \
+  bash Scripts/swiftpm.sh test \
     --skip-build \
     --filter 'HLS(MediaFixtureIntegrity|ParserMutation|ParserScaling|LiveRace|AssetDownloadEventHubRace)Tests'
 else
-  xcrun swift test \
+  bash Scripts/swiftpm.sh test \
     --filter 'HLS(MediaFixtureIntegrity|ParserMutation|ParserScaling|LiveRace|AssetDownloadEventHubRace)Tests'
 fi
 

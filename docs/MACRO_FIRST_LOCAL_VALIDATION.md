@@ -25,6 +25,23 @@ delivery shares transport-neutral mechanics, not one native ownership policy.
 
 ## Evidence and corrections
 
+### Supported build-cache entry point
+
+Use `bash Scripts/swiftpm.sh test --force-resolved-versions --parallel` for direct
+SwiftPM feedback, or the local preflight below. The wrapper preserves old build
+trees and selects a reusable scratch scope from the canonical package path,
+selected Swift toolchain and SDK/settings identity. An explicit `--scratch-path`
+is a base directory; the scope is nested inside it. Platform and external-consumer
+checks use the same entry point. Moving the package or changing tools/SDKs selects
+a fresh scope; source edits alone do not force a fresh build.
+
+Dependency validation verifies object connectivity, not only the reported HEAD.
+Missing alternate stores fail closed and are not repaired by editing or deleting
+the original cache. Public API collection reads only the selected build scope
+and no longer removes symbol graphs from other scopes or diagnostic folders.
+Bare `xcrun swift test` still uses SwiftPM's default `.build`; it is not the
+rename-safe entry point and does not receive this cache isolation.
+
 Diagnostics remain in ignored `.build/macro-first-redesign/`; no failed
 attempt is erased. Reused initial memory-footprint/profiler evidence is recorded
 in the execution plan, not claimed as a new final-SHA performance benchmark.

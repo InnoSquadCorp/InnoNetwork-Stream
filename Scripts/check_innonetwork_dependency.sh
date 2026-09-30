@@ -7,6 +7,7 @@ if [[ $# -gt 1 ]]; then
 fi
 
 package_root="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$package_root"
 
 fail() {
@@ -34,7 +35,7 @@ jq -e --arg url "$network_url" '
 
 network_version="$(jq -r '.pins[] | select(.identity == "innonetwork") | .state.version' Package.resolved)"
 network_revision="$(jq -r '.pins[] | select(.identity == "innonetwork") | .state.revision' Package.resolved)"
-graph="$(xcrun swift package --force-resolved-versions show-dependencies --format json)"
+graph="$(bash "$script_root/swiftpm.sh" package --force-resolved-versions show-dependencies --format json)"
 
 printf '%s\n' "$graph" | jq -e \
   --arg url "$network_url" --arg version "$network_version" '
@@ -69,6 +70,8 @@ while IFS= read -r node; do
   observed_revision="$(git -C "$dependency_path" rev-parse --verify HEAD)"
   [[ "$observed_revision" == "$locked_revision" ]] \
     || fail "$identity dependency checkout does not match the locked revision"
+  git -C "$dependency_path" fsck --no-reflogs --connectivity-only --no-dangling >/dev/null \
+    || fail "$identity dependency cache integrity failed; preserve it and use a fresh scoped scratch path"
 done <<< "$active_nodes"
 [[ "$(shasum -a 256 Package.resolved)" == "$resolved_before" ]] \
   || fail "dependency lock drifted while resolving"

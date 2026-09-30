@@ -116,7 +116,7 @@ curl --fail --silent --show-error "$live_timeshift_url" \
   | grep -Fxq '#EXT-X-PLAYLIST-TYPE:EVENT'
 
 test_command=(
-  xcrun swift test
+  bash Scripts/swiftpm.sh test
   --filter 'HLS(AudioMixProcessing|DecodedAudio|IntegratedTimeline|LocalPlayback|OfflineAsset|LiveDVRPreload|LiveDVRMapRotation|LiveDVRGap|LiveDVRTimeshift)RuntimeTests'
 )
 if [[ "$skip_build" == true ]]; then

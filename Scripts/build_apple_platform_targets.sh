@@ -33,13 +33,13 @@ targets=()
 while IFS= read -r target; do
   targets+=("$target")
 done < <(
-  xcrun swift package --package-path "$repo_root" dump-package \
+  bash "$repo_root/Scripts/swiftpm.sh" package --package-path "$repo_root" dump-package \
     | jq -r '.products[] | select(.type.library != null) | .targets[]' \
     | sort -u
 )
 
 for target in "${targets[@]}"; do
-  xcrun swift build \
+  bash "$repo_root/Scripts/swiftpm.sh" build \
     --package-path "$repo_root" \
     --force-resolved-versions \
     --scratch-path "$scratch_path" \
