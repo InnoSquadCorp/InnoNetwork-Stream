@@ -73,17 +73,24 @@ expect_hash "$fixture/segment-1.m4s" \
 expect_hash "$fixture/segment-2.m4s" \
   "863096b38668959a66385bc34a3f67e71c9664e1ebcabb45e7d82309f9272ee9"
 
-scratch="$(mktemp -d "${TMPDIR:-/tmp}/innonetwork-hls-runtime.XXXXXX")"
+diagnostics_root="$repo_root/.build/hls-runtime-diagnostics"
+mkdir -p "$diagnostics_root"
+scratch="$(mktemp -d "$diagnostics_root/run.XXXXXX")"
 ready_file="$scratch/base-url"
 server_log="$scratch/server.log"
 server_pid=""
 
 cleanup() {
+  local status=$?
   if [[ -n "$server_pid" ]] && kill -0 "$server_pid" 2>/dev/null; then
     kill "$server_pid" 2>/dev/null || true
     wait "$server_pid" 2>/dev/null || true
   fi
-  rm -rf "$scratch"
+  if [[ "$status" -eq 0 ]]; then
+    rm -rf "$scratch"
+  else
+    echo "hls-runtime-smoke: failure diagnostics retained at $scratch" >&2
+  fi
 }
 trap cleanup EXIT
 
@@ -93,25 +100,7 @@ python3 Scripts/serve_hls_runtime_fixtures.py \
   >"$server_log" 2>&1 &
 server_pid=$!
 
-for _ in {1..100}; do
-  if [[ -s "$ready_file" ]]; then
-    break
-  fi
-  if ! kill -0 "$server_pid" 2>/dev/null; then
-    cat "$server_log" >&2
-    echo "hls-runtime-smoke: fixture server exited before readiness" >&2
-    exit 1
-  fi
-  sleep 0.05
-done
-
-if [[ ! -s "$ready_file" ]]; then
-  cat "$server_log" >&2
-  echo "hls-runtime-smoke: fixture server readiness timed out" >&2
-  exit 1
-fi
-
-base_url="$(tr -d '\r\n' <"$ready_file")"
+base_url="$(python3 Scripts/wait_hls_fixture_ready.py "$ready_file" "$server_pid" "$server_log")"
 playlist_url="$base_url/audio-fmp4/index.m3u8"
 live_preload_url="$base_url/live-preload/index.m3u8"
 live_map_rotation_url="$base_url/live-map-rotation/index.m3u8"

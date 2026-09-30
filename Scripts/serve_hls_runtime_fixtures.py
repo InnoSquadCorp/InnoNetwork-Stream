@@ -8,6 +8,7 @@ import functools
 import http.server
 import json
 import os
+import socketserver
 from pathlib import Path
 import sys
 import threading
@@ -317,7 +318,18 @@ def write_ready_file(path: Path, base_url: str) -> None:
     os.replace(temporary, path)
 
 
+class LoopbackFixtureServer(http.server.ThreadingHTTPServer):
+    def server_bind(self) -> None:
+        # HTTPServer otherwise calls getfqdn synchronously before readiness.
+        # An explicit loopback fixture needs neither DNS nor a hostname alias.
+        socketserver.TCPServer.server_bind(self)
+        self.server_name = "127.0.0.1"
+        self.server_port = self.server_address[1]
+
+
 def main() -> None:
+    started = time.monotonic()
+    print(f"hls-runtime-server: starting pid={os.getpid()} python={sys.version.split()[0]}", flush=True)
     parser = argparse.ArgumentParser()
     parser.add_argument("fixture_root", type=Path)
     parser.add_argument("ready_file", type=Path)
@@ -340,10 +352,11 @@ def main() -> None:
         FixtureRequestHandler,
         directory=str(fixture_root),
     )
-    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    server = LoopbackFixtureServer(("127.0.0.1", 0), handler)
     server.daemon_threads = True
     port = server.server_address[1]
     write_ready_file(arguments.ready_file, f"http://127.0.0.1:{port}")
+    print(f"hls-runtime-server: ready elapsed_ms={(time.monotonic() - started) * 1000:.2f} port={port}", flush=True)
     try:
         server.serve_forever(poll_interval=0.1)
     except KeyboardInterrupt:

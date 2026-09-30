@@ -90,6 +90,7 @@ jobs:
           python3 -m py_compile Scripts/*.py
           ruby Scripts/check_codeql_contract.rb
           ruby Scripts/tests/test_codeql_contract.rb
+          python3 Scripts/tests/test_hls_fixture_readiness.py
           bash Scripts/tests/test_check_innonetwork_dependency.sh
           bash Scripts/tests/test_validate_docs_release_state.sh
           bash Scripts/tests/test_validate_release_candidate.sh
@@ -103,6 +104,13 @@ jobs:
         run: bash Scripts/check_public_api_contract.sh
       - name: Run HLS contract gates
         run: bash Scripts/run_hls_quality_gates.sh
+      - name: Preserve HLS startup and runtime failures
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hls-runtime-diagnostics
+          path: .build/hls-runtime-diagnostics/
+          if-no-files-found: ignore
 
   platform-build:
     name: Apple Platform Build (${{ matrix.runtime }})
