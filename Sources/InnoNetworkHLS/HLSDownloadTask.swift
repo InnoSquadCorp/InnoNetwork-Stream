@@ -64,6 +64,7 @@ public final class HLSDownloadTask: Sendable {
     deinit { worker.cancel() }
 
     public var state: HLSDownloadTaskState { hub.state }
+    public var failureReport: HLSFailureReport? { hub.failureReport }
 
     /// Requests cancellation; completed output is never implicitly deleted.
     public func cancel() { worker.cancel() }
@@ -105,6 +106,16 @@ private final class HLSDownloadTaskHub: Sendable {
     private let storage = OSAllocatedUnfairLock(initialState: Storage())
 
     init(id: UUID) { self.id = id }
+
+    var failureReport: HLSFailureReport? {
+        storage.withLock {
+            switch $0.outcome {
+            case .failed(let error): .classify(error, backend: .singleFileDownload, operationID: id)
+            case .cancelled: .classify(CancellationError(), backend: .singleFileDownload, operationID: id)
+            default: nil
+            }
+        }
+    }
 
     var state: HLSDownloadTaskState {
         storage.withLock {

@@ -233,6 +233,9 @@ public final class HLSLiveDVRRecording: Sendable {
     private let channel: HLSOperationChannel<HLSLiveDVREvent, HLSLiveDVRReceipt>
     public var id: UUID { channel.id }
     public var state: HLSDownloadTaskState { channel.state }
+    public var failureReport: HLSFailureReport? {
+        channel.failure.map { .classify($0, backend: .liveDVR, operationID: id) }
+    }
 
     /// Independent bounded observation. Cancellation does not discard work.
     public func observations() throws -> AsyncThrowingStream<HLSOperationObservation<HLSLiveDVREvent>, Error> {

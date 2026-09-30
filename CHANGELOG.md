@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add structured parse/operation failure reports, backend lifetime/recovery
+  capabilities and explicit bounded export-safe incidents. Preserve existing
+  NSError codes and suppress underlying descriptions, URLs and credentials.
+
 - Add opt-in `@HLSCatalogDefinition` and bounded versioned metadata coordination
   with typed identities, explicit reconciliation and staged app-owned atomic
   persistence. Never implicitly delete/move media or touch key storage.

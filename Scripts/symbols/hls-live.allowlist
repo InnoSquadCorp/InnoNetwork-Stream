@@ -327,3 +327,8 @@ InnoNetworkHLSLive	swift.type.method	HLSLiveDVRConfiguration.validated(maximumDu
 InnoNetworkHLSLive	swift.type.method	HLSLiveDefining.configuration()
 InnoNetworkHLSLive	swift.type.method	HLSLiveDefining.makeClient(session:requestContext:requestPolicy:)
 InnoNetworkHLSLive	swift.type.method	HLSLiveDefining.watch(from:session:requestContext:requestPolicy:)
+InnoNetworkHLSLive	swift.property	HLSLiveConfigurationError.hlsFailureCategory
+InnoNetworkHLSLive	swift.property	HLSLiveDVRError.hlsFailureCategory
+InnoNetworkHLSLive	swift.property	HLSLiveDVRError.hlsRecoveryAction
+InnoNetworkHLSLive	swift.property	HLSLiveDVRRecording.failureReport
+InnoNetworkHLSLive	swift.property	HLSLiveWatching.failureReport

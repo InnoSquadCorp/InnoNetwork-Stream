@@ -710,3 +710,4 @@ InnoNetworkHLSAVFoundation	swift.protocol	HLSPlaybackDefining
 InnoNetworkHLSAVFoundation	swift.type.method	HLSPlaybackConfiguration.validated(maximumPeakBitRate:maximumWidth:maximumHeight:)
 InnoNetworkHLSAVFoundation	swift.type.method	HLSPlaybackDefining.apply(to:)
 InnoNetworkHLSAVFoundation	swift.type.method	HLSPlaybackDefining.configuration()
+InnoNetworkHLSAVFoundation	swift.property	HLSPlaybackLimitError.hlsFailureCategory

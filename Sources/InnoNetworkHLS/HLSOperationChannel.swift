@@ -28,6 +28,10 @@ package final class HLSOperationChannel<Event: Sendable, Output: Sendable>: Send
 
     package init() {}
 
+    package var failure: (any Error)? {
+        storage.withLock { if case .failure(let error) = $0.result { error } else { nil } }
+    }
+
     package var state: HLSDownloadTaskState {
         storage.withLock {
             switch $0.result {

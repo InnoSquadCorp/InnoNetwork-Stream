@@ -19,6 +19,10 @@ public extension HLSPlaybackDefining {
 
 public enum HLSPlaybackLimitError: Error, Equatable, Sendable { case invalidLimits }
 
+extension HLSPlaybackLimitError: HLSFailureCategorizing {
+    public var hlsFailureCategory: HLSFailureCategory { .configuration }
+}
+
 public extension HLSPlaybackConfiguration {
     static func validated(maximumPeakBitRate: Int = 10_000_000, maximumWidth: Int = 1920, maximumHeight: Int = 1080)
         throws -> Self

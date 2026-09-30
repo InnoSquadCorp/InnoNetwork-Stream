@@ -12,6 +12,21 @@ private enum TestRecording {}
 
 @Suite("Live workflow definitions", .serialized)
 struct HLSWorkflowTests {
+    @Test("DVR recovery advice distinguishes checkpoint, authorization and input")
+    func failureAdvice() {
+        #expect(
+            HLSFailureReport.classify(HLSLiveDVRError.transferFailed, backend: .liveDVR).recovery
+                == .resumeSubjectToCheckpoint)
+        #expect(
+            HLSFailureReport.classify(HLSLiveDVRError.invalidMediaResponseStatus(404), backend: .liveDVR).recovery
+                == .inspectInput)
+        #expect(
+            HLSFailureReport.classify(HLSLiveDVRError.invalidMediaResponseStatus(401), backend: .liveDVR).recovery
+                == .provideFreshAuthorization)
+        #expect(
+            HLSFailureReport.classify(HLSLiveConfigurationError.invalidReloadTiming, backend: .liveWatch).category
+                == .configuration)
+    }
     @Test("macro and dynamic validation expose the same accepted effective settings")
     func settings() throws {
         #expect(try TestWatch.configuration().minimumPollingInterval == 0.05)

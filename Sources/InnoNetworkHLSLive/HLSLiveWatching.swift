@@ -8,6 +8,9 @@ public final class HLSLiveWatching: Sendable {
     private let worker: Task<Void, Never>
     public var id: UUID { channel.id }
     public var state: HLSDownloadTaskState { channel.state }
+    public var failureReport: HLSFailureReport? {
+        channel.failure.map { .classify($0, backend: .liveWatch, operationID: id) }
+    }
 
     init(client: HLSLivePlaylistClient, sourceURL: URL) {
         let channel = HLSOperationChannel<HLSLivePlaylistSnapshot, HLSLivePlaylistSnapshot>()
