@@ -19,6 +19,14 @@ public struct HLSWorkflowDefinitionMacro: MemberMacro, ExtensionMacro {
         let name = String(node.attributeName.trimmedDescription.split(separator: ".").last ?? "")
         var spec: Spec
         switch name {
+        case "HLSCatalogDefinition":
+            spec = Spec(
+                module: "InnoNetworkHLS", configuration: "HLSMediaCatalogConfiguration",
+                conformance: "HLSCatalogDefining",
+                fields: [
+                    Field(name: "maximumEntries", value: 512, range: 1...512),
+                    Field(name: "maximumSnapshotBytes", value: 1_048_576, range: 1024...1_048_576),
+                ])
         case "HLSLiveDefinition":
             spec = Spec(
                 module: "InnoNetworkHLSLive", configuration: "HLSLiveConfiguration", conformance: "HLSLiveDefining",

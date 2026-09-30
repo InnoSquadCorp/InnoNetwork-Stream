@@ -18,6 +18,8 @@ enum ConsumerLive {}
 enum ConsumerDVR {}
 @HLSPlaybackDefinition(maximumPeakBitRate: 1000, maximumWidth: 320, maximumHeight: 240)
 enum ConsumerPlayback {}
+@HLSCatalogDefinition(maximumEntries: 3, maximumSnapshotBytes: 2048)
+enum ConsumerCatalog {}
 
 // Compile backend-specific entry points without initiating external effects.
 func observeLive(source: URL, session: URLSession) throws -> HLSLiveWatching {
@@ -70,6 +72,11 @@ let playbackConfiguration = try ConsumerPlayback.configuration()
 precondition(liveConfiguration.minimumPollingInterval == 0.05)
 precondition(dvrConfiguration.effectiveLimits.maximumSegmentCount == 10)
 precondition(playbackConfiguration.variant.maximumWidth == 320)
+let catalog = try ConsumerCatalog.makeCatalog()
+let catalogRecord = try HLSMediaRecord(id: HLSMediaID(), ownership: .applicationFile, reference: "consumer-asset")
+try await catalog.upsert(catalogRecord)
+let catalogSnapshot = await catalog.snapshot()
+precondition(catalogSnapshot.count == 1)
 precondition(ConsumerEndpoint().path == "/fixture")
 
 let parsedDocument = try HLSPlaylistParser().parse(

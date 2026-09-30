@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add opt-in `@HLSCatalogDefinition` and bounded versioned metadata coordination
+  with typed identities, explicit reconciliation and staged app-owned atomic
+  persistence. Never implicitly delete/move media or touch key storage.
+
 - Add macro-first Live, DVR and native playback definitions with validated
   effective limits. Add a foreground watch owner and independent bounded DVR
   observations/receipts while preserving native background and audio ownership.

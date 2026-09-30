@@ -40,13 +40,13 @@ The checked snapshots in `Scripts/symbols/*.allowlist` are the source of truth:
 
 | Module | Public declarations |
 | --- | ---: |
-| `InnoNetworkHLS` | 877 |
+| `InnoNetworkHLS` | 928 |
 | `InnoNetworkHLSLive` | 329 |
 | `InnoNetworkHLSAVFoundation` | 712 |
 | `InnoNetworkHLSAudio` | 65 |
-| **Total** | **1,983** |
+| **Total** | **2,034** |
 
-The 117 new name rows (macro, validated settings, workflow protocol,
+The 168 new name rows (macro, validated settings, workflow protocol,
 download task/observation contracts and pure discriminated documents) are
 **Draft**, not automatically promoted
 to Provisionally Stable by an allowlist update. Macro expansion/diagnostics,
@@ -54,7 +54,7 @@ external Debug/Release consumers, runtime ownership controls and the final
 supported-toolchain/platform gates must pass before promotion. See
 [the macro-first execution plan](docs/MACRO_FIRST_REDESIGN.md).
 
-The net increase of 116 name rows reflects documented families. One inherited
+The net increase of 167 name rows reflects documented families. One inherited
 flat playlist constructor is internal; 1,866 inherited rows remain. Typed
 selector overloads share name rows and require the semantic signature gate. The collector
 now includes `swift.macro`, so the primary declarative surface is gated too.

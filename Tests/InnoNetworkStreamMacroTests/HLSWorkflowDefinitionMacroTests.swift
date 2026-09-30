@@ -6,19 +6,26 @@ import Testing
 
 @Suite("Workflow definition expansion")
 struct HLSWorkflowDefinitionMacroTests {
-    @Test(arguments: ["HLSLiveDefinition", "HLSDVRDefinition", "HLSPlaybackDefinition"])
+    @Test(arguments: ["HLSLiveDefinition", "HLSDVRDefinition", "HLSPlaybackDefinition", "HLSCatalogDefinition"])
     func defaultExpansion(_ name: String) {
         let live = name == "HLSLiveDefinition"
         let dvr = name == "HLSDVRDefinition"
-        let module = live || dvr ? "InnoNetworkHLSLive" : "InnoNetworkHLSAVFoundation"
-        let configuration = live ? "HLSLiveConfiguration" : dvr ? "HLSLiveDVRConfiguration" : "HLSPlaybackConfiguration"
-        let conformance = live ? "HLSLiveDefining" : dvr ? "HLSDVRDefining" : "HLSPlaybackDefining"
+        let catalog = name == "HLSCatalogDefinition"
+        let module = catalog ? "InnoNetworkHLS" : live || dvr ? "InnoNetworkHLSLive" : "InnoNetworkHLSAVFoundation"
+        let configuration =
+            catalog
+            ? "HLSMediaCatalogConfiguration"
+            : live ? "HLSLiveConfiguration" : dvr ? "HLSLiveDVRConfiguration" : "HLSPlaybackConfiguration"
+        let conformance =
+            catalog ? "HLSCatalogDefining" : live ? "HLSLiveDefining" : dvr ? "HLSDVRDefining" : "HLSPlaybackDefining"
         let arguments =
-            live
-            ? "minimumPollingMilliseconds: 500, maximumPollingMilliseconds: 30000, requestTimeoutSeconds: 45"
-            : dvr
-                ? "maximumDurationSeconds: 1800, maximumSegmentCount: 900, maximumMediaResourceBytes: 134217728, maximumTotalMediaBytes: 8589934592"
-                : "maximumPeakBitRate: 10000000, maximumWidth: 1920, maximumHeight: 1080"
+            catalog
+            ? "maximumEntries: 512, maximumSnapshotBytes: 1048576"
+            : live
+                ? "minimumPollingMilliseconds: 500, maximumPollingMilliseconds: 30000, requestTimeoutSeconds: 45"
+                : dvr
+                    ? "maximumDurationSeconds: 1800, maximumSegmentCount: 900, maximumMediaResourceBytes: 134217728, maximumTotalMediaBytes: 8589934592"
+                    : "maximumPeakBitRate: 10000000, maximumWidth: 1920, maximumHeight: 1080"
         assertMacroExpansion(
             "@\(name)\npublic enum Workflow {}",
             expandedSource: """
