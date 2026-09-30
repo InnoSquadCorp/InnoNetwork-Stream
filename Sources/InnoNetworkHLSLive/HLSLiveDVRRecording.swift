@@ -1,4 +1,5 @@
 import Foundation
+import InnoNetworkHLS
 
 enum HLSLiveDVRRecordingIntent: Sendable {
     case stopAndCommit
@@ -229,6 +230,17 @@ actor HLSLiveDVRPlaybackSnapshotRequest {
 /// Legacy recordings remove staging; a resumable recording preserves its last
 /// complete-segment checkpoint when one exists.
 public final class HLSLiveDVRRecording: Sendable {
+    private let channel: HLSOperationChannel<HLSLiveDVREvent, HLSLiveDVRReceipt>
+    public var id: UUID { channel.id }
+    public var state: HLSDownloadTaskState { channel.state }
+
+    /// Independent bounded observation. Cancellation does not discard work.
+    public func observations() throws -> AsyncThrowingStream<HLSOperationObservation<HLSLiveDVREvent>, Error> {
+        try channel.subscribe()
+    }
+
+    /// Authoritative committed receipt, independent of event consumption.
+    public func receipt() async throws -> HLSLiveDVRReceipt { try await channel.value() }
     /// Bounded progress and completion events for this recording.
     ///
     /// Stopping iteration does not stop the recording. Use
@@ -241,10 +253,12 @@ public final class HLSLiveDVRRecording: Sendable {
 
     init(
         events: AsyncThrowingStream<HLSLiveDVREvent, Error>,
+        channel: HLSOperationChannel<HLSLiveDVREvent, HLSLiveDVRReceipt>,
         control: HLSLiveDVRRecordingControl,
         task: Task<HLSLiveDVRReceipt, Error>
     ) {
         self.events = events
+        self.channel = channel
         self.control = control
         self.task = task
     }

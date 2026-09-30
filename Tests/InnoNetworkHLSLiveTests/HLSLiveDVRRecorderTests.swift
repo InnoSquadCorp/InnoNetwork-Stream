@@ -259,6 +259,14 @@ extension HLSLivePlaylistClientTests {
             return
         }
         #expect(progress.segmentCount == 1)
+        let cancelledWaiter = Task { try await recording.receipt() }
+        cancelledWaiter.cancel()
+        do {
+            _ = try await cancelledWaiter.value
+            Issue.record("Expected observer cancellation")
+        } catch { #expect(error is CancellationError) }
+        #expect(recording.state == .running)
+        let independent = try recording.observations()
         #expect(
             progress.preloadStatistics
                 == HLSLiveDVRPreloadStatistics()
@@ -267,6 +275,10 @@ extension HLSLivePlaylistClientTests {
         let receipt = try await recording.stopAndCommit()
         let repeatedReceipt = try await recording.stopAndCommit()
         #expect(receipt == repeatedReceipt)
+        #expect(try await recording.receipt() == receipt)
+        #expect(recording.state == .completed)
+        let observations = try await independent.reduce(into: []) { $0.append($1.event) }
+        #expect(observations.last == .completed(receipt))
         #expect(receipt.segmentCount == 1)
         #expect(receipt.firstMediaSequence == 10)
         #expect(receipt.lastMediaSequence == 10)

@@ -12,6 +12,21 @@ import InnoNetworkHLSLive
 )
 enum ConsumerDownload {}
 
+@HLSLiveDefinition(minimumPollingMilliseconds: 50, maximumPollingMilliseconds: 100)
+enum ConsumerLive {}
+@HLSDVRDefinition(maximumDurationSeconds: 60, maximumSegmentCount: 10)
+enum ConsumerDVR {}
+@HLSPlaybackDefinition(maximumPeakBitRate: 1000, maximumWidth: 320, maximumHeight: 240)
+enum ConsumerPlayback {}
+
+// Compile backend-specific entry points without initiating external effects.
+func observeLive(source: URL, session: URLSession) throws -> HLSLiveWatching {
+    try ConsumerLive.watch(from: source, session: session)
+}
+func recordLive(source: URL, destination: URL, client: HLSLivePlaylistClient) throws -> HLSLiveDVRRecording {
+    try ConsumerDVR.startRecording(from: source, to: destination, client: client)
+}
+
 struct ManualDownload: HLSDownloadDefining {
     static func configuration() throws -> HLSDownloadConfiguration {
         try .validated(maximumMediaResourceBytes: 4_096, maximumTotalDownloadBytes: 16_384)
@@ -49,6 +64,12 @@ precondition(macroConfiguration.maximumTotalDownloadBytes == 16_384)
 precondition(macroConfiguration.maximumConcurrentResourceTransfers == 2)
 _ = try ConsumerDownload.makeDownloader()
 _ = try ManualDownload.makeDownloader()
+let liveConfiguration = try ConsumerLive.configuration()
+let dvrConfiguration = try ConsumerDVR.configuration()
+let playbackConfiguration = try ConsumerPlayback.configuration()
+precondition(liveConfiguration.minimumPollingInterval == 0.05)
+precondition(dvrConfiguration.effectiveLimits.maximumSegmentCount == 10)
+precondition(playbackConfiguration.variant.maximumWidth == 320)
 precondition(ConsumerEndpoint().path == "/fixture")
 
 let parsedDocument = try HLSPlaylistParser().parse(

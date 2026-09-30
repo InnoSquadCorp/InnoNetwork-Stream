@@ -73,7 +73,7 @@ controls; the final status must distinguish local completion from release gates.
 | 4 | Dedicated macro target and initial download definition; compile-time bounds/collision diagnostics | Exact expansions, invalid declarations, no conditional DEBUG surface, actual external macro consumer | Initial VOD macro locally complete, Draft |
 | 5 | Explicit foreground download operation handle, independent bounded subscriptions, awaitable receipt and terminal ownership | Zero/slow/multiple observers; result waiter vs operation cancel; late commit; cleanup and limits | VOD lifetime locally complete, Draft |
 | 6 | Discriminated parser-produced model views, pure parser/loader effect separation and macro-first advisory preparation | Kind invariants, complete metadata preservation, lenient inspection vs unsupported execution, trust/redirect boundaries | Locally complete; flat authoring constructor internal, typed backend planning and migration documented |
-| 7 | Generalize coherent lifetime APIs to live/DVR/native adapters and stage transitions | Existing DVR intent/native background behavior retained; observation cannot cancel background work | Pending |
+| 7 | Generalize coherent lifetime APIs to live/DVR/native adapters and stage transitions | Existing DVR intent/native background behavior retained; observation cannot cancel background work | Locally complete; backend-specific macros, watch owner and independent DVR results/observations |
 | 8 | Optional bounded/versioned media metadata coordinator and explicit reconciliation | No implicit deletion/move of app/native/key resources, atomic persistence, migration/corruption limits | Pending |
 | 9 | Structured parse/config/operation failures, capability/recovery and bounded redacted incidents | Preserve error codes/security redaction, drop/sequence semantics and backend-specific support | Pending |
 | 10 | Macro-first examples/migration, semantic API checks and affected fast/full CI contract | External macro/manual consumers, exact counts, trust/readiness diagnostics; final full regression/runtime/API/format | Consumer/docs/count-based gate prepared; semantic API/selection/remote gates pending |
@@ -155,7 +155,7 @@ gates. Tests passing locally are not release-ready proof.
 - Implemented F1-F5 with passing controls and the initial VOD macro, validated
   configuration, operation owner and pure typed parse/advisory prepare path.
   Breaking permission is used to reconsider contracts, not to rewrite published
-  Network 6.0.0 or change persisted schemas. No local commit or push yet.
+  Network 6.0.0 or change persisted schemas. Initial work was subsequently committed locally; no push.
 - Fresh diagnostics live in `.build/macro-first-redesign/`. Baseline
   `.build/code-quality-review-2026-09-30/` reproductions remain preserved. The
   first Int.max delta fixture failed in sequence arithmetic before reaching the

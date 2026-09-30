@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add macro-first Live, DVR and native playback definitions with validated
+  effective limits. Add a foreground watch owner and independent bounded DVR
+  observations/receipts while preserving native background and audio ownership.
+
 These changes have not been tagged. `1.0.0` remains a draft until the release
 state, remote dependency, Apple-platform, and HLS conformance gates pass.
 

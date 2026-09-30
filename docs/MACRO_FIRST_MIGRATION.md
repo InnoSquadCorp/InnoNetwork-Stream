@@ -1,5 +1,25 @@
 # Macro-first migration (unreleased 1.0 Draft)
 
+## Live, DVR and native playback
+
+Prefer `@HLSLiveDefinition` and `@HLSDVRDefinition` for bounded static settings;
+their `configuration()` uses the same throwing `validated()` factory as dynamic
+callers. Legacy `advanced()` packs explicitly normalize values and remain for
+key preload, steering, rolling retention and recovery tuning.
+`HLSLiveDefining.watch` returns an explicitly retained foreground owner. Zero,
+slow or multiple observers do not own reloads. ENDLIST produces an awaitable
+`finalSnapshot`; cancel the handle to stop reloads. DVR's first stop/commit or
+discard intent still wins. `receipt()` and `observations()` issue no lifecycle
+commands; the legacy `events` property remains single-channel.
+
+`@HLSPlaybackDefinition` applies settings to a caller-owned item on MainActor;
+it never creates/plays a player. Native background downloads retain system task
+IDs and session restoration semantics. Cancelling an event observer does not
+cancel a native download. Realtime audio keeps its native callback boundary,
+not an actor hop or generated foreground lifetime.
+
+## Parser and VOD migration
+
 There is no published Stream 1.0 API to rewrite. These breaking migrations apply
 to local/pre-release adopters; InnoNetwork 6.0.0 and media/checkpoint schemas do
 not change. No application source migration is performed by this repository.

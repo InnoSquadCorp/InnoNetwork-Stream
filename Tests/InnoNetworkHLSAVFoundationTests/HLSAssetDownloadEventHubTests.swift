@@ -59,6 +59,22 @@ struct HLSAssetDownloadEventHubTests {
         #expect(events.count == 3)
     }
 
+    @Test("cancelling a native observer leaves other observers and terminal replay alive")
+    func independentCancellation() async {
+        let hub = HLSAssetDownloadEventHub()
+        let first = hub.stream(taskIdentifier: 42)
+        let second = hub.stream(taskIdentifier: 42)
+        let waiter = Task { for await _ in first {} }
+        waiter.cancel()
+        await waiter.value
+        hub.sendProgress(0.5, taskIdentifier: 42)
+        hub.sendCompletion(taskIdentifier: 42)
+        let events = await second.reduce(into: []) { $0.append($1) }
+        #expect(events.count == 2)
+        let replay = await hub.stream(taskIdentifier: 42).reduce(into: []) { $0.append($1) }
+        #expect(!replay.isEmpty)
+    }
+
     @Test("download summaries are delivered and replayed before completion")
     func downloadSummaryReplay() async throws {
         let hub = HLSAssetDownloadEventHub()

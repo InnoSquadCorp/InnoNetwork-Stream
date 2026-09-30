@@ -870,3 +870,8 @@ InnoNetworkHLS	swift.type.property	HLSLocalizedRenditionNameCatalog.sessionDataI
 InnoNetworkHLS	swift.type.property	HLSMediaCharacteristic.machineGenerated
 InnoNetworkHLS	swift.type.property	HLSMediaCharacteristic.translation
 InnoNetworkHLS	swift.type.property	HLSPlaylistInspectionPack.appleAuthoring
+InnoNetworkHLS	swift.property	HLSOperationObservation.droppedEventCount
+InnoNetworkHLS	swift.property	HLSOperationObservation.event
+InnoNetworkHLS	swift.property	HLSOperationObservation.operationID
+InnoNetworkHLS	swift.property	HLSOperationObservation.sequence
+InnoNetworkHLS	swift.struct	HLSOperationObservation

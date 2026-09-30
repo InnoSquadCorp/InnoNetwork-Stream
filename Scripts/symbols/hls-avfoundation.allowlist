@@ -703,3 +703,10 @@ InnoNetworkHLSAVFoundation	swift.type.property	HLSTimedMetadataIdentifier.id3Pri
 InnoNetworkHLSAVFoundation	swift.type.property	HLSTimedMetadataIdentifier.id3Title
 InnoNetworkHLSAVFoundation	swift.type.property	HLSTimedMetadataIdentifier.id3UserText
 InnoNetworkHLSAVFoundation	swift.type.property	HLSTimedMetadataIdentifier.id3UserURL
+InnoNetworkHLSAVFoundation	swift.enum	HLSPlaybackLimitError
+InnoNetworkHLSAVFoundation	swift.enum.case	HLSPlaybackLimitError.invalidLimits
+InnoNetworkHLSAVFoundation	swift.macro	HLSPlaybackDefinition(maximumPeakBitRate:maximumWidth:maximumHeight:)
+InnoNetworkHLSAVFoundation	swift.protocol	HLSPlaybackDefining
+InnoNetworkHLSAVFoundation	swift.type.method	HLSPlaybackConfiguration.validated(maximumPeakBitRate:maximumWidth:maximumHeight:)
+InnoNetworkHLSAVFoundation	swift.type.method	HLSPlaybackDefining.apply(to:)
+InnoNetworkHLSAVFoundation	swift.type.method	HLSPlaybackDefining.configuration()

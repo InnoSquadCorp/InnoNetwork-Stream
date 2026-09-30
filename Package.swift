@@ -93,6 +93,7 @@ let package = Package(
             dependencies: [
                 .product(name: "InnoNetwork", package: "InnoNetwork"),
                 "InnoNetworkHLS",
+                "InnoNetworkStreamMacros",
             ],
             swiftSettings: strictSettings
         ),
@@ -101,6 +102,7 @@ let package = Package(
             dependencies: [
                 .product(name: "InnoNetwork", package: "InnoNetwork"),
                 "InnoNetworkHLS",
+                "InnoNetworkStreamMacros",
             ],
             resources: [.process("Resources")],
             swiftSettings: strictSettings

@@ -143,6 +143,7 @@ public struct HLSLiveDVRRecorder: Sendable {
                 bufferingPolicy: .bufferingNewest(64)
             )
         let control = HLSLiveDVRRecordingControl()
+        let channel = HLSOperationChannel<HLSLiveDVREvent, HLSLiveDVRReceipt>()
         let recorder = self
         let task = Task<HLSLiveDVRReceipt, Error> {
             do {
@@ -154,23 +155,29 @@ public struct HLSLiveDVRRecorder: Sendable {
                     mode: mode
                 ) {
                     continuation.yield(.progress($0))
+                    channel.emit(.progress($0))
                 }
                 await control.finishPlaybackSnapshotRequests()
                 continuation.yield(.completed(receipt))
                 continuation.finish()
+                channel.emit(.completed(receipt))
+                channel.finish(.success(receipt))
                 return receipt
             } catch is CancellationError {
                 await control.finishPlaybackSnapshotRequests()
                 continuation.finish()
+                channel.finish(.failure(CancellationError()))
                 throw CancellationError()
             } catch {
                 await control.finishPlaybackSnapshotRequests()
                 continuation.finish(throwing: error)
+                channel.finish(.failure(error))
                 throw error
             }
         }
         return HLSLiveDVRRecording(
             events: stream,
+            channel: channel,
             control: control,
             task: task
         )
