@@ -84,6 +84,10 @@ unchanged. No old public tag or GitHub redirect is assumed to exist.
 
 ## Development
 
+The [production-candidate review and evidence](docs/PRODUCTION_HARDENING_2026_10_02.md)
+cover all four modules, six macro-first workflows and the remaining device/service
+and publication boundaries. Local validation does not imply a published release.
+
 For incremental local feedback, select reverse-dependent suites from an explicit
 baseline: `bash Scripts/run_affected_tests.sh --base <commit>`. Inspect the plan
 with `--dry-run`. Development milestones require

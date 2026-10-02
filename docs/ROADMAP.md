@@ -18,8 +18,9 @@ published Core version before this release gate can pass.
 The authorized pre-release macro-first redesign implements some foundations
 listed below in the 1.0 Draft. Local implementation and validation are recorded
 in [the redesign plan](MACRO_FIRST_REDESIGN.md) and
-[local evidence](MACRO_FIRST_LOCAL_VALIDATION.md); they are not Stable promotion,
-native device acceptance or remote release evidence.
+[local evidence](MACRO_FIRST_LOCAL_VALIDATION.md), followed by the
+[production-candidate hardening record](PRODUCTION_HARDENING_2026_10_02.md).
+These are not Stable promotion, native device acceptance or remote release evidence.
 
 ## 1.1.0 Candidate Scope
 
@@ -33,7 +34,7 @@ named adopter or a reproducible media fixture.
 1. **Promote only adopter-proven declarations.** Use Capto plus at least one
    additional media consumer to identify the declarations that applications
    use directly and without SPI. Of the initial 1,867 inherited name rows,
-   1,866 remain; 260 new rows are Draft (2,126 total, 2,131 distinct signatures).
+   1,866 remain; 273 new rows are Draft (2,139 total, 2,144 distinct signatures).
    Promotion is
    per coherent workflow—playlist parsing, live reload, playback, asset
    download, FairPlay, or decoded audio—not a bulk declaration-count goal.
