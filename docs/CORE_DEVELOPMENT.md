@@ -32,7 +32,9 @@ update both manifests to its compatible version requirement, resolve the lock,
 restore version-only CI checks, and run the full release preflight and clean
 external consumer against the published tag.
 
-The next Stream quality work covers actual HLS transfer, cancellation, retries,
-live/DVR ownership and native adapters against this Core revision. Dedicated
+The first integration milestone and corrected FairPlay cancellation boundaries
+are recorded in [Core branch validation](CORE_BRANCH_VALIDATION_2026_10_02.md).
+Further Stream work continues through actual HLS transfer, retries, live/DVR
+ownership and native adapters against this Core revision. Dedicated
 FairPlay service, locked-device restoration and production CDN acceptance still
 require the application owner's environment.
