@@ -30,16 +30,18 @@ actor HLSContentSteeringResolver {
 
     private let client: HLSHTTPClient
     private let settings: HLSContentSteeringSettings
-    private let clock = ContinuousClock()
+    private let now: @Sendable () -> ContinuousClock.Instant
     private var entries: [URL: CacheEntry] = [:]
     private var recentlyUsedURLs: [URL] = []
 
     init(
         client: HLSHTTPClient,
-        settings: HLSContentSteeringSettings
+        settings: HLSContentSteeringSettings,
+        now: @escaping @Sendable () -> ContinuousClock.Instant = { ContinuousClock.now }
     ) {
         self.client = client
         self.settings = settings
+        self.now = now
     }
 
     func catalog(
@@ -73,7 +75,7 @@ actor HLSContentSteeringResolver {
     private func cachedManifest(
         for directive: HLSContentSteering
     ) async throws -> HLSContentSteeringManifest? {
-        let now = clock.now
+        let now = self.now()
         if let entry = entries[directive.serverURL] {
             if entry.isGone || now < entry.expiration {
                 recordAccess(to: directive.serverURL)
@@ -84,13 +86,15 @@ actor HLSContentSteeringResolver {
         let previous = entries[directive.serverURL]
         let requestURL = previous?.reloadURL ?? directive.serverURL
         let outcome = try await loadManifest(from: requestURL)
+        // Loading/adaptation time must not consume a server's requested wait.
+        let receivedAt = self.now()
         switch outcome {
         case .success(let manifest):
             cache(
                 CacheEntry(
                     manifest: manifest,
                     reloadURL: manifest.reloadURL ?? requestURL,
-                    expiration: now.advanced(
+                    expiration: receivedAt.advanced(
                         by: .seconds(manifest.timeToLive)
                     ),
                     isGone: false
@@ -101,7 +105,7 @@ actor HLSContentSteeringResolver {
                 CacheEntry(
                     manifest: previous?.manifest,
                     reloadURL: requestURL,
-                    expiration: now,
+                    expiration: receivedAt,
                     isGone: true
                 ), for: directive.serverURL)
             return previous?.manifest
@@ -116,7 +120,7 @@ actor HLSContentSteeringResolver {
                 CacheEntry(
                     manifest: previous?.manifest,
                     reloadURL: requestURL,
-                    expiration: now.advanced(by: delay),
+                    expiration: receivedAt.advanced(by: delay),
                     isGone: false
                 ), for: directive.serverURL)
             return previous?.manifest
