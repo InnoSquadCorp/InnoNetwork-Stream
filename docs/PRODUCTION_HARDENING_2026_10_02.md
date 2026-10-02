@@ -1,5 +1,9 @@
 # Stream production-candidate hardening
 
+This is the historical `15c03db` closure snapshot. The subsequent
+[iterative review and corrections](ITERATIVE_HARDENING_2026_10_02.md) reopen the
+Steering timing row and supersede the final API counts and verification totals.
+
 ## Frozen scope and execution contract
 
 The owner requested production-quality Stream implementation, not another small

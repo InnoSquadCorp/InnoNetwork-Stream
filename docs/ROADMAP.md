@@ -34,7 +34,7 @@ named adopter or a reproducible media fixture.
 1. **Promote only adopter-proven declarations.** Use Capto plus at least one
    additional media consumer to identify the declarations that applications
    use directly and without SPI. Of the initial 1,867 inherited name rows,
-   1,866 remain; 273 new rows are Draft (2,139 total, 2,144 distinct signatures).
+   1,866 remain; 282 new rows are Draft (2,148 total, 2,153 distinct signatures).
    Promotion is
    per coherent workflow—playlist parsing, live reload, playback, asset
    download, FairPlay, or decoded audio—not a bulk declaration-count goal.
