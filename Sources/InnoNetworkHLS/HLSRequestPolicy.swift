@@ -98,7 +98,7 @@ public enum HLSRequestFailure: Equatable, Sendable {
 /// A value-redacted event emitted at the HLS request boundary.
 ///
 /// Events never contain URLs, headers, query values, bodies, or arbitrary
-/// error messages. Core ``InnoNetwork/NetworkEventObserving`` remains the
+/// error messages. Core `InnoNetwork.NetworkEventObserving` remains the
 /// source for complete transport lifecycle and metrics events.
 public enum HLSRequestEvent: Equatable, Sendable {
     /// Request adaptation is about to begin.

@@ -123,7 +123,7 @@ struct HLSResolvedTransferSettings: Sendable {
 /// Configures bounded HLS VOD transfer and assembly behavior.
 ///
 /// Start with ``safeDefaults()``. Use
-/// ``advanced(storage:variantSelectionPolicy:transfer:)`` only when the
+/// ``advanced(storage:variantSelectionPolicy:contentSteering:transfer:)`` only when the
 /// application owns the storage, quality, concurrency, or retry trade-offs.
 public struct HLSDownloadConfiguration: Sendable {
     /// Effective maximum bytes accepted for one media resource.
@@ -177,7 +177,7 @@ public struct HLSDownloadConfiguration: Sendable {
     /// three resources, leaves session-key preloading disabled, and selects
     /// the highest-quality supported variant.
     /// Transient GET failures receive up to three exponential-backoff retries
-    /// through InnoNetwork's core ``RetryPolicy``.
+    /// through InnoNetwork's core `RetryPolicy`.
     public static func safeDefaults() -> HLSDownloadConfiguration {
         advanced()
     }

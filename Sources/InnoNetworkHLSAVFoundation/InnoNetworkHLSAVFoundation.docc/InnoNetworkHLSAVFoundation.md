@@ -6,7 +6,8 @@ events.
 
 ## Overview
 
-Prefer ``HLSPlaybackDefinition`` for a declarative playback profile. It applies
+Prefer ``HLSPlaybackDefinition(maximumPeakBitRate:maximumWidth:maximumHeight:)``
+for a declarative playback profile. It applies
 to a caller-owned item on MainActor without creating, retaining or playing a
 player. `HLSPlaybackConfiguration.validated(...)` is its dynamic equivalent.
 This foreground configuration contract does not replace system-managed

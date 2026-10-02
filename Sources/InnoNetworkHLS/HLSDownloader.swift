@@ -39,6 +39,7 @@ public struct HLSDownloader: Sendable {
     ///
     /// - Parameters:
     ///   - session: The URL session used for playlist and media requests.
+    ///   - configuration: Immutable storage, selection and transfer settings.
     ///   - requestContext: InnoNetwork trust, redirect, and metrics policy
     ///     applied to every request. Its event observers receive media retry
     ///     scheduling and terminal-cancellation events.

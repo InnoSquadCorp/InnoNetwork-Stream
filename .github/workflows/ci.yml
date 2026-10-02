@@ -102,7 +102,9 @@ jobs:
           python3 Scripts/tests/test_public_signatures.py
           bash Scripts/validate_docs_release_state.sh --expect draft
       - name: Validate public API
-        run: bash Scripts/check_public_api_contract.sh --development
+        run: |
+          bash Scripts/check_public_api_contract.sh --development
+          bash Scripts/check_docc.sh --skip-build
       - name: Run HLS contract gates
         run: bash Scripts/run_hls_quality_gates.sh
       - name: Preserve HLS startup and runtime failures

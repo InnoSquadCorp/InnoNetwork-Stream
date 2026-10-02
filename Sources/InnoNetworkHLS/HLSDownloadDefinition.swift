@@ -16,7 +16,8 @@ public macro HLSDownloadDefinition(
 ) = #externalMacro(module: "InnoNetworkStreamMacros", type: "HLSDownloadDefinitionMacro")
 
 /// The generated workflow contract, also available as an advanced manual
-/// compiler-plugin recovery boundary. Prefer ``HLSDownloadDefinition``.
+/// compiler-plugin recovery boundary. Prefer
+/// ``HLSDownloadDefinition(maximumMediaResourceBytes:maximumTotalDownloadBytes:maximumConcurrentResourceTransfers:)``.
 public protocol HLSDownloadDefining {
     static func configuration() throws -> HLSDownloadConfiguration
 }

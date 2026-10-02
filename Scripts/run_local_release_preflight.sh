@@ -45,6 +45,7 @@ ruby Scripts/tests/test_codeql_contract.rb
 python3 Scripts/tests/test_hls_fixture_readiness.py
 python3 Scripts/tests/test_swiftpm_scratch.py
 bash Scripts/check_public_api_contract.sh ${dependency_arguments[@]+"${dependency_arguments[@]}"}
+bash Scripts/check_docc.sh --skip-build
 bash Scripts/tests/test_package_identity.sh
 bash Scripts/tests/test_run_affected_tests.sh
 python3 Scripts/tests/test_public_signatures.py

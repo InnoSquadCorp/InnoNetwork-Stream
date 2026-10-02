@@ -1,7 +1,10 @@
 # ``InnoNetworkHLS``
 
-The macro-first surface includes ``HLSDownloadDefinition`` and the opt-in
-``HLSCatalogDefinition``. Both delegate to validated immutable runtime settings;
+The macro-first surface includes
+``HLSDownloadDefinition(maximumMediaResourceBytes:maximumTotalDownloadBytes:maximumConcurrentResourceTransfers:)``,
+``HLSOfflinePackageDefinition(maximumMediaResourceBytes:maximumTotalDownloadBytes:maximumConcurrentResourceTransfers:)``
+and the opt-in ``HLSCatalogDefinition(maximumEntries:maximumSnapshotBytes:)``.
+All delegate to validated immutable runtime settings;
 expansion/construction starts no effects. ``HLSMediaCatalog`` stores bounded,
 versioned metadata through an explicit app-owned staging/atomic-commit contract,
 never automatically moving/deleting media or acquiring keys. ``HLSFailureReport``
@@ -16,7 +19,8 @@ Resolve and download non-DRM HLS VOD streams with bounded transfers.
 playlists, chooses a deterministic stream, and downloads media resources in
 playlist order without launching a browser or external process.
 
-Prefer ``HLSDownloadDefinition`` for foreground VOD workflows. The macro checks
+Prefer ``HLSDownloadDefinition(maximumMediaResourceBytes:maximumTotalDownloadBytes:maximumConcurrentResourceTransfers:)``
+for foreground VOD workflows. The macro checks
 constant limits and generates a validated configuration; network and disk
 effects start only at the explicit runtime entry point. Observation does not
 own the download. Cancelling a receipt waiter cancels only that wait; a
@@ -152,7 +156,7 @@ let downloader = HLSDownloader(
 ``HLSRequestEventObserving`` receives purpose-aware start, response, and
 pre-response failure events. The event model contains no URL, header, query
 value, body, or arbitrary error string; use core
-``InnoNetwork/NetworkEventObserving`` for full transport lifecycle and metrics.
+`InnoNetwork.NetworkEventObserving` for full transport lifecycle and metrics.
 The legacy single-argument request adapter initializer remains available for
 source compatibility.
 
@@ -713,7 +717,7 @@ Its expected-total value remains `nil` and
 ``HLSDownloadProgress/isIndeterminate`` remains `true` until every active
 resource supplies a content length. The final progress event normalizes the
 total to the completed plaintext byte count. Transfer failures preserve their
-underlying `NSError` domain/code through ``SendableUnderlyingError``, while
+underlying `NSError` domain/code through Core's `SendableUnderlyingError`, while
 ``HLSDownloadError/code`` and the `CustomNSError` bridge provide stable HLS
 classification for recovery and telemetry.
 Media retry scheduling is delivered to the `NetworkEventObserving` values in
@@ -845,6 +849,8 @@ so adding an HLS target cannot silently leave it outside release validation.
 
 ### Offline packages
 
+- ``HLSOfflinePackageDefinition(maximumMediaResourceBytes:maximumTotalDownloadBytes:maximumConcurrentResourceTransfers:)``
+- ``HLSOfflinePackageDefining``
 - ``HLSLocalPlaybackSource``
 - ``HLSLocalPlaybackSourceError``
 - ``HLSOfflinePackageDownloader``
