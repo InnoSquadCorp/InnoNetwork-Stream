@@ -47,18 +47,21 @@ Alternatively, choose only the individual products the application needs:
 
 The package requires InnoNetwork 6 for bounded HTTP transfer, retry policy,
 request context, trust, redirect, metrics, and observability contracts. It
-resolves the published InnoNetwork `6.0.0` tag by default. The checked-in
-`Package.resolved` records its release revision and the transitive dependency
-versions used for compatibility validation. CI, CodeQL, and release preflight
-resolve that lock without selecting InnoNetwork `main`.
+currently develops against the InnoNetwork `codex/core-stream-followup` branch,
+which extends the 6.1 candidate in Core PR #132. The checked-in `Package.resolved`
+records the exact tested commit and transitive versions. CI and CodeQL validate
+this remote branch and its lock; they do not automatically advance to its latest
+commit. This development configuration cannot pass the published-dependency
+release gate.
 An explicit dependency gate verifies active remote versions and revisions
 against the resolved graph and checkouts, including when SwiftPM reuses cached state.
 
-Resolve and test the published dependency with:
+Validate and test the current development dependency with:
 
 ```bash
-env -u INNONETWORK_LOCAL_PATH bash Scripts/check_innonetwork_dependency.sh
+env -u INNONETWORK_LOCAL_PATH bash Scripts/check_innonetwork_dependency.sh --development
 env -u INNONETWORK_LOCAL_PATH bash Scripts/swiftpm.sh test --force-resolved-versions --parallel
+env -u INNONETWORK_LOCAL_PATH bash Scripts/run_local_release_preflight.sh --quick --development
 ```
 
 When developing both packages together, select a local checkout explicitly:
@@ -67,8 +70,12 @@ When developing both packages together, select a local checkout explicitly:
 INNONETWORK_LOCAL_PATH=/path/to/InnoNetwork bash Scripts/swiftpm.sh test
 ```
 
-Unset `INNONETWORK_LOCAL_PATH` before release preflight. Local-path testing is
-for joint development; release preflight requires the published dependency.
+Unset `INNONETWORK_LOCAL_PATH` before checking the remote development branch.
+Before release, replace the branch requirement in both manifests with the
+published compatible Core version, resolve and review the lock, then run release
+preflight without `--development`. The migration back to a public tag includes
+the external macro-first consumer and HLS runtime checks. See the
+[Core development contract](docs/CORE_DEVELOPMENT.md).
 
 Consumers of the earlier unreleased `InnoStream` checkout must update its
 repository/path and the `.product(..., package:)` argument to
@@ -79,8 +86,9 @@ unchanged. No old public tag or GitHub redirect is assumed to exist.
 
 For incremental local feedback, select reverse-dependent suites from an explicit
 baseline: `bash Scripts/run_affected_tests.sh --base <commit>`. Inspect the plan
-with `--dry-run`. This does not replace full CI/release preflight; final candidates
-still require `bash Scripts/run_local_release_preflight.sh --full`.
+with `--dry-run`. Development milestones require
+`bash Scripts/run_local_release_preflight.sh --full --development`. This does
+not replace the version-only `--full` release preflight after Core publication.
 
 ```bash
 bash Scripts/swiftpm.sh test --filter InnoNetworkHLSTests

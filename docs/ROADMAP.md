@@ -8,9 +8,12 @@ therefore `1.0.0`, not `6.0.0`, and the follow-up minor is `1.1.0`, not
 moving their package ownership out of InnoNetwork.
 
 No 1.1 candidate below is a blocker for 1.0. The 1.0 exit gate remains the
-documented clean remote resolution order: publish InnoNetwork 6.0.0, validate
-InnoNetwork-Stream without a local override, publish InnoNetwork-Stream 1.0.0, and then build a
-clean external consumer from both tags.
+documented clean remote resolution order: publish the compatible InnoNetwork
+version, validate InnoNetwork-Stream without a local override, publish
+InnoNetwork-Stream 1.0.0, and then build a clean external consumer from both tags.
+Current development follows the Core 6.1 branch described in
+[Core development](CORE_DEVELOPMENT.md); its branch lock must return to a
+published Core version before this release gate can pass.
 
 The authorized pre-release macro-first redesign implements some foundations
 listed below in the 1.0 Draft. Local implementation and validation are recorded

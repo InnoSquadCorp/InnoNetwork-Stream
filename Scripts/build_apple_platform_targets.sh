@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+dependency_arguments=()
+if [[ "${1:-}" == "--development" ]]; then
+  dependency_arguments=(--development)
+  shift
+fi
+
 if [[ $# -lt 3 || $# -gt 4 ]]; then
-  echo "Usage: $0 <runtime> <sdk> <target-triple> [scratch-path]" >&2
+  echo "Usage: $0 [--development] <runtime> <sdk> <target-triple> [scratch-path]" >&2
   exit 64
 fi
 
@@ -26,7 +32,7 @@ esac
 
 command -v jq >/dev/null 2>&1 \
   || { echo "jq is required to discover library targets" >&2; exit 69; }
-bash "$repo_root/Scripts/check_innonetwork_dependency.sh"
+bash "$repo_root/Scripts/check_innonetwork_dependency.sh" ${dependency_arguments[@]+"${dependency_arguments[@]}"}
 sdk_path="$(xcrun --sdk "$sdk" --show-sdk-path)"
 
 targets=()

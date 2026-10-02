@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+dependency_arguments=()
+if [[ "${1:-}" == "--development" ]]; then
+  dependency_arguments=(--development)
+  shift
+fi
+[[ $# -eq 0 ]] || { echo "Usage: $0 [--development]" >&2; exit 64; }
+
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 symbols_dir="$repo_root/Scripts/symbols"
 budgets_file="$symbols_dir/budgets.tsv"
@@ -12,7 +19,7 @@ fail() {
 }
 
 [[ -f "$budgets_file" ]] || fail "missing Scripts/symbols/budgets.tsv"
-bash Scripts/check_innonetwork_dependency.sh
+bash Scripts/check_innonetwork_dependency.sh ${dependency_arguments[@]+"${dependency_arguments[@]}"}
 
 # Select only this build context; never delete diagnostic or other-context graphs.
 scratch_path="$(python3 Scripts/swiftpm_scratch_path.py "$repo_root")"

@@ -25,7 +25,7 @@ if let localInnoNetworkPath = ProcessInfo.processInfo.environment[
 } else {
     innoNetworkDependency = .package(
         url: "https://github.com/InnoSquadCorp/InnoNetwork.git",
-        .upToNextMajor(from: "6.0.0")
+        branch: "codex/core-stream-followup"
     )
 }
 

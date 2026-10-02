@@ -38,8 +38,8 @@ jobs:
         run: sudo xcode-select -s /Applications/Xcode_26.0.1.app
       - name: Verify coupled CodeQL action pins
         run: ruby Scripts/check_codeql_contract.rb
-      - name: Verify published InnoNetwork dependency
-        run: bash Scripts/check_innonetwork_dependency.sh
+      - name: Verify locked InnoNetwork development dependency
+        run: bash Scripts/check_innonetwork_dependency.sh --development
       - name: Initialize CodeQL
         uses: github/codeql-action/init@9e0d7b8d25671d64c341c19c0152d693099fb5ba # v4.35.5
         with:

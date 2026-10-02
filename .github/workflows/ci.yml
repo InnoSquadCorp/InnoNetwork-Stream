@@ -66,8 +66,8 @@ jobs:
         run: |
           xcodebuild -version
           xcrun swift --version
-      - name: Verify published InnoNetwork dependency
-        run: bash Scripts/check_innonetwork_dependency.sh
+      - name: Verify locked InnoNetwork development dependency
+        run: bash Scripts/check_innonetwork_dependency.sh --development
       - name: Verify dependency lock did not drift
         run: git diff --exit-code -- Package.resolved
       - name: Run tests
@@ -82,8 +82,8 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Select Xcode 27
         run: sudo xcode-select -s /Applications/Xcode.app
-      - name: Verify published InnoNetwork dependency
-        run: bash Scripts/check_innonetwork_dependency.sh
+      - name: Verify locked InnoNetwork development dependency
+        run: bash Scripts/check_innonetwork_dependency.sh --development
       - name: Validate scripts and documentation
         run: |
           bash -n Scripts/*.sh Scripts/tests/*.sh
@@ -102,7 +102,7 @@ jobs:
           python3 Scripts/tests/test_public_signatures.py
           bash Scripts/validate_docs_release_state.sh --expect draft
       - name: Validate public API
-        run: bash Scripts/check_public_api_contract.sh
+        run: bash Scripts/check_public_api_contract.sh --development
       - name: Run HLS contract gates
         run: bash Scripts/run_hls_quality_gates.sh
       - name: Preserve HLS startup and runtime failures
@@ -149,8 +149,8 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Select Xcode 26.0.1
         run: sudo xcode-select -s /Applications/Xcode_26.0.1.app
-      - name: Verify published InnoNetwork dependency
-        run: bash Scripts/check_innonetwork_dependency.sh
+      - name: Verify locked InnoNetwork development dependency
+        run: bash Scripts/check_innonetwork_dependency.sh --development
       - name: Build with xcodebuild
         if: matrix.builder == 'xcodebuild'
         run: |
@@ -165,6 +165,7 @@ jobs:
         if: matrix.builder == 'swiftpm-cross'
         run: |
           bash Scripts/build_apple_platform_targets.sh \
+            --development \
             '${{ matrix.runtime }}' \
             '${{ matrix.sdk }}' \
             '${{ matrix.triple }}' \

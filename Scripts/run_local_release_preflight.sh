@@ -5,18 +5,22 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
 mode="quick"
-case "${1:-}" in
-  "") ;;
+dependency_arguments=()
+preflight_label="local-release-preflight"
+for argument in "$@"; do
+case "$argument" in
+  --development) dependency_arguments=(--development); preflight_label="local-development-preflight" ;;
   --quick) mode="quick" ;;
   --full) mode="full" ;;
   *)
-    echo "Usage: bash Scripts/run_local_release_preflight.sh [--quick|--full]" >&2
+    echo "Usage: bash Scripts/run_local_release_preflight.sh [--quick|--full] [--development]" >&2
     exit 64
     ;;
 esac
+done
 
 if [[ "${INNONETWORK_LOCAL_PATH+x}" == "x" ]]; then
-  echo "local-release-preflight: unset INNONETWORK_LOCAL_PATH to validate the published dependency" >&2
+  echo "$preflight_label: unset INNONETWORK_LOCAL_PATH to validate the remote dependency" >&2
   exit 64
 fi
 
@@ -30,7 +34,7 @@ if [[ -z "$swift_version" ]] \
 fi
 
 resolved_before="$(shasum -a 256 Package.resolved)"
-bash Scripts/check_innonetwork_dependency.sh
+bash Scripts/check_innonetwork_dependency.sh ${dependency_arguments[@]+"${dependency_arguments[@]}"}
 [[ "$(shasum -a 256 Package.resolved)" == "$resolved_before" ]] \
   || { echo "local-release-preflight: dependency lock drifted" >&2; exit 1; }
 
@@ -40,7 +44,7 @@ ruby Scripts/check_codeql_contract.rb
 ruby Scripts/tests/test_codeql_contract.rb
 python3 Scripts/tests/test_hls_fixture_readiness.py
 python3 Scripts/tests/test_swiftpm_scratch.py
-bash Scripts/check_public_api_contract.sh
+bash Scripts/check_public_api_contract.sh ${dependency_arguments[@]+"${dependency_arguments[@]}"}
 bash Scripts/tests/test_package_identity.sh
 bash Scripts/tests/test_run_affected_tests.sh
 python3 Scripts/tests/test_public_signatures.py
@@ -59,18 +63,23 @@ if [[ "$mode" == "full" ]]; then
   # package scheme. Compile exact package library targets against each SDK
   # without modifying that project or pretending to validate an app/signing.
   bash Scripts/build_apple_platform_targets.sh \
+    ${dependency_arguments[@]+"${dependency_arguments[@]}"} \
     macOS macosx arm64-apple-macos14.0 \
     .build/local-release-preflight/swiftpm-macos
   bash Scripts/build_apple_platform_targets.sh \
+    ${dependency_arguments[@]+"${dependency_arguments[@]}"} \
     iOS iphonesimulator arm64-apple-ios16.0-simulator \
     .build/local-release-preflight/swiftpm-ios-simulator
   bash Scripts/build_apple_platform_targets.sh \
+    ${dependency_arguments[@]+"${dependency_arguments[@]}"} \
     tvOS appletvos arm64-apple-tvos16.0 \
     .build/local-release-preflight/tvos
   bash Scripts/build_apple_platform_targets.sh \
+    ${dependency_arguments[@]+"${dependency_arguments[@]}"} \
     watchOS watchos arm64_32-apple-watchos9.0 \
     .build/local-release-preflight/watchos
   bash Scripts/build_apple_platform_targets.sh \
+    ${dependency_arguments[@]+"${dependency_arguments[@]}"} \
     visionOS xros arm64-apple-xros1.0 \
     .build/local-release-preflight/visionos
 else
@@ -80,4 +89,4 @@ fi
 [[ "$(shasum -a 256 Package.resolved)" == "$resolved_before" ]] \
   || { echo "local-release-preflight: dependency lock drifted" >&2; exit 1; }
 
-echo "local-release-preflight: OK ($mode)"
+echo "$preflight_label: OK ($mode)"
