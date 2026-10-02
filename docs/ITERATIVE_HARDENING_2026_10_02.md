@@ -16,8 +16,8 @@ not a proof of zero defects in every environment.
 
 | Work | Implementation and closure evidence |
 | --- | --- |
-| Steering receive-time TTL/Retry-After | Pending: controlled clock and positive/failure controls |
-| Bounded same-resolver manifest sharing | Pending: independent cancellation, capacity, late completion and retry controls |
+| Steering receive-time TTL/Retry-After | Immediate 200/429 controls passed before and after; delayed cases failed before and pass after receipt anchoring (`steering-time-before/after.log`). |
+| Bounded same-resolver manifest sharing | `steering-flight.log`: 200/429/410/503 shared responses, independent cancellation, 64 waiter/producer bounds, capacity reuse and a late cancelled generation pass. Cancelled producers count against capacity until drained; overload falls back without I/O. |
 | Macro-first offline owned operation | Pending: progress/receipt independence, owner cancel/release, atomic success/failure and external consumer |
 | Registered waiter cancellation | Pending: registration barrier, completion/cancel ordering and capacity reuse |
 | Adjacent VOD/DVR/resource/API contracts | Pending: repeat review and regression |

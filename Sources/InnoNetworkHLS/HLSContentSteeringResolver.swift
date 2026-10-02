@@ -33,6 +33,18 @@ actor HLSContentSteeringResolver {
     private let now: @Sendable () -> ContinuousClock.Instant
     private var entries: [URL: CacheEntry] = [:]
     private var recentlyUsedURLs: [URL] = []
+    private struct Flight {
+        let id: UUID
+        let task: Task<Void, Never>
+        var waiters: [UUID: CheckedContinuation<HLSContentSteeringManifest?, Error>]
+    }
+    private var flights: [URL: Flight] = [:]
+    // Includes cancelled producers until they actually finish, so rapid
+    // cancel/restart cannot bypass the work bound with draining tasks.
+    private var activeLoads = 0
+
+    var pendingManifestWaiterCount: Int { flights.values.reduce(0) { $0 + $1.waiters.count } }
+    var activeManifestLoadCount: Int { activeLoads }
 
     init(
         client: HLSHTTPClient,
@@ -47,6 +59,7 @@ actor HLSContentSteeringResolver {
     func catalog(
         for playlist: HLSPlaylist
     ) async throws -> HLSPathwayCatalog {
+        try Task.checkCancellation()
         guard let directive = playlist.contentSteering else {
             return .unsteered(playlist)
         }
@@ -57,6 +70,7 @@ actor HLSContentSteeringResolver {
             )
         }
         let manifest = try await cachedManifest(for: directive)
+        try Task.checkCancellation()
         guard let manifest,
             let catalog = HLSPathwayCatalogBuilder.make(
                 playlist: playlist,
@@ -83,9 +97,77 @@ actor HLSContentSteeringResolver {
             }
         }
 
-        let previous = entries[directive.serverURL]
-        let requestURL = previous?.reloadURL ?? directive.serverURL
-        let outcome = try await loadManifest(from: requestURL)
+        return try await waitForManifest(at: directive.serverURL)
+    }
+
+    private func waitForManifest(at url: URL) async throws -> HLSContentSteeringManifest? {
+        let waiterID = UUID()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                guard !Task.isCancelled else {
+                    continuation.resume(throwing: CancellationError())
+                    return
+                }
+                if var flight = flights[url] {
+                    guard flight.waiters.count < 64 else {
+                        continuation.resume(returning: entries[url]?.manifest)
+                        return
+                    }
+                    flight.waiters[waiterID] = continuation
+                    flights[url] = flight
+                    return
+                }
+                guard activeLoads < 64 else {
+                    // Steering is optional; bounded overload uses the last
+                    // manifest or the declared initial pathway, without I/O.
+                    continuation.resume(returning: entries[url]?.manifest)
+                    return
+                }
+                let id = UUID()
+                let previous = entries[url]
+                let requestURL = previous?.reloadURL ?? url
+                activeLoads += 1
+                let task = Task {
+                    let result: Result<ManifestLoadOutcome, Error>
+                    do {
+                        let outcome = try await self.loadManifest(from: requestURL)
+                        try Task.checkCancellation()
+                        result = .success(outcome)
+                    } catch { result = .failure(error) }
+                    self.completeFlight(at: url, id: id, result: result, previous: previous, requestURL: requestURL)
+                }
+                flights[url] = Flight(id: id, task: task, waiters: [waiterID: continuation])
+            }
+        } onCancel: {
+            Task { await self.cancelWaiter(waiterID, at: url) }
+        }
+    }
+
+    private func cancelWaiter(_ id: UUID, at url: URL) {
+        guard var flight = flights[url], let waiter = flight.waiters.removeValue(forKey: id) else { return }
+        if flight.waiters.isEmpty {
+            flights.removeValue(forKey: url)
+            flight.task.cancel()
+        } else {
+            flights[url] = flight
+        }
+        waiter.resume(throwing: CancellationError())
+    }
+
+    private func completeFlight(
+        at url: URL, id: UUID, result: Result<ManifestLoadOutcome, Error>,
+        previous: CacheEntry?, requestURL: URL
+    ) {
+        activeLoads -= 1
+        guard let flight = flights[url], flight.id == id else { return }
+        flights.removeValue(forKey: url)
+        let manifest = result.map { store($0, at: url, previous: previous, requestURL: requestURL) }
+        for waiter in flight.waiters.values { waiter.resume(with: manifest) }
+    }
+
+    private func store(
+        _ outcome: ManifestLoadOutcome, at url: URL, previous: CacheEntry?, requestURL: URL
+    ) -> HLSContentSteeringManifest? {
         // Loading/adaptation time must not consume a server's requested wait.
         let receivedAt = self.now()
         switch outcome {
@@ -98,7 +180,7 @@ actor HLSContentSteeringResolver {
                         by: .seconds(manifest.timeToLive)
                     ),
                     isGone: false
-                ), for: directive.serverURL)
+                ), for: url)
             return manifest
         case .gone:
             cache(
@@ -107,7 +189,7 @@ actor HLSContentSteeringResolver {
                     reloadURL: requestURL,
                     expiration: receivedAt,
                     isGone: true
-                ), for: directive.serverURL)
+                ), for: url)
             return previous?.manifest
         case .unavailable(let retryDelay):
             let delay =
@@ -122,7 +204,7 @@ actor HLSContentSteeringResolver {
                     reloadURL: requestURL,
                     expiration: receivedAt.advanced(by: delay),
                     isGone: false
-                ), for: directive.serverURL)
+                ), for: url)
             return previous?.manifest
         }
     }

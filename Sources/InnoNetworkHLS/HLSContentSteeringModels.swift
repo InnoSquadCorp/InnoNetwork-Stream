@@ -161,6 +161,11 @@ public protocol HLSContentSteeringEventObserving: Sendable {
 /// Each downloader/planner retains at most 64 recently used manifest entries,
 /// including unavailable and gone responses. Evicted entries are resolved again
 /// when needed; TTL reuse is best-effort within this bounded working set.
+/// Identical manifest loads share work within that downloader's request policy.
+/// At most 64 loads (including cancelling work) and 64 waiters per manifest are
+/// admitted. Excess plans use the last manifest or the initial pathway instead
+/// of starting additional I/O. Cancelling one waiter never cancels another;
+/// cancelling the last waiter requests cancellation of the shared transfer.
 public struct HLSContentSteeringPack: Sendable {
     private let isEnabled: Bool
     private let maximumManifestBytes: Int
