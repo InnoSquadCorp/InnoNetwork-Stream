@@ -357,6 +357,88 @@ struct HLSFairPlayStreamingKeyWorkflowTests {
         )
     }
 
+    @Test("pre-cancelled streaming fulfillment never starts SPC", arguments: [false, true])
+    func preCancelledFulfillment(advisory: Bool) async throws {
+        let request = StreamingKeyRequestDouble(
+            spcResult: advisory ? .fulfilledByAdvisoryKey : .generated(Data("spc".utf8))
+        )
+        let transport = StreamingLicenseTransportDouble(response: Data("ckc".utf8))
+        let workflow = HLSFairPlayStreamingKeyWorkflow(transport: transport)
+        let cancelled = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            do {
+                _ = try await workflow.fulfill(
+                    request,
+                    keyID: HLSFairPlayKeyID("pre-cancelled"),
+                    acquisition: .init(
+                        applicationCertificate: Data("certificate".utf8),
+                        contentIdentifier: Data("content".utf8)
+                    ),
+                    purpose: .initial
+                )
+                return false
+            } catch { return error is CancellationError }
+        }
+        #expect(await cancelled.value)
+        #expect(request.snapshot().applicationCertificate == nil)
+        #expect(request.snapshot().processedKeys.isEmpty)
+        #expect(request.snapshot().failureCodes == [1])
+        #expect(await transport.requests().isEmpty)
+    }
+
+    @Test("SPC cancellation cannot become advisory success", arguments: [false, true])
+    func cancellationDuringSPC(advisory: Bool) async throws {
+        let request = StreamingKeyRequestDouble(
+            spcResult: advisory ? .fulfilledByAdvisoryKey : .generated(Data("spc".utf8)),
+            cancelDuringSPC: true
+        )
+        let transport = StreamingLicenseTransportDouble(response: Data("ckc".utf8))
+        let workflow = HLSFairPlayStreamingKeyWorkflow(transport: transport)
+        let result = Task {
+            do {
+                _ = try await workflow.fulfill(
+                    request,
+                    keyID: HLSFairPlayKeyID("cancelled-spc"),
+                    acquisition: .init(
+                        applicationCertificate: Data("certificate".utf8),
+                        contentIdentifier: Data("content".utf8)
+                    ),
+                    purpose: .renewal
+                )
+                return false
+            } catch { return error is CancellationError }
+        }
+        #expect(await result.value)
+        #expect(request.snapshot().processedKeys.isEmpty)
+        #expect(request.snapshot().failureCodes == [1])
+        #expect(await transport.requests().isEmpty)
+    }
+
+    @Test("license cancellation takes precedence over an empty response")
+    func cancellationDuringLicense() async throws {
+        let request = StreamingKeyRequestDouble()
+        let transport = StreamingLicenseTransportDouble(response: Data(), cancelDuringExchange: true)
+        let workflow = HLSFairPlayStreamingKeyWorkflow(transport: transport)
+        let result = Task {
+            do {
+                _ = try await workflow.fulfill(
+                    request,
+                    keyID: HLSFairPlayKeyID("cancelled-license"),
+                    acquisition: .init(
+                        applicationCertificate: Data("certificate".utf8),
+                        contentIdentifier: Data("content".utf8)
+                    ),
+                    purpose: .renewal
+                )
+                return false
+            } catch { return error is CancellationError }
+        }
+        #expect(await result.value)
+        #expect(request.snapshot().processedKeys.isEmpty)
+        #expect(request.snapshot().failureCodes == [1])
+        #expect(await transport.requests().count == 1)
+    }
+
     @Test("SPC callbacks prioritize errors over partial data")
     func validatesSPCCallback() throws {
         let data = Data("partial".utf8)
@@ -426,6 +508,7 @@ private final class StreamingKeyRequestDouble:
 
     private let lock = NSLock()
     private let spcResult: HLSFairPlayStreamingSPCResult
+    private let cancelDuringSPC: Bool
     private var applicationCertificate: Data?
     private var contentIdentifier: Data?
     private var supportedProtocolVersions: [Int]?
@@ -435,10 +518,12 @@ private final class StreamingKeyRequestDouble:
 
     init(spc: Data = Data("spc".utf8)) {
         self.spcResult = .generated(spc)
+        self.cancelDuringSPC = false
     }
 
-    init(spcResult: HLSFairPlayStreamingSPCResult) {
+    init(spcResult: HLSFairPlayStreamingSPCResult, cancelDuringSPC: Bool = false) {
         self.spcResult = spcResult
+        self.cancelDuringSPC = cancelDuringSPC
     }
 
     func makeSPC(
@@ -453,6 +538,7 @@ private final class StreamingKeyRequestDouble:
             self.supportedProtocolVersions = supportedProtocolVersions
             self.deviceIdentifierPolicy = deviceIdentifierPolicy
         }
+        if cancelDuringSPC { withUnsafeCurrentTask { $0?.cancel() } }
         return spcResult
     }
 
@@ -487,17 +573,20 @@ private actor StreamingLicenseTransportDouble:
 {
     private let response: Data
     private let failure: (any Error)?
+    private let cancelDuringExchange: Bool
     private var capturedRequests: [HLSFairPlayLicenseRequest] = []
 
-    init(response: Data, failure: (any Error)? = nil) {
+    init(response: Data, failure: (any Error)? = nil, cancelDuringExchange: Bool = false) {
         self.response = response
         self.failure = failure
+        self.cancelDuringExchange = cancelDuringExchange
     }
 
     func contentKeyContext(
         for request: HLSFairPlayLicenseRequest
     ) async throws -> Data {
         capturedRequests.append(request)
+        if cancelDuringExchange { withUnsafeCurrentTask { $0?.cancel() } }
         if let failure {
             throw failure
         }

@@ -98,6 +98,7 @@ public struct HLSFairPlayStreamingKeyWorkflow: Sendable {
         acquisition: HLSFairPlayStreamingKeyAcquisition,
         purpose: HLSFairPlayLicenseRequestPurpose
     ) async throws -> HLSFairPlayContentKeyEvent {
+        try Task.checkCancellation()
         try validate(acquisition)
         let spcResult: HLSFairPlayStreamingSPCResult
         do {
@@ -116,6 +117,7 @@ public struct HLSFairPlayStreamingKeyWorkflow: Sendable {
             }
             throw HLSFairPlayStreamingKeyError.spcGenerationFailed
         }
+        try Task.checkCancellation()
         guard case .generated(let spc) = spcResult else {
             return .fulfilledByAdvisoryKey(purpose)
         }
@@ -142,6 +144,7 @@ public struct HLSFairPlayStreamingKeyWorkflow: Sendable {
             }
             throw HLSFairPlayStreamingKeyError.licenseExchangeFailed
         }
+        try Task.checkCancellation()
         guard
             !licenseResponse.isEmpty,
             licenseResponse.count

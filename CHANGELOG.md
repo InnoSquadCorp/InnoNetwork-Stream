@@ -2,11 +2,18 @@
 
 ## Unreleased
 
+- Develop against Core PR #141's `codex/core-stream-followup` branch and lock
+  its exact revision. Verify manifest, active graph and checkout agreement;
+  keep published release validation version-only.
+- Stop cancelled streaming FairPlay requests before SPC generation, advisory
+  success and license-response validation. Retain normal initial/renewal and
+  advisory-key controls alongside deterministic cancellation regressions.
+
 - Preserve typed core cancellation in HLS request policies, persistent and
   streaming FairPlay workflows, and redacted content-key failure diagnostics.
   Diagnose escaped and conditional reserved configuration members in all five
   Stream macros. Verify macro-first cancellation with published core 6.0 and
-  the separate local core 6.1 candidate; do not raise the public dependency yet.
+  the separate local core 6.1 candidate in the earlier compatibility snapshot.
 - Add distinct semantic API signature gates, persisted-format fixtures and
   fail-closed reverse-dependent local test selection; keep full CI/release
   validation mandatory. Compile all five macro workflows and manual equivalents
