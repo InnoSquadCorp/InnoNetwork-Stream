@@ -18,8 +18,8 @@ not a proof of zero defects in every environment.
 | --- | --- |
 | Steering receive-time TTL/Retry-After | Immediate 200/429 controls passed before and after; delayed cases failed before and pass after receipt anchoring (`steering-time-before/after.log`). |
 | Bounded same-resolver manifest sharing | `steering-flight.log`: 200/429/410/503 shared responses, independent cancellation, 64 waiter/producer bounds, capacity reuse and a late cancelled generation pass. Cancelled producers count against capacity until drained; overload falls back without I/O. |
-| Macro-first offline owned operation | Pending: progress/receipt independence, owner cancel/release, atomic success/failure and external consumer |
-| Registered waiter cancellation | Pending: registration barrier, completion/cancel ordering and capacity reuse |
+| Macro-first offline owned operation | `offline-registered-fixed.log`: macro/manual parity, calling-task cancellation, independent progress/receipt cancellation, explicit owner cancellation/release, lease reuse, atomic receipt and late cancel controls pass. Debug aggregate/individual consumer succeeds in `consumer-debug.log`; nine additive API rows are reviewed, 2,148 names/2,153 signatures pass. |
+| Registered waiter cancellation | Actual registered-count barriers: 64-waiter admission, cancellation/replacement, cancellation-first/finish-first and 200 concurrent completion races pass (`offline-registered-fixed.log`). |
 | Adjacent VOD/DVR/resource/API contracts | Pending: repeat review and regression |
 | Final source verification | Pending: normal + TSAN, runtime/Apple HLS, five SDKs, Debug/Release consumer, API/DocC/scripts |
 
