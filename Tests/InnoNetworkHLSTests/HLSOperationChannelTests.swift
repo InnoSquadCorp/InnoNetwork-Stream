@@ -5,6 +5,45 @@ import Testing
 
 @Suite("Independent operation delivery")
 struct HLSOperationChannelTests {
+    @Test("repeated saturated delivery retains only bounded terminal observations")
+    func productionDeliveryEndurance() async throws {
+        for cycle in 0..<32 {
+            let channel = HLSOperationChannel<Int, Int>()
+            let streams = try (0..<64).map { _ in try channel.subscribe(buffer: 1) }
+            #expect(throws: HLSOperationObservationError.capacityExceeded) { try channel.subscribe() }
+            await withTaskGroup(of: Void.self) { group in
+                for producer in 0..<8 {
+                    group.addTask { for value in 0..<125 { channel.emit(producer * 125 + value) } }
+                }
+            }
+            // Cancelling independent waiters must not terminate the producer.
+            await withTaskGroup(of: Void.self) { group in
+                for _ in 0..<16 {
+                    group.addTask {
+                        withUnsafeCurrentTask { $0?.cancel() }
+                        await #expect(throws: CancellationError.self) { try await channel.value() }
+                    }
+                }
+            }
+            #expect(channel.state == .running)
+            channel.finish(.success(cycle))
+            channel.finish(.failure(CancellationError()))
+            for stream in streams {
+                let tail = try await stream.reduce(into: []) { $0.append($1) }
+                #expect(tail.count == 1)
+                #expect(tail.first?.sequence == 1000)
+                #expect(tail.first?.droppedEventCount == 998)
+            }
+            #expect(try await channel.value() == cycle)
+            // Completion releases all 64 slots synchronously; late consumers
+            // replay the bounded terminal snapshot rather than retaining slots.
+            for _ in 0..<65 {
+                let replay = try await channel.subscribe().reduce(into: []) { $0.append($1) }
+                #expect(replay.count == 1)
+            }
+        }
+    }
+
     @Test("slow independent subscriptions remain bounded and replay the terminal snapshot")
     func delivery() async throws {
         let channel = HLSOperationChannel<Int, Int>()

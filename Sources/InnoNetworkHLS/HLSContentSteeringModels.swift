@@ -157,6 +157,10 @@ public protocol HLSContentSteeringEventObserving: Sendable {
 }
 
 /// Bounds optional Content Steering manifest resolution.
+///
+/// Each downloader/planner retains at most 64 recently used manifest entries,
+/// including unavailable and gone responses. Evicted entries are resolved again
+/// when needed; TTL reuse is best-effort within this bounded working set.
 public struct HLSContentSteeringPack: Sendable {
     private let isEnabled: Bool
     private let maximumManifestBytes: Int

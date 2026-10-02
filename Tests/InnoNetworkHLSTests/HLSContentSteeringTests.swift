@@ -6,6 +6,34 @@ import os
 @testable import InnoNetworkHLS
 
 extension HLSDownloaderTests {
+    @Test("long-lived downloaders bound steering cache including negative entries", arguments: [200, 410, 503])
+    func productionSteeringCacheRetention(statusCode: Int) async throws {
+        let session = makeContentSteeringSession()
+        defer {
+            session.invalidateAndCancel()
+            HLSURLProtocol.reset()
+        }
+        let downloader = HLSDownloader(session: session)
+        let masters = try (0..<65).map { try #require(URL(string: "https://media.example/cache-\($0).m3u8")) }
+        let manifests = try (0..<65).map { try #require(URL(string: "https://steering.example/cache-\($0).json")) }
+        for index in masters.indices {
+            registerContentSteeringMaster(at: masters[index], steeringURL: manifests[index])
+            HLSURLProtocol.register(
+                .success(statusCode: statusCode, data: contentSteeringManifestData(), headers: [:]),
+                for: manifests[index])
+        }
+        let urls = try makeContentSteeringURLs()
+        registerContentSteeringMediaPlaylist(at: urls.baseMedia)
+        registerContentSteeringMediaPlaylist(at: urls.cloneMedia)
+        for index in 0..<64 { _ = try await downloader.prepare(sourceURL: masters[index]) }
+        _ = try await downloader.prepare(sourceURL: masters[0])  // Keep the first entry hot.
+        _ = try await downloader.prepare(sourceURL: masters[64])  // Evict entry 1, not entry 0.
+        _ = try await downloader.prepare(sourceURL: masters[0])
+        _ = try await downloader.prepare(sourceURL: masters[1])
+        #expect(HLSURLProtocol.capturedRequests().filter { $0.url == manifests[0] }.count == 1)
+        #expect(HLSURLProtocol.capturedRequests().filter { $0.url == manifests[1] }.count == 2)
+    }
+
     @Test("pathway health penalizes and recovers on session time")
     func contentSteeringPathwayHealthRecoversAfterCooldown() async {
         let observationTime = OSAllocatedUnfairLock<Date>(

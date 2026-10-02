@@ -26,11 +26,13 @@ struct HLSPathwayCatalog: Sendable {
 
 actor HLSContentSteeringResolver {
     private static let failedReloadDelay: Duration = .seconds(300)
+    private static let maximumCachedManifests = 64
 
     private let client: HLSHTTPClient
     private let settings: HLSContentSteeringSettings
     private let clock = ContinuousClock()
     private var entries: [URL: CacheEntry] = [:]
+    private var recentlyUsedURLs: [URL] = []
 
     init(
         client: HLSHTTPClient,
@@ -74,6 +76,7 @@ actor HLSContentSteeringResolver {
         let now = clock.now
         if let entry = entries[directive.serverURL] {
             if entry.isGone || now < entry.expiration {
+                recordAccess(to: directive.serverURL)
                 return entry.manifest
             }
         }
@@ -83,22 +86,24 @@ actor HLSContentSteeringResolver {
         let outcome = try await loadManifest(from: requestURL)
         switch outcome {
         case .success(let manifest):
-            entries[directive.serverURL] = CacheEntry(
-                manifest: manifest,
-                reloadURL: manifest.reloadURL ?? requestURL,
-                expiration: now.advanced(
-                    by: .seconds(manifest.timeToLive)
-                ),
-                isGone: false
-            )
+            cache(
+                CacheEntry(
+                    manifest: manifest,
+                    reloadURL: manifest.reloadURL ?? requestURL,
+                    expiration: now.advanced(
+                        by: .seconds(manifest.timeToLive)
+                    ),
+                    isGone: false
+                ), for: directive.serverURL)
             return manifest
         case .gone:
-            entries[directive.serverURL] = CacheEntry(
-                manifest: previous?.manifest,
-                reloadURL: requestURL,
-                expiration: now,
-                isGone: true
-            )
+            cache(
+                CacheEntry(
+                    manifest: previous?.manifest,
+                    reloadURL: requestURL,
+                    expiration: now,
+                    isGone: true
+                ), for: directive.serverURL)
             return previous?.manifest
         case .unavailable(let retryDelay):
             let delay =
@@ -107,14 +112,28 @@ actor HLSContentSteeringResolver {
                     .seconds($0.timeToLive)
                 }
                 ?? Self.failedReloadDelay
-            entries[directive.serverURL] = CacheEntry(
-                manifest: previous?.manifest,
-                reloadURL: requestURL,
-                expiration: now.advanced(by: delay),
-                isGone: false
-            )
+            cache(
+                CacheEntry(
+                    manifest: previous?.manifest,
+                    reloadURL: requestURL,
+                    expiration: now.advanced(by: delay),
+                    isGone: false
+                ), for: directive.serverURL)
             return previous?.manifest
         }
+    }
+
+    private func cache(_ entry: CacheEntry, for url: URL) {
+        entries[url] = entry
+        recordAccess(to: url)
+        while recentlyUsedURLs.count > Self.maximumCachedManifests {
+            entries.removeValue(forKey: recentlyUsedURLs.removeFirst())
+        }
+    }
+
+    private func recordAccess(to url: URL) {
+        recentlyUsedURLs.removeAll { $0 == url }
+        recentlyUsedURLs.append(url)
     }
 
     private func loadManifest(
