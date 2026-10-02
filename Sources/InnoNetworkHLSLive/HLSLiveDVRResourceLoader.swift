@@ -97,7 +97,7 @@ struct HLSLiveDVRResourceLoader: Sendable {
         defer {
             transfer.cancel()
         }
-        try validate(
+        let expectedRangeLength = try validate(
             transfer.response,
             byteRange: byteRange,
             openEndedByteRangeStart: openEndedByteRangeStart
@@ -114,7 +114,7 @@ struct HLSLiveDVRResourceLoader: Sendable {
                         + "\(UUID().uuidString).ciphertext"
                 )
         let expectedBytes =
-            byteRange?.length
+            expectedRangeLength
             ?? max(0, transfer.response.expectedContentLength)
         let capacityMultiplier: Int64 = encryption == nil ? 1 : 2
         let (requiredCapacity, capacityOverflow) =
@@ -208,8 +208,8 @@ struct HLSLiveDVRResourceLoader: Sendable {
         guard byteCount > 0 else {
             throw HLSLiveDVRResourceLoadError.emptyResponse
         }
-        if let byteRange,
-            byteCount != byteRange.length
+        if let expectedRangeLength,
+            byteCount != expectedRangeLength
         {
             throw HLSLiveDVRResourceLoadError
                 .invalidByteRangeResponse
@@ -251,9 +251,12 @@ struct HLSLiveDVRResourceLoader: Sendable {
         _ response: URLResponse,
         byteRange: HLSByteRange?,
         openEndedByteRangeStart: Int64?
-    ) throws {
+    ) throws -> Int64? {
         guard let httpResponse = response as? HTTPURLResponse else {
-            return
+            if byteRange != nil || openEndedByteRangeStart != nil {
+                throw HLSLiveDVRResourceLoadError.invalidByteRangeResponse
+            }
+            return nil
         }
         guard (200..<300).contains(httpResponse.statusCode) else {
             throw
@@ -277,12 +280,14 @@ struct HLSLiveDVRResourceLoader: Sendable {
                 throw HLSLiveDVRResourceLoadError
                     .invalidByteRangeResponse
             }
+            return byteRange.length
         } else if let openEndedByteRangeStart {
             guard
                 httpResponse.statusCode == 206,
                 let contentRange = httpResponse.value(
                     forHTTPHeaderField: "Content-Range"
                 ),
+                let parsedRange = HLSContentRange(contentRange),
                 Self.matches(
                     contentRange: contentRange,
                     openEndedByteRangeStart:
@@ -294,49 +299,20 @@ struct HLSLiveDVRResourceLoader: Sendable {
                 throw HLSLiveDVRResourceLoadError
                     .invalidByteRangeResponse
             }
+            return parsedRange.length
         } else if httpResponse.statusCode == 206 {
             throw HLSLiveDVRResourceLoadError
                 .invalidByteRangeResponse
         }
+        return nil
     }
 
     static func matches(
         contentRange: String,
         byteRange: HLSByteRange
     ) -> Bool {
-        let components = contentRange.split(
-            separator: " ",
-            maxSplits: 1
-        )
-        guard
-            components.count == 2,
-            components[0].lowercased() == "bytes"
-        else {
-            return false
-        }
-        let interval = components[1].split(
-            separator: "/",
-            maxSplits: 1
-        ).first
-        let bounds = interval?.split(
-            separator: "-",
-            maxSplits: 1
-        )
-        guard
-            let bounds,
-            bounds.count == 2,
-            let lower = Int64(bounds[0]),
-            let upper = Int64(bounds[1])
-        else {
-            return false
-        }
-        let (expectedUpper, overflow) =
-            byteRange.offset.addingReportingOverflow(
-                byteRange.length - 1
-            )
-        return !overflow
-            && lower == byteRange.offset
-            && upper == expectedUpper
+        guard let range = HLSContentRange(contentRange) else { return false }
+        return range.offset == byteRange.offset && range.length == byteRange.length
     }
 
     static func matches(
@@ -344,40 +320,9 @@ struct HLSLiveDVRResourceLoader: Sendable {
         openEndedByteRangeStart: Int64,
         expectedContentLength: Int64
     ) -> Bool {
-        let components = contentRange.split(
-            separator: " ",
-            maxSplits: 1
-        )
-        guard
-            components.count == 2,
-            components[0].lowercased() == "bytes"
-        else {
-            return false
-        }
-        let interval = components[1].split(
-            separator: "/",
-            maxSplits: 1
-        ).first
-        let bounds = interval?.split(
-            separator: "-",
-            maxSplits: 1
-        )
-        guard let bounds,
-            bounds.count == 2,
-            let lower = Int64(bounds[0]),
-            let upper = Int64(bounds[1]),
-            lower == openEndedByteRangeStart,
-            upper >= lower
-        else {
-            return false
-        }
-        let (distance, subtractionOverflow) =
-            upper.subtractingReportingOverflow(lower)
-        let (length, additionOverflow) =
-            distance.addingReportingOverflow(1)
-        return !subtractionOverflow
-            && !additionOverflow
+        guard let range = HLSContentRange(contentRange) else { return false }
+        return range.offset == openEndedByteRangeStart
             && (expectedContentLength < 0
-                || expectedContentLength == length)
+                || expectedContentLength == range.length)
     }
 }

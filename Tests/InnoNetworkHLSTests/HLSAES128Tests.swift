@@ -5,6 +5,36 @@ import Testing
 @testable import InnoNetworkHLS
 
 extension HLSDownloaderTests {
+    @Test("Empty decrypted media cannot publish an offline package", arguments: [false, true])
+    func productionEmptyPlaintext(empty: Bool) async throws {
+        let url = try #require(URL(string: "https://media.example/empty-plaintext.m3u8"))
+        let keyURL = try #require(URL(string: "https://media.example/key.bin"))
+        let mediaURL = try #require(URL(string: "https://media.example/segment.ts"))
+        let key = Data(repeating: 0, count: 16)
+        let iv = Data(repeating: 0, count: 16)
+        let ciphertext = try aes128Encrypt(empty ? Data() : Data("MEDIA".utf8), key: key, initializationVector: iv)
+        let session = makeAES128Session()
+        let directory = try makeAES128TemporaryDirectory()
+        let destination = directory.appendingPathComponent("media.hlspkg")
+        defer {
+            session.invalidateAndCancel()
+            HLSURLProtocol.reset()
+            try? FileManager.default.removeItem(at: directory)
+        }
+        let playlist =
+            "#EXTM3U\n#EXT-X-TARGETDURATION:1\n#EXT-X-KEY:METHOD=AES-128,URI=\"key.bin\"\n#EXTINF:1,\nsegment.ts\n#EXT-X-ENDLIST\n"
+        HLSURLProtocol.register(.success(statusCode: 200, data: Data(playlist.utf8), headers: [:]), for: url)
+        HLSURLProtocol.register(.success(statusCode: 200, data: key, headers: [:]), for: keyURL)
+        HLSURLProtocol.register(.success(statusCode: 200, data: ciphertext, headers: [:]), for: mediaURL)
+        var rejected = false
+        do {
+            _ = try await HLSOfflinePackageDownloader(session: session).downloadPackage(
+                sourceURL: url, destinationDirectoryURL: destination)
+        } catch HLSDownloadError.aes128DecryptionFailed { rejected = true }
+        #expect(rejected == empty)
+        #expect(FileManager.default.fileExists(atPath: destination.path) == !empty)
+    }
+
     @Test("AES-128 media is decrypted with an explicit IV")
     func downloadsAES128Media() async throws {
         let playlistURL = try #require(

@@ -63,10 +63,24 @@ package struct HLSHTTPClient: Sendable {
 
         var adaptedRequest: URLRequest
         do {
+            try Task.checkCancellation()
             adaptedRequest = try await requestPolicy.adapt(
                 request,
                 context: context
             )
+            try Task.checkCancellation()
+            // Retry eligibility is derived from the original bodyless GET.
+            // Authentication and URL adaptation must not change that contract.
+            guard adaptedRequest.httpMethod == "GET",
+                adaptedRequest.httpBody == nil,
+                adaptedRequest.httpBodyStream == nil
+            else {
+                throw NetworkError.configuration(
+                    reason: .invalidRequest(
+                        "HLS request policies must preserve bodyless GET semantics."
+                    )
+                )
+            }
         } catch {
             await requestPolicy.emit(
                 .requestFailed(

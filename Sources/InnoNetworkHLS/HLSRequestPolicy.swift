@@ -128,8 +128,10 @@ public protocol HLSRequestEventObserving: Sendable {
 /// The policy is immutable and shared by playlist, media, AES-key, Content
 /// Steering, Session Data, localized rendition names, Custom Media Selection,
 /// interstitial, and Date Range resource requests. The adapter may change
-/// headers and other request properties, but its resulting URL still passes
-/// through InnoNetwork's secure URL admission.
+/// headers, URL, and transport properties, but must preserve a bodyless GET.
+/// Changing the method or adding a body is rejected before transport because
+/// HLS retry eligibility is derived from the original GET. The resulting URL
+/// still passes through InnoNetwork's secure URL admission.
 public struct HLSRequestPolicy: Sendable {
     private let adapter: @Sendable (URLRequest, HLSRequestContext) async throws -> URLRequest
     private let eventObservers: [any HLSRequestEventObserving]
