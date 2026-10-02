@@ -155,6 +155,36 @@ external consumer compilation are required before stabilizing this Draft API.
 See [the ordered implementation plan](docs/MACRO_FIRST_REDESIGN.md) for
 local execution evidence and the remaining external release gates.
 
+## Macro-first offline packages (Draft)
+
+Use a package instead of concatenating a single file when preserving the HLS
+presentation and selected audio/subtitle timelines matters. This async operation
+runs in the calling task: cancelling that task cancels the unfinished download.
+The receipt is returned only after atomic publication; an existing destination
+is never overwritten. The default keeps resumable checkpoints after interruption.
+
+```swift
+import Foundation
+import InnoNetworkHLS
+
+@HLSOfflinePackageDefinition(
+    maximumMediaResourceBytes: 8_388_608,
+    maximumTotalDownloadBytes: 268_435_456,
+    maximumConcurrentResourceTransfers: 3
+)
+enum OfflineMovie {}
+
+func saveOfflineMovie(source: URL, destination: URL) async throws -> HLSOfflinePackageReceipt {
+    try await OfflineMovie.downloadPackage(sourceURL: source, destinationDirectoryURL: destination)
+}
+```
+
+`prepare(...)` is an advisory, media-free preview; download revalidates its plan.
+Pass caller-owned transport/context/request policy to these entry points. Dynamic
+rendition, retry and storage settings use `HLSOfflinePackageConfiguration.validated`
+through `HLSOfflinePackageDefining`; both paths run the same bounded package engine.
+Request policies may adapt URLs and headers but must preserve a bodyless GET.
+
 ## Live, DVR, native playback and metadata (Draft)
 
 ```swift
@@ -196,7 +226,7 @@ client for transport, steering and key policy. Native playback remains MainActor
 and caller-owned. System background task restoration and realtime audio are
 not converted into foreground handle ownership.
 
-All five definitions delegate to throwing immutable `validated()` factories.
+All six definitions delegate to throwing immutable `validated()` factories.
 The corresponding `*Defining` protocols are the dynamic/manual compiler-plugin
 recovery equivalent, not a different network or storage implementation.
 Generated pure `configuration()` factories are nonisolated even on a global-actor

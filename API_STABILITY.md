@@ -40,13 +40,13 @@ The checked snapshots in `Scripts/symbols/*.allowlist` are the source of truth:
 
 | Module | Public declarations |
 | --- | ---: |
-| `InnoNetworkHLS` | 1,014 |
+| `InnoNetworkHLS` | 1,027 |
 | `InnoNetworkHLSLive` | 334 |
 | `InnoNetworkHLSAVFoundation` | 713 |
 | `InnoNetworkHLSAudio` | 65 |
-| **Total** | **2,126** |
+| **Total** | **2,139** |
 
-The 260 new name rows (macro, validated settings, workflow protocol,
+The 273 new name rows (macro, validated settings, workflow protocol,
 download task/observation contracts and pure discriminated documents) are
 **Draft**, not automatically promoted
 to Provisionally Stable by an allowlist update. Macro expansion/diagnostics,
@@ -54,13 +54,13 @@ external Debug/Release consumers, runtime ownership controls and the final
 supported-toolchain/platform gates must pass before promotion. See
 [the macro-first execution plan](docs/MACRO_FIRST_REDESIGN.md).
 
-The net increase of 259 name rows reflects documented families. One inherited
+The net increase of 272 name rows reflects documented families. One inherited
 flat playlist constructor is internal; 1,866 inherited rows remain. Typed
 selector overloads share name rows and require the semantic signature gate. The collector
 now includes `swift.macro`, so the primary declarative surface is gated too.
 
 `Scripts/check_public_api_contract.sh` regenerates Swift symbol graphs and
-checks `public-signatures.tsv` with 2,131 distinct signatures as well as 2,126
+checks `public-signatures.tsv` with 2,144 distinct signatures as well as 2,139
 name rows. Signatures include overload USRs, typed declaration fragments,
 async/throws, actor attributes, generics, availability and explicit conformance
 relationships. Locations/comments do not affect the snapshot. Regenerate only

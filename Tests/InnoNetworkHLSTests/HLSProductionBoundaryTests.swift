@@ -7,6 +7,9 @@ import Testing
 @HLSDownloadDefinition(maximumMediaResourceBytes: 4096, maximumTotalDownloadBytes: 8192)
 private enum ProductionBoundaryDownload {}
 
+@HLSOfflinePackageDefinition(maximumMediaResourceBytes: 4096, maximumTotalDownloadBytes: 8192)
+private enum ProductionBoundaryPackage {}
+
 extension HLSDownloaderTests {
     @Test("request policy preserves bodyless GET semantics", arguments: ["headers", "method", "body", "stream"])
     func productionRequestSemantics(mutation: String) async throws {
@@ -87,8 +90,8 @@ extension HLSDownloaderTests {
         var failed = false
         do {
             if offline {
-                _ = try await HLSOfflinePackageDownloader(session: session).downloadPackage(
-                    sourceURL: url, destinationDirectoryURL: destination)
+                _ = try await ProductionBoundaryPackage.downloadPackage(
+                    sourceURL: url, destinationDirectoryURL: destination, session: session)
             } else {
                 let task = try ProductionBoundaryDownload.start(
                     sourceURL: url, destinationURL: destination, session: session)

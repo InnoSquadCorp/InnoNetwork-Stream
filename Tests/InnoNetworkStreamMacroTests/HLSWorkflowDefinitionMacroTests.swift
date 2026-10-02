@@ -6,6 +6,51 @@ import Testing
 
 @Suite("Workflow definition expansion")
 struct HLSWorkflowDefinitionMacroTests {
+    @Test("Offline workflow emits only validated configuration and conformance")
+    func offlineExpansion() {
+        assertMacroExpansion(
+            "@HLSOfflinePackageDefinition\npublic enum Offline {}",
+            expandedSource: """
+                public enum Offline {
+
+                    public nonisolated static func configuration() throws -> InnoNetworkHLS.HLSOfflinePackageConfiguration {
+                        try InnoNetworkHLS.HLSOfflinePackageConfiguration.validated(maximumMediaResourceBytes: 134217728, maximumTotalDownloadBytes: 8589934592, maximumConcurrentResourceTransfers: 3)
+                    }
+                }
+
+                extension Offline: InnoNetworkHLS.HLSOfflinePackageDefining {
+                }
+                """, macros: ["HLSOfflinePackageDefinition": HLSWorkflowDefinitionMacro.self])
+    }
+
+    @Test(
+        "Offline limits and declaration errors diagnose before execution",
+        arguments: [
+            (
+                "(maximumMediaResourceBytes: 2, maximumTotalDownloadBytes: 1)", "enum Offline {}",
+                "maximumMediaResourceBytes must not exceed maximumTotalDownloadBytes."
+            ),
+            (
+                "(maximumConcurrentResourceTransfers: 9)", "enum Offline {}",
+                "maximumConcurrentResourceTransfers must be a decimal integer literal in 1...8. Use validated() for dynamic values."
+            ),
+            (
+                "(maximumMediaResourceBytes: 2147483648)", "enum Offline {}",
+                "maximumMediaResourceBytes must be a decimal integer literal in 1...2147483647. Use validated() for dynamic values."
+            ),
+            ("", "class Offline {}", "@HLSOfflinePackageDefinition requires a struct or enum declaration."),
+            (
+                "", "enum Offline: HLSOfflinePackageDefining {}",
+                "@HLSOfflinePackageDefinition adds HLSOfflinePackageDefining; remove the explicit conformance."
+            ),
+        ])
+    func offlineDiagnostics(example: (String, String, String)) {
+        assertMacroExpansion(
+            "@HLSOfflinePackageDefinition\(example.0)\n\(example.1)", expandedSource: example.1,
+            diagnostics: [DiagnosticSpec(message: example.2, line: 1, column: 1)],
+            macros: ["HLSOfflinePackageDefinition": HLSWorkflowDefinitionMacro.self])
+    }
+
     @Test(
         "Escaped and conditional configuration collisions diagnose at the macro",
         arguments: [

@@ -19,6 +19,15 @@ public struct HLSWorkflowDefinitionMacro: MemberMacro, ExtensionMacro {
         let name = String(node.attributeName.trimmedDescription.split(separator: ".").last ?? "")
         var spec: Spec
         switch name {
+        case "HLSOfflinePackageDefinition":
+            spec = Spec(
+                module: "InnoNetworkHLS", configuration: "HLSOfflinePackageConfiguration",
+                conformance: "HLSOfflinePackageDefining",
+                fields: [
+                    Field(name: "maximumMediaResourceBytes", value: 134_217_728, range: 1...Int64(Int32.max)),
+                    Field(name: "maximumTotalDownloadBytes", value: 8_589_934_592, range: 1...Int64.max),
+                    Field(name: "maximumConcurrentResourceTransfers", value: 3, range: 1...8),
+                ])
         case "HLSCatalogDefinition":
             spec = Spec(
                 module: "InnoNetworkHLS", configuration: "HLSMediaCatalogConfiguration",
@@ -93,6 +102,9 @@ public struct HLSWorkflowDefinitionMacro: MemberMacro, ExtensionMacro {
         }
         if name == "HLSDVRDefinition", spec.fields[2].value > spec.fields[3].value {
             throw Failure("maximumMediaResourceBytes must not exceed maximumTotalMediaBytes.")
+        }
+        if name == "HLSOfflinePackageDefinition", spec.fields[0].value > spec.fields[1].value {
+            throw Failure("maximumMediaResourceBytes must not exceed maximumTotalDownloadBytes.")
         }
         return spec
     }

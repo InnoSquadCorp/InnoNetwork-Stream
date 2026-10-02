@@ -1,6 +1,6 @@
 # allowlist	maximum public declarations
-hls.allowlist	1014
+hls.allowlist	1027
 hls-live.allowlist	334
 hls-avfoundation.allowlist	713
 hls-audio.allowlist	65
-TOTAL	2126
+TOTAL	2139

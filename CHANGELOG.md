@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Add macro-first atomic offline packages with `@HLSOfflinePackageDefinition`,
+  validated dynamic settings and equivalent manual workflows. Cancellation is
+  owned by the calling task; existing destinations are not overwritten.
+- Enforce bodyless GET request adaptation and cancellation on both sides of
+  adaptation. Reject empty media/plaintext before VOD or offline publication.
+  Share strict Content-Range parsing between VOD and DVR, including actual
+  open-ended response byte counts without Content-Length.
+- Compile all four DocC catalogs with warnings as errors and explicit sibling
+  archive dependencies. Correct macro signatures, stale overload links and
+  cross-module paths; reuse generated API graphs in CI/preflight.
+- Bound long-lived downloader/planner Content Steering caches to 64 recently
+  used entries, including negative responses. Active plans retain their own
+  immutable pathway candidates; eviction only affects subsequent planning.
 - Develop against Core PR #141's `codex/core-stream-followup` branch and lock
   its exact revision. Verify manifest, active graph and checkout agreement;
   keep published release validation version-only.

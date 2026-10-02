@@ -13,6 +13,28 @@ import InnoNetworkHLSLive
 )
 enum ConsumerDownload {}
 
+@HLSOfflinePackageDefinition(maximumMediaResourceBytes: 4096, maximumTotalDownloadBytes: 8192)
+enum ConsumerOfflinePackage {}
+
+@MainActor
+@HLSOfflinePackageDefinition
+enum IsolatedOfflinePackage {}
+
+struct ManualOfflinePackage: HLSOfflinePackageDefining {
+    static func configuration() throws -> HLSOfflinePackageConfiguration { try .validated() }
+}
+
+@HLSOfflinePackageDefinition(
+    maximumMediaResourceBytes: 8_388_608,
+    maximumTotalDownloadBytes: 268_435_456,
+    maximumConcurrentResourceTransfers: 3
+)
+enum OfflineMovie {}
+
+func saveOfflineMovie(source: URL, destination: URL) async throws -> HLSOfflinePackageReceipt {
+    try await OfflineMovie.downloadPackage(sourceURL: source, destinationDirectoryURL: destination)
+}
+
 @HLSDownloadDefinition
 enum ConditionalDownload {
     #if DEBUG
@@ -145,14 +167,18 @@ _ = try ManualDVR.configuration()
 _ = try ManualPlayback.configuration()
 _ = try ManualCatalog.makeCatalog()
 _ = try QualifiedLive.configuration()
-// All five pure generated configuration factories work across actor boundaries.
+// All six pure generated configuration factories work across actor boundaries.
 _ = try await Task.detached {
     _ = try IsolatedDownload.makeDownloader()
+    _ = try IsolatedOfflinePackage.makeDownloader()
     _ = try IsolatedLive.makeClient()
     _ = try IsolatedDVR.configuration()
     _ = try IsolatedPlayback.configuration()
     _ = try IsolatedCatalog.makeCatalog()
 }.value
+_ = try ManualOfflinePackage.makeDownloader()
+let offlineSettings = try ConsumerOfflinePackage.configuration()
+precondition(offlineSettings.maximumMediaResourceBytes == 4096)
 precondition(ConsumerEndpoint().path == "/fixture")
 
 let parsedDocument = try HLSPlaylistParser().parse(
@@ -241,4 +267,41 @@ do {
 let observedCancellation = await cancellationRecorder.endedWithCancellation()
 precondition(observedCancellation)
 
-print("package-identity-consumer: OK (four unchanged imports, Stream/Network macros, README, Core cancellation)")
+// Exercise the offline macro's actual Core transport, planner and atomic writer
+// without any external service. This protocol is scoped to this session only.
+final class OfflineFixtureProtocol: URLProtocol, @unchecked Sendable {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        let playlist = "#EXTM3U\n#EXT-X-TARGETDURATION:1\n#EXTINF:1,\nsegment.ts\n#EXT-X-ENDLIST\n"
+        let body = Data((request.url!.path.hasSuffix("m3u8") ? playlist : "MEDIA").utf8)
+        let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: [:])!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: body)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
+let offlineConfiguration = URLSessionConfiguration.ephemeral
+offlineConfiguration.protocolClasses = [OfflineFixtureProtocol.self]
+let offlineSession = URLSession(configuration: offlineConfiguration)
+let offlineDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+defer {
+    offlineSession.invalidateAndCancel()
+    try? FileManager.default.removeItem(at: offlineDirectory)
+}
+let offlineURL = URL(string: "https://media.example/offline.m3u8")!
+let offlinePreview = try await ConsumerOfflinePackage.prepare(sourceURL: offlineURL, session: offlineSession)
+precondition(offlinePreview.resourceTransferCount == 1)
+precondition(!FileManager.default.fileExists(atPath: offlineDirectory.path))
+let offlineReceipt = try await ConsumerOfflinePackage.downloadPackage(
+    sourceURL: offlineURL, destinationDirectoryURL: offlineDirectory.appendingPathComponent("movie.hlspkg"),
+    session: offlineSession)
+let reopenedOfflineReceipt = try HLSOfflinePackageStore().open(at: offlineReceipt.directoryURL)
+precondition(offlineReceipt.byteCount > 5)  // Includes local playlists and manifest.
+precondition(reopenedOfflineReceipt.byteCount == offlineReceipt.byteCount)
+precondition(FileManager.default.fileExists(atPath: offlineReceipt.entryPlaylistURL.path))
+
+print(
+    "package-identity-consumer: OK (four imports, six Stream macros, Core macro/cancellation, README, atomic offline transfer)"
+)
