@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased iterative hardening
+
+- Start Steering TTL and Retry-After waits after receipt, share same-context
+  manifest loads with independent cancellation, and bound waiters/producers.
+- Add macro-first offline `start` and `HLSOfflinePackageTask` with independent
+  bounded events/receipt observation and explicit owner cancellation. Reuse the
+  existing atomic package engine and preserve legacy ownership contracts.
+- Exercise registered waiter cancellation, capacity reuse and finish races with
+  actual registration barriers rather than scheduling assumptions.
+
 ## Unreleased
 
 - Add macro-first atomic offline packages with `@HLSOfflinePackageDefinition`,

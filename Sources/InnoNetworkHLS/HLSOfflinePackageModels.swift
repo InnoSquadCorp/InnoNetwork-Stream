@@ -349,6 +349,8 @@ public enum HLSOfflinePackageEvent: Sendable {
     /// Package creation failed with a typed HLS error.
     case failed(HLSDownloadError)
 
-    /// The consuming task or event stream cancelled package creation.
+    /// The owner cancelled package creation (or the calling task / legacy
+    /// `download` stream cancelled). Independent owned-operation observers do
+    /// not cancel package creation.
     case cancelled
 }

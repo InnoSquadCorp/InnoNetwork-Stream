@@ -302,6 +302,24 @@ precondition(offlineReceipt.byteCount > 5)  // Includes local playlists and mani
 precondition(reopenedOfflineReceipt.byteCount == offlineReceipt.byteCount)
 precondition(FileManager.default.fileExists(atPath: offlineReceipt.entryPlaylistURL.path))
 
+let ownedOffline = try ConsumerOfflinePackage.start(
+    sourceURL: offlineURL, destinationDirectoryURL: offlineDirectory.appendingPathComponent("owned.hlspkg"),
+    session: offlineSession)
+let ownedEvents = try ownedOffline.events()
+let ownedReceipt = try await ownedOffline.receipt()
+var completedOfflineEvents = 0
+for try await observation in ownedEvents {
+    precondition(observation.operationID == ownedOffline.id)
+    if case .completed(let receipt) = observation.event {
+        precondition(receipt.directoryURL == ownedReceipt.directoryURL)
+        completedOfflineEvents += 1
+    }
+}
+precondition(completedOfflineEvents == 1 && ownedOffline.state == .completed)
+ownedOffline.cancel()  // Late cancellation must preserve the atomic commit.
+let lateOwnedReceipt = try await ownedOffline.receipt()
+precondition(lateOwnedReceipt.directoryURL == ownedReceipt.directoryURL)
+
 print(
     "package-identity-consumer: OK (four imports, six Stream macros, Core macro/cancellation, README, atomic offline transfer)"
 )

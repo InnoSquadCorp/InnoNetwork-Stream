@@ -40,13 +40,13 @@ The checked snapshots in `Scripts/symbols/*.allowlist` are the source of truth:
 
 | Module | Public declarations |
 | --- | ---: |
-| `InnoNetworkHLS` | 1,027 |
+| `InnoNetworkHLS` | 1,036 |
 | `InnoNetworkHLSLive` | 334 |
 | `InnoNetworkHLSAVFoundation` | 713 |
 | `InnoNetworkHLSAudio` | 65 |
-| **Total** | **2,139** |
+| **Total** | **2,148** |
 
-The 273 new name rows (macro, validated settings, workflow protocol,
+The 282 new name rows (macro, validated settings, workflow protocol,
 download task/observation contracts and pure discriminated documents) are
 **Draft**, not automatically promoted
 to Provisionally Stable by an allowlist update. Macro expansion/diagnostics,
@@ -54,17 +54,21 @@ external Debug/Release consumers, runtime ownership controls and the final
 supported-toolchain/platform gates must pass before promotion. See
 [the macro-first execution plan](docs/MACRO_FIRST_REDESIGN.md).
 
-The net increase of 272 name rows reflects documented families. One inherited
+The net increase of 281 name rows reflects documented families. One inherited
 flat playlist constructor is internal; 1,866 inherited rows remain. Typed
 selector overloads share name rows and require the semantic signature gate. The collector
 now includes `swift.macro`, so the primary declarative surface is gated too.
 
 `Scripts/check_public_api_contract.sh` regenerates Swift symbol graphs and
-checks `public-signatures.tsv` with 2,144 distinct signatures as well as 2,139
+checks `public-signatures.tsv` with 2,153 distinct signatures as well as 2,148
 name rows. Signatures include overload USRs, typed declaration fragments,
 async/throws, actor attributes, generics, availability and explicit conformance
 relationships. Locations/comments do not affect the snapshot. Regenerate only
 after intentional semantic review; drift is never automatically accepted.
+The nine offline-owner additions expose `start`, bounded independent `events`
+and `receipt` observations, explicit cancellation, state and redacted failure
+reporting. Releasing the owner cancels unfinished work; cancelling an observer
+does not. Existing caller-owned async and legacy stream ownership are unchanged.
 The initial snapshot is generated on Xcode 27/Swift 6.4. Xcode 26 parity is an
 external gate, not inferred from a declaration count. Fixture controls verify
 that removing semantic fields changes the result without source-location noise.

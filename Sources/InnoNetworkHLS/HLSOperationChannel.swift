@@ -28,6 +28,8 @@ package final class HLSOperationChannel<Event: Sendable, Output: Sendable>: Send
 
     package init() {}
 
+    var pendingWaiterCount: Int { storage.withLock { $0.waiters.count } }
+
     package var failure: (any Error)? {
         storage.withLock { if case .failure(let error) = $0.result { error } else { nil } }
     }

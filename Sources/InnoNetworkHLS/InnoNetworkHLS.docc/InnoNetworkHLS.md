@@ -851,6 +851,7 @@ so adding an HLS target cannot silently leave it outside release validation.
 
 - ``HLSOfflinePackageDefinition(maximumMediaResourceBytes:maximumTotalDownloadBytes:maximumConcurrentResourceTransfers:)``
 - ``HLSOfflinePackageDefining``
+- ``HLSOfflinePackageTask``
 - ``HLSLocalPlaybackSource``
 - ``HLSLocalPlaybackSourceError``
 - ``HLSOfflinePackageDownloader``

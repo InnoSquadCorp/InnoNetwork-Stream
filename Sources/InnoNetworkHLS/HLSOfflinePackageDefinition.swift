@@ -23,6 +23,20 @@ public protocol HLSOfflinePackageDefining {
 }
 
 public extension HLSOfflinePackageDefining {
+    /// Starts an explicitly owned operation. The macro supplies validated
+    /// configuration; this runtime entry point owns effects. Retain the handle
+    /// and call `cancel()` to stop work independently of progress observers.
+    static func start(
+        sourceURL: URL,
+        destinationDirectoryURL: URL,
+        session: URLSession = .shared,
+        requestContext: NetworkRequestContext = NetworkRequestContext(),
+        requestPolicy: HLSRequestPolicy = HLSRequestPolicy()
+    ) throws -> HLSOfflinePackageTask {
+        try makeDownloader(session: session, requestContext: requestContext, requestPolicy: requestPolicy)
+            .start(sourceURL: sourceURL, destinationDirectoryURL: destinationDirectoryURL)
+    }
+
     /// Creates an effect-free downloader with caller-owned transport policy.
     static func makeDownloader(
         session: URLSession = .shared,

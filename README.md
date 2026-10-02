@@ -189,6 +189,16 @@ rendition, retry and storage settings use `HLSOfflinePackageConfiguration.valida
 through `HLSOfflinePackageDefining`; both paths run the same bounded package engine.
 Request policies may adapt URLs and headers but must preserve a bodyless GET.
 
+For independent progress observation, use `try OfflineMovie.start(...)` and
+retain the returned `HLSOfflinePackageTask`. `try operation.events()` provides
+bounded, sequenced events; `try await operation.receipt()` confirms atomic
+publication. Cancelling an observer or receipt waiter does not stop the producer:
+call `operation.cancel()` explicitly, or release the owner. The default preserves
+resumable checkpoints, not an incomplete destination. A committed package is not
+removed by late cancellation. The legacy `downloader.download(...)` stream still
+cancels its producer when observation terminates. These ownership contracts are
+intentionally different; the async convenience above remains caller-owned.
+
 ## Live, DVR, native playback and metadata (Draft)
 
 ```swift

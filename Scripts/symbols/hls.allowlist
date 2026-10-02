@@ -1,3 +1,12 @@
+InnoNetworkHLS	swift.class	HLSOfflinePackageTask
+InnoNetworkHLS	swift.method	HLSOfflinePackageDownloader.start(sourceURL:destinationDirectoryURL:)
+InnoNetworkHLS	swift.method	HLSOfflinePackageTask.cancel()
+InnoNetworkHLS	swift.method	HLSOfflinePackageTask.events()
+InnoNetworkHLS	swift.method	HLSOfflinePackageTask.receipt()
+InnoNetworkHLS	swift.property	HLSOfflinePackageTask.failureReport
+InnoNetworkHLS	swift.property	HLSOfflinePackageTask.id
+InnoNetworkHLS	swift.property	HLSOfflinePackageTask.state
+InnoNetworkHLS	swift.type.method	HLSOfflinePackageDefining.start(sourceURL:destinationDirectoryURL:session:requestContext:requestPolicy:)
 InnoNetworkHLS	swift.macro	HLSOfflinePackageDefinition(maximumMediaResourceBytes:maximumTotalDownloadBytes:maximumConcurrentResourceTransfers:)
 InnoNetworkHLS	swift.property	HLSOfflinePackageConfiguration.diskCapacityPolicy
 InnoNetworkHLS	swift.property	HLSOfflinePackageConfiguration.maximumConcurrentResourceTransfers
