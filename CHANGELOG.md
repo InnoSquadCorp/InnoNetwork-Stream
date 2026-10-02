@@ -4,6 +4,8 @@
 
 - Start Steering TTL and Retry-After waits after receipt, share same-context
   manifest loads with independent cancellation, and bound waiters/producers.
+  Honor zero and HTTP-date Retry-After values; reject signed or overflowing
+  delays instead of interpreting them as valid positive waits.
 - Add macro-first offline `start` and `HLSOfflinePackageTask` with independent
   bounded events/receipt observation and explicit owner cancellation. Reuse the
   existing atomic package engine and preserve legacy ownership contracts.

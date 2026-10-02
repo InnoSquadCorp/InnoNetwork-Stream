@@ -27,5 +27,19 @@ The original delayed-response reproducer is retained at
 `/private/tmp/stream-current-review.Tf9RNq/`; immediate controls make one request,
 delayed 200/429 cases make two. That bug predates the latest LRU correction.
 New logs will be retained under `.build/iterative-hardening/`.
+
+The repeat pass reopened the timing row: Retry-After ignored zero, HTTP-date
+and surrounding whitespace, while accepting signed `+1`. Ten syntax controls
+produce five failures before correction (`retry-syntax-before.log`); ordinary
+positive seconds, malformed/negative/fractional/overflow controls remain distinct.
+The correction reuses the existing HLS HTTP-date parser, samples wall time only
+for conversion and retains monotonic receipt-based storage. Contract reference:
+[RFC 9110 section 10.2.3](https://www.rfc-editor.org/rfc/rfc9110.html#section-10.2.3).
+All ten syntax cases pass after correction. The eleven-method combined suite
+passes 20 consecutive runs (`all-repeat-1.log` through `all-repeat-20.log`),
+including 200 registered completion races per run. An additional actual Core
+transfer cancellation case confirms that the first waiter does not stop its
+survivor, while the last cancellation calls URLProtocol `stopLoading` and drains
+the producer. The final focused suite is 12 methods (`final-focused.log`).
 Remote CI, publication, Xcode 26, physical-device background/locked-storage and
 real DRM/CDN/exporter acceptance are not substituted by local fixture success.

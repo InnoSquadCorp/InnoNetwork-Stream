@@ -362,17 +362,19 @@ actor HLSContentSteeringResolver {
         return renditions.filter { groupIDs.contains($0.groupID) }
     }
 
-    private static func retryDelay(
-        from response: HTTPURLResponse
+    static func retryDelay(
+        from response: HTTPURLResponse, now: Date = Date()
     ) -> Duration? {
-        guard
-            let value = response.value(forHTTPHeaderField: "Retry-After"),
-            let seconds = Int64(value),
-            seconds > 0
-        else {
-            return nil
+        guard let raw = response.value(forHTTPHeaderField: "Retry-After") else { return nil }
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return nil }
+        // RFC 9110: delay-seconds is unsigned decimal, including zero; the
+        // alternative is HTTP-date. Invalid/overflow input retains fallback.
+        if value.utf8.allSatisfy({ (48...57).contains($0) }) {
+            return Int64(value).map { .seconds($0) }
         }
-        return .seconds(seconds)
+        guard let date = HLSHTTPDateParser.parse(value, requiresGMTZone: true) else { return nil }
+        return .seconds(max(0, date.timeIntervalSince(now)))
     }
 
     private static func decodeDataURL(

@@ -6,6 +6,69 @@ import os
 @testable import InnoNetworkHLS
 
 extension HLSDownloaderTests {
+    @Test("last steering waiter cancellation stops an active Core transfer")
+    func steeringLastWaiterStopsTransfer() async throws {
+        let url = URL(string: "https://steering.example/unfinished.json")!
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [HLSURLProtocol.self]
+        let session = URLSession(configuration: config)
+        defer {
+            session.invalidateAndCancel()
+            HLSURLProtocol.reset()
+        }
+        let stopped = OSAllocatedUnfairLock(initialState: false)
+        HLSURLProtocol.setStopLoadingHandler { if $0 == url { stopped.withLock { $0 = true } } }
+        HLSURLProtocol.register(.unfinished(statusCode: 200, data: Data("{".utf8), headers: [:]), for: url)
+        let resolver = HLSContentSteeringResolver(
+            client: HLSHTTPClient(
+                session: session,
+                requestContext: NetworkRequestContext(), requestAdapter: { $0 }),
+            settings: HLSContentSteeringPack().resolvedSettings)
+        let playlist = try steeringLifecyclePlaylist(serverURL: url)
+        let first = Task { try await resolver.catalog(for: playlist) }
+        let second = Task { try await resolver.catalog(for: playlist) }
+        do {
+            try await steeringEventually {
+                await resolver.pendingManifestWaiterCount == 2 && !HLSURLProtocol.capturedRequests().isEmpty
+            }
+            first.cancel()
+            await #expect(throws: CancellationError.self) { try await first.value }
+            #expect(!stopped.withLock { $0 })
+            second.cancel()
+            await #expect(throws: CancellationError.self) { try await second.value }
+            try await steeringEventually { stopped.withLock { $0 } }
+            try await steeringEventually { await resolver.activeManifestLoadCount == 0 }
+            #expect(HLSURLProtocol.capturedRequests().count == 1)
+        } catch {
+            first.cancel()
+            second.cancel()
+            _ = await first.result
+            _ = await second.result
+            throw error
+        }
+    }
+
+    @Test(
+        "steering Retry-After accepts HTTP wait syntax",
+        arguments: [
+            "0", "60", " 60 ", "Thu, 01 Jan 1970 00:00:10 GMT", "Wed, 31 Dec 1969 23:59:59 GMT",
+            "+1", "-1", "1.5", "bogus", "999999999999999999999999999999999999",
+        ])
+    func steeringRetryAfterSyntax(header: String) throws {
+        let response = try #require(
+            HTTPURLResponse(
+                url: URL(string: "https://steering.example/retry")!,
+                statusCode: 429, httpVersion: "HTTP/1.1", headerFields: ["Retry-After": header]))
+        let expected: Duration?
+        switch header {
+        case "0", "Wed, 31 Dec 1969 23:59:59 GMT": expected = .zero
+        case "60", " 60 ": expected = .seconds(60)
+        case "Thu, 01 Jan 1970 00:00:10 GMT": expected = .seconds(10)
+        default: expected = nil
+        }
+        #expect(HLSContentSteeringResolver.retryDelay(from: response, now: Date(timeIntervalSince1970: 0)) == expected)
+    }
+
     @Test("shared steering waiters cancel independently", arguments: [200, 429, 410, 503])
     func steeringSharedWaiters(status: Int) async throws {
         let fixture = try SteeringFlightFixture(status: status)
