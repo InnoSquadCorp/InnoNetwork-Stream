@@ -5,6 +5,8 @@
 These changes have not been tagged. `1.0.0` remains a draft until the release
 state, remote dependency, Apple-platform, and HLS conformance gates pass.
 
+- Wait for the live playlist producer and relay to terminate before returning
+  from DVR stop/discard, preventing requests after caller-owned session cleanup.
 - Split the four HLS products from InnoNetwork 6 into an independently
   versioned package while preserving their module names.
 - Depend on InnoNetwork's public bounded-transfer and retry-execution

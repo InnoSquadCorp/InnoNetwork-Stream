@@ -157,6 +157,18 @@ public struct HLSLivePlaylistClient: Sendable {
     public func snapshots(
         from sourceURL: URL
     ) -> AsyncThrowingStream<HLSLivePlaylistSnapshot, Error> {
+        makeSnapshotStream(from: sourceURL).stream
+    }
+
+    // Internal owners must join this producer before releasing its transport.
+    // AsyncThrowingStream cancellation only requests cancellation; it does not
+    // wait for an adapter, observer, or request already in progress to unwind.
+    func makeSnapshotStream(
+        from sourceURL: URL
+    ) -> (
+        stream: AsyncThrowingStream<HLSLivePlaylistSnapshot, Error>,
+        task: Task<Void, Never>
+    ) {
         let (stream, continuation) =
             AsyncThrowingStream<
                 HLSLivePlaylistSnapshot,
@@ -189,7 +201,7 @@ public struct HLSLivePlaylistClient: Sendable {
         continuation.onTermination = { _ in
             task.cancel()
         }
-        return stream
+        return (stream, task)
     }
 
     private func run(
@@ -202,6 +214,7 @@ public struct HLSLivePlaylistClient: Sendable {
         keyPreloadCoordinator:
             HLSLiveKeyPreloadCoordinator?
     ) async throws {
+        try Task.checkCancellation()
         let contentSteeringSession = makeContentSteeringSession()
         let entryURL = try HLSLiveReloadRequestBuilder.fullReloadURL(
             from: sourceURL
