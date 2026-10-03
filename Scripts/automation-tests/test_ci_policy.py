@@ -145,8 +145,19 @@ class WorkflowTests(unittest.TestCase):
         jobs=yaml(ROOT/'.github/workflows/release.yml')['jobs']
         for key,old in self.old['release'].items():
             if key.startswith('publish'):continue
-            self.assertEqual(jobs[key],old) if 'codeql' in self.old else self.assertEqual(
-                [s for s in jobs[key]['steps'] if 'run' in s],[s for s in old['steps'] if 'run' in s])
+            if 'codeql' in self.old:
+                changed = {'Validate tagged release ref', 'Prepare tagged source archive'}
+                current = {s.get('name'): s for s in jobs[key]['steps']}
+                for step in old['steps']:
+                    if step.get('name') not in changed:
+                        self.assertEqual(current[step.get('name')], step)
+                names = [s.get('name') for s in jobs[key]['steps']]
+                self.assertEqual(names[names.index('Publish GitHub release') - 1],
+                                 'Revalidate release identity immediately before publication')
+                self.assertIn('$RELEASE_COMMIT_SHA', current['Prepare tagged source archive']['run'])
+                self.assertEqual(current['Validate tagged release ref']['env']['RELEASE_EXPECTED_SHA'], '${{ github.sha }}')
+            else:
+                self.assertEqual([s for s in jobs[key]['steps'] if 'run' in s], [s for s in old['steps'] if 'run' in s])
         if 'codeql' not in self.old:
             release=jobs['publish-release'];self.assertEqual(release['needs'],'validate-release')
             notes=next(s for s in release['steps'] if s.get('id')=='notes')

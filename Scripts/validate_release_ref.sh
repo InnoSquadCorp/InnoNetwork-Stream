@@ -47,6 +47,33 @@ main_commit="$(git -C "$repo_root" rev-parse "${main_ref}^{commit}")"
 [[ "$tag_commit" == "$main_commit" ]] \
   || fail "tagged commit must exactly match canonical main"
 
+head_commit="$(git -C "$repo_root" rev-parse HEAD)"
+[[ "$head_commit" == "$tag_commit" ]] \
+  || fail "checkout HEAD must exactly match the release tag"
+tag_object="$(git -C "$repo_root" rev-parse "$tag_ref")"
+if [[ -n "${RELEASE_EXPECTED_SHA:-}" ]]; then
+  [[ "$tag_commit" == "$(git -C "$repo_root" rev-parse "${RELEASE_EXPECTED_SHA}^{commit}")" ]] \
+    || fail "release commit changed since validation"
+fi
+if [[ -n "${RELEASE_EXPECTED_TAG_OBJECT:-}" ]]; then
+  [[ "$tag_object" == "$RELEASE_EXPECTED_TAG_OBJECT" ]] \
+    || fail "release tag object changed since validation"
+fi
+
+# Unit fixtures can opt out without a remote; hosted publication always uses 1.
+case "${RELEASE_VERIFY_REMOTE:-1}" in
+  1)
+    remote_tags="$(git -C "$repo_root" ls-remote --exit-code --tags "$remote" "$tag_ref" "${tag_ref}^{}")" \
+      || fail "could not read the remote release tag"
+    remote_object="$(awk -v ref="$tag_ref" '$2 == ref { print $1 }' <<< "$remote_tags")"
+    remote_commit="$(awk -v ref="${tag_ref}^{}" '$2 == ref { print $1 }' <<< "$remote_tags")"
+    [[ "$remote_object" == "$tag_object" && "$remote_commit" == "$tag_commit" ]] \
+      || fail "remote tag differs from the validated annotated tag"
+    ;;
+  0) ;;
+  *) fail "RELEASE_VERIFY_REMOTE must be 0 or 1" ;;
+esac
+
 notes="docs/releases/$release_tag.md"
 [[ "$(git -C "$repo_root" show "$tag_commit:$notes" 2>/dev/null | sed -n '1p')" == '<!-- release-status: ready -->' ]] \
   || fail "$notes must exist and begin with the ready marker"
@@ -58,3 +85,7 @@ if [[ "$release_tag" == "1.0.0" ]]; then
 fi
 
 echo "release-ref: OK ($release_tag at $tag_commit)"
+
+if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+  printf 'commit_sha=%s\ntag_object=%s\n' "$tag_commit" "$tag_object" >> "$GITHUB_OUTPUT"
+fi
