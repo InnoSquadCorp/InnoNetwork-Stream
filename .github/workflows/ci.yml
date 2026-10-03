@@ -1,6 +1,6 @@
 name: CI
 run-name: >-
-  ${{ (github.event_name == 'pull_request' && (((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name && github.event.label.name != 'release-validation') || (github.event.action == 'edited' && !github.event.changes.base))) && 'CI metadata only' || 'CI' }}
+  ${{ (github.event_name == 'pull_request' && (((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name && github.event.label.name != 'release-validation') || (github.event.action == 'edited' && !github.event.changes.base))) && format('CI metadata-only v1 pr:{0} head:{1} base:{2} action:{3} source:{4}', github.event.pull_request.number, github.event.pull_request.head.sha, github.event.pull_request.base.sha, github.event.action, github.workflow_sha) || (github.event_name == 'pull_request' && format('CI validation v2 pr:{0} head:{1} base:{2} source:{3} release:{4} asan:{5} concurrency:{6}', github.event.pull_request.number, github.event.pull_request.head.sha, github.event.pull_request.base.sha, github.sha, contains(github.event.pull_request.labels.*.name, 'release-validation'), false, false) || format('CI validation / {0} / {1}', github.event_name, github.ref)) }}
 
 on:
   pull_request:
@@ -11,8 +11,9 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ (github.event_name == 'pull_request' && (((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name && github.event.label.name != 'release-validation') || (github.event.action == 'edited' && !github.event.changes.base))) && format('metadata-{0}', github.run_id) || (github.event.pull_request.number || github.ref) }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ !(github.event_name == 'pull_request' && (((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name && github.event.label.name != 'release-validation') || (github.event.action == 'edited' && !github.event.changes.base))) }}
+  queue: ${{ (github.event_name == 'pull_request' && (((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name && github.event.label.name != 'release-validation') || (github.event.action == 'edited' && !github.event.changes.base))) && 'max' || 'single' }}
 
 permissions:
   contents: read
@@ -222,17 +223,28 @@ jobs:
     uses: ./.github/workflows/codeql.yml
 
   ci-required:
-    name: ${{ (github.event_name == 'pull_request' && (((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name && github.event.label.name != 'release-validation') || (github.event.action == 'edited' && !github.event.changes.base))) && 'CI Metadata Only' || 'CI Required' }}
-    if: ${{ always() && !(github.event_name == 'pull_request' && (((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name && github.event.label.name != 'release-validation') || (github.event.action == 'edited' && !github.event.changes.base))) }}
+    name: CI Required
+    if: ${{ always() }}
     needs: ['ci-plan', 'policy', 'dependency-review', 'lint', 'build-and-test', 'contracts', 'platform-build', 'codeql']
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      checks: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
       - name: Require every selected validation
+        if: ${{ !(github.event_name == 'pull_request' && (((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name && github.event.label.name != 'release-validation') || (github.event.action == 'edited' && !github.event.changes.base))) }}
         env:
           CI_PLAN: ${{ needs.ci-plan.outputs.plan }}
           CI_NEEDS: ${{ toJSON(needs) }}
         run: python3 -B Scripts/ci-policy.py evaluate
+      - name: Verify prior validation for metadata
+        if: ${{ (github.event_name == 'pull_request' && (((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name && github.event.label.name != 'release-validation') || (github.event.action == 'edited' && !github.event.changes.base))) }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -B Scripts/verify-ci-metadata.py --check 'CI Required'
