@@ -319,6 +319,40 @@ extension HLSLivePlaylistClientTests {
         #expect(try await events.next() == nil)
     }
 
+    @Test("discard waits for the playlist producer to leave request adaptation")
+    func discardJoinsPlaylistProducer() async throws {
+        let fixture = try makeFixture()
+        defer { fixture.cleanup() }
+        let entered = AsyncStream<Void>.makeStream()
+        let exited = DVRAdapterExitProbe()
+        let recording = recorder(
+            session: fixture.session,
+            startPosition: .currentWindow,
+            requestPolicy: HLSRequestPolicy { _, _ in
+                entered.continuation.yield(())
+                // Model an adapter whose cleanup does not finish immediately
+                // when cancellation is requested. No URLSession task is created.
+                await withCheckedContinuation { continuation in
+                    DispatchQueue.global().asyncAfter(deadline: .now() + 0.2) {
+                        continuation.resume()
+                    }
+                }
+                await exited.finish()
+                throw CancellationError()
+            }
+        ).startRecording(
+            from: try url("https://media.example/join-producer.m3u8"),
+            to: fixture.destinationURL
+        )
+        var arrivals = entered.stream.makeAsyncIterator()
+        _ = await arrivals.next()
+        await recording.cancelAndDiscard()
+        #expect(await exited.didFinish)
+        // Drain the fixture even on the pre-fix implementation before invalidating
+        // its session. The assertion above must observe the actual terminal call.
+        await exited.wait()
+    }
+
     @Test("playback snapshot freezes a coherent package while recording continues")
     func capturesPlaybackSnapshotWhileRecordingContinues() async throws {
         let sourceURL = try url("https://media.example/timeshift.m3u8")
@@ -8564,6 +8598,23 @@ extension HLSLivePlaylistClientTests {
 
     private func url(_ value: String) throws -> URL {
         try #require(URL(string: value))
+    }
+}
+
+private actor DVRAdapterExitProbe {
+    private(set) var didFinish = false
+    private var waiter: CheckedContinuation<Void, Never>?
+
+    func finish() {
+        didFinish = true
+        waiter?.resume()
+        waiter = nil
+    }
+
+    func wait() async {
+        if !didFinish {
+            await withCheckedContinuation { waiter = $0 }
+        }
     }
 }
 

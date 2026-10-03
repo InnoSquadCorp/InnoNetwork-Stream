@@ -8,11 +8,20 @@ import functools
 import http.server
 import json
 import os
+import socketserver
 from pathlib import Path
 import sys
 import threading
 import time
 from urllib.parse import urlsplit
+
+
+class LoopbackHTTPServer(http.server.ThreadingHTTPServer):
+    def server_bind(self) -> None:
+        # Numeric loopback fixtures need no reverse DNS. HTTPServer otherwise
+        # calls getfqdn here, delaying readiness when runner DNS is unavailable.
+        socketserver.TCPServer.server_bind(self)
+        self.server_name, self.server_port = self.server_address[:2]
 
 
 class LivePreloadState:
@@ -334,16 +343,18 @@ def main() -> None:
             f"{arguments.ready_file}"
         )
 
+    print("hls-runtime-server: binding loopback socket", file=sys.stderr, flush=True)
     FixtureRequestHandler.preload_state = LivePreloadState()
     FixtureRequestHandler.gap_state = LiveGapState()
     handler = functools.partial(
         FixtureRequestHandler,
         directory=str(fixture_root),
     )
-    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    server = LoopbackHTTPServer(("127.0.0.1", 0), handler)
     server.daemon_threads = True
     port = server.server_address[1]
     write_ready_file(arguments.ready_file, f"http://127.0.0.1:{port}")
+    print(f"hls-runtime-server: ready on port {port}", file=sys.stderr, flush=True)
     try:
         server.serve_forever(poll_interval=0.1)
     except KeyboardInterrupt:

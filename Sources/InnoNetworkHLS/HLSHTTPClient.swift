@@ -63,6 +63,7 @@ package struct HLSHTTPClient: Sendable {
 
         var adaptedRequest: URLRequest
         do {
+            try Task.checkCancellation()
             adaptedRequest = try await requestPolicy.adapt(
                 request,
                 context: context
@@ -87,6 +88,7 @@ package struct HLSHTTPClient: Sendable {
         }
         let transfer: BoundedNetworkTransfer
         do {
+            try Task.checkCancellation()
             transfer = try await session.boundedTransfer(
                 for: adaptedRequest,
                 context: requestContext,

@@ -1,0 +1,329 @@
+{
+  "jobs": {
+    "dependency-review": {
+      "name": "Dependency Review",
+      "if": "github.event_name == 'pull_request'",
+      "runs-on": "ubuntu-latest",
+      "timeout-minutes": 10,
+      "permissions": {
+        "contents": "read"
+      },
+      "steps": [
+        {
+          "name": "Checkout",
+          "uses": "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd"
+        },
+        {
+          "name": "Review dependency changes",
+          "uses": "actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294",
+          "with": {
+            "fail-on-severity": "low",
+            "fail-on-scopes": "runtime, development, unknown"
+          }
+        }
+      ]
+    },
+    "lint": {
+      "name": "Lint (swift-format)",
+      "runs-on": "macos-15",
+      "timeout-minutes": 15,
+      "steps": [
+        {
+          "name": "Checkout InnoNetwork-Stream",
+          "uses": "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd"
+        },
+        {
+          "name": "Select Xcode 26.0.1",
+          "run": "sudo xcode-select -s /Applications/Xcode_26.0.1.app"
+        },
+        {
+          "name": "Run swift-format lint",
+          "run": "bash Scripts/format.sh --lint"
+        }
+      ]
+    },
+    "build-and-test": {
+      "name": "Build and Test (SwiftPM) \u2014 Xcode ${{ matrix.xcode.label }}",
+      "runs-on": "${{ matrix.xcode.runner }}",
+      "timeout-minutes": 50,
+      "strategy": {
+        "fail-fast": false,
+        "matrix": {
+          "xcode": [
+            {
+              "label": "26.0.1",
+              "runner": "macos-15",
+              "path": "/Applications/Xcode_26.0.1.app"
+            },
+            {
+              "label": "27.0",
+              "runner": "xcode-27",
+              "path": "/Applications/Xcode.app"
+            }
+          ]
+        }
+      },
+      "steps": [
+        {
+          "name": "Checkout InnoNetwork-Stream",
+          "uses": "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd"
+        },
+        {
+          "name": "Select Xcode",
+          "run": "sudo xcode-select -s ${{ matrix.xcode.path }}"
+        },
+        {
+          "name": "Show toolchain versions",
+          "run": "xcodebuild -version\nxcrun swift --version\n"
+        },
+        {
+          "name": "Verify published InnoNetwork dependency",
+          "run": "bash Scripts/check_innonetwork_dependency.sh"
+        },
+        {
+          "name": "Verify dependency lock did not drift",
+          "run": "git diff --exit-code -- Package.resolved"
+        },
+        {
+          "name": "Run tests",
+          "run": "xcrun swift test --force-resolved-versions --parallel"
+        }
+      ]
+    },
+    "contracts": {
+      "name": "Docs / API / HLS Contract",
+      "runs-on": "xcode-27",
+      "timeout-minutes": 60,
+      "steps": [
+        {
+          "name": "Checkout InnoNetwork-Stream",
+          "uses": "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd"
+        },
+        {
+          "name": "Select Xcode 27",
+          "run": "sudo xcode-select -s /Applications/Xcode.app"
+        },
+        {
+          "name": "Verify published InnoNetwork dependency",
+          "run": "bash Scripts/check_innonetwork_dependency.sh"
+        },
+        {
+          "name": "Validate scripts and documentation",
+          "run": "bash -n Scripts/*.sh Scripts/tests/*.sh\npython3 -m py_compile Scripts/*.py\nbash Scripts/tests/test_check_innonetwork_dependency.sh\nbash Scripts/tests/test_validate_docs_release_state.sh\nbash Scripts/tests/test_validate_release_candidate.sh\nbash Scripts/tests/test_validate_release_ref.sh\nbash Scripts/tests/test_validate_hls_with_apple_tools.sh\nbash Scripts/tests/test_package_identity.sh\nbash Scripts/validate_docs_release_state.sh --expect draft\n"
+        },
+        {
+          "name": "Validate public API",
+          "run": "bash Scripts/check_public_api_contract.sh"
+        },
+        {
+          "name": "Run HLS contract gates",
+          "run": "bash Scripts/run_hls_quality_gates.sh"
+        }
+      ]
+    },
+    "platform-build": {
+      "name": "Apple Platform Build (${{ matrix.runtime }})",
+      "runs-on": "${{ matrix.runner }}",
+      "timeout-minutes": 50,
+      "strategy": {
+        "fail-fast": false,
+        "matrix": {
+          "include": [
+            {
+              "runtime": "macOS",
+              "runner": "macos-15",
+              "builder": "xcodebuild",
+              "destination": "platform=macOS"
+            },
+            {
+              "runtime": "iOS",
+              "runner": "macos-15",
+              "builder": "xcodebuild",
+              "destination": "generic/platform=iOS Simulator"
+            },
+            {
+              "runtime": "tvOS",
+              "runner": "macos-15",
+              "builder": "swiftpm-cross",
+              "sdk": "appletvos",
+              "triple": "arm64-apple-tvos16.0"
+            },
+            {
+              "runtime": "watchOS",
+              "runner": "macos-15",
+              "builder": "swiftpm-cross",
+              "sdk": "watchos",
+              "triple": "arm64_32-apple-watchos9.0"
+            },
+            {
+              "runtime": "visionOS",
+              "runner": "macos-15",
+              "builder": "swiftpm-cross",
+              "sdk": "xros",
+              "triple": "arm64-apple-xros1.0"
+            }
+          ]
+        }
+      },
+      "steps": [
+        {
+          "name": "Checkout InnoNetwork-Stream",
+          "uses": "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd"
+        },
+        {
+          "name": "Select Xcode 26.0.1",
+          "run": "sudo xcode-select -s /Applications/Xcode_26.0.1.app"
+        },
+        {
+          "name": "Verify published InnoNetwork dependency",
+          "run": "bash Scripts/check_innonetwork_dependency.sh"
+        },
+        {
+          "name": "Build with xcodebuild",
+          "if": "matrix.builder == 'xcodebuild'",
+          "run": "xcodebuild \\\n  -scheme InnoNetwork-Stream-Package \\\n  -destination '${{ matrix.destination }}' \\\n  -derivedDataPath '.build/platform-${{ matrix.runtime }}' \\\n  CODE_SIGNING_ALLOWED=NO \\\n  build\n"
+        },
+        {
+          "name": "Build with SwiftPM cross compilation",
+          "if": "matrix.builder == 'swiftpm-cross'",
+          "run": "bash Scripts/build_apple_platform_targets.sh \\\n  '${{ matrix.runtime }}' \\\n  '${{ matrix.sdk }}' \\\n  '${{ matrix.triple }}' \\\n  '.build/platform-${{ matrix.runtime }}'\n"
+        }
+      ]
+    }
+  },
+  "codeql": {
+    "analyze": {
+      "name": "CodeQL / Swift",
+      "runs-on": "macos-15",
+      "timeout-minutes": 60,
+      "permissions": {
+        "actions": "read",
+        "contents": "read",
+        "security-events": "write"
+      },
+      "strategy": {
+        "fail-fast": false,
+        "matrix": {
+          "language": [
+            "swift"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "name": "Checkout InnoNetwork-Stream",
+          "uses": "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd"
+        },
+        {
+          "name": "Select Xcode 26.0.1",
+          "run": "sudo xcode-select -s /Applications/Xcode_26.0.1.app"
+        },
+        {
+          "name": "Verify published InnoNetwork dependency",
+          "run": "bash Scripts/check_innonetwork_dependency.sh"
+        },
+        {
+          "name": "Initialize CodeQL",
+          "uses": "github/codeql-action/init@9e0d7b8d25671d64c341c19c0152d693099fb5ba",
+          "with": {
+            "languages": "${{ matrix.language }}",
+            "queries": "security-extended,security-and-quality"
+          }
+        },
+        {
+          "name": "Build",
+          "run": "xcrun swift build --force-resolved-versions"
+        },
+        {
+          "name": "Perform CodeQL analysis",
+          "uses": "github/codeql-action/analyze@9e0d7b8d25671d64c341c19c0152d693099fb5ba",
+          "with": {
+            "category": "/language:${{ matrix.language }}"
+          }
+        }
+      ]
+    }
+  },
+  "release": {
+    "validate-release": {
+      "name": "Validate Release",
+      "runs-on": "xcode-27",
+      "timeout-minutes": 120,
+      "permissions": {
+        "contents": "write"
+      },
+      "steps": [
+        {
+          "name": "Checkout",
+          "uses": "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+          "with": {
+            "fetch-depth": 0,
+            "persist-credentials": false
+          }
+        },
+        {
+          "name": "Select Xcode 27",
+          "run": "sudo xcode-select -s /Applications/Xcode.app"
+        },
+        {
+          "name": "Validate release scripts",
+          "run": "bash -n Scripts/*.sh Scripts/tests/*.sh\npython3 -m py_compile Scripts/*.py\nbash Scripts/tests/test_check_innonetwork_dependency.sh\nbash Scripts/tests/test_validate_docs_release_state.sh\nbash Scripts/tests/test_validate_release_candidate.sh\nbash Scripts/tests/test_validate_release_ref.sh\nbash Scripts/tests/test_validate_hls_with_apple_tools.sh\nbash Scripts/tests/test_package_identity.sh\n"
+        },
+        {
+          "name": "Validate tagged release ref",
+          "if": "github.event_name == 'push'",
+          "env": {
+            "RELEASE_TAG": "${{ github.ref_name }}",
+            "RELEASE_TAG_REF": "${{ github.ref }}",
+            "RELEASE_REMOTE": "origin",
+            "RELEASE_MAIN_REF": "refs/remotes/origin/main",
+            "RELEASE_FETCH_MAIN": "1"
+          },
+          "run": "bash Scripts/validate_release_ref.sh"
+        },
+        {
+          "name": "Validate manual release candidate",
+          "if": "github.event_name == 'workflow_dispatch'",
+          "env": {
+            "RELEASE_CANDIDATE_REF": "${{ github.sha }}",
+            "RELEASE_REMOTE": "origin",
+            "RELEASE_MAIN_REF": "refs/remotes/origin/main",
+            "RELEASE_FETCH_MAIN": "1"
+          },
+          "run": "bash Scripts/validate_release_candidate.sh"
+        },
+        {
+          "name": "Run full release preflight",
+          "run": "bash Scripts/run_local_release_preflight.sh --full"
+        },
+        {
+          "name": "Prepare tagged source archive",
+          "if": "github.event_name == 'push'",
+          "env": {
+            "RELEASE_TAG": "${{ github.ref_name }}"
+          },
+          "run": "mkdir -p .build/release-artifacts\narchive=\".build/release-artifacts/InnoNetwork-Stream-$RELEASE_TAG.tar.gz\"\ngit archive \\\n  --format=tar.gz \\\n  --prefix=\"InnoNetwork-Stream-$RELEASE_TAG/\" \\\n  --output=\"$archive\" \\\n  \"$RELEASE_TAG\"\n(cd .build/release-artifacts && shasum -a 256 \"$(basename \"$archive\")\" > SHA256SUMS)\n"
+        },
+        {
+          "name": "Upload release validation artifacts",
+          "if": "github.event_name == 'push'",
+          "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+          "with": {
+            "name": "InnoNetwork-Stream-${{ github.ref_name }}-release-artifacts",
+            "path": ".build/release-artifacts/InnoNetwork-Stream-${{ github.ref_name }}.tar.gz\n.build/release-artifacts/SHA256SUMS\n.build/local-release-preflight/apple-hls/\n",
+            "if-no-files-found": "error"
+          }
+        },
+        {
+          "name": "Publish GitHub release",
+          "if": "github.event_name == 'push'",
+          "env": {
+            "GH_TOKEN": "${{ github.token }}",
+            "RELEASE_TAG": "${{ github.ref_name }}"
+          },
+          "run": "gh release create \"$RELEASE_TAG\" \\\n  --verify-tag \\\n  --title \"InnoNetwork-Stream $RELEASE_TAG\" \\\n  --notes-file \"docs/releases/$RELEASE_TAG.md\" \\\n  \".build/release-artifacts/InnoNetwork-Stream-$RELEASE_TAG.tar.gz\" \\\n  .build/release-artifacts/SHA256SUMS\n"
+        }
+      ]
+    }
+  }
+}
