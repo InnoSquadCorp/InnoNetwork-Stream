@@ -20,6 +20,7 @@ ARCHIVES = {
     ('Linux', 'x86_64'): ('linux_amd64', '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8'),
 }
 QUEUE_LOCATIONS = {}
+QUEUE_LOCATIONS[('ci.yml', None)] = "  queue: ${{ (github.event_name == 'pull_request' && (((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name && github.event.label.name != 'release-validation') || (github.event.action == 'edited' && !github.event.changes.base))) && 'max' || 'single' }}"
 QUEUE_DIAGNOSTIC = 'unexpected key "queue" for "concurrency" section. expected one of "cancel-in-progress", "group"'
 
 

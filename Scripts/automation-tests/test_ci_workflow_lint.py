@@ -77,3 +77,18 @@ class WorkflowLintTests(unittest.TestCase):
         for output in bad_outputs:
             with self.assertRaises(ValueError):
                 p.require_clean_diagnostics(output, allowed, ROOT)
+
+    def test_ci_queue_exception_rejects_condition_or_location_drift(self):
+        with tempfile.TemporaryDirectory() as directory:
+            copies=[]
+            for source in (ROOT / '.github/workflows').glob('*.yml'):
+                path=Path(directory)/source.name;path.write_text(source.read_text());copies.append(path)
+            p.check_queue_compatibility(copies)
+            name, line=next((key[0],line) for key,line in p.QUEUE_LOCATIONS.items() if key[1] is None)
+            candidate=next(x for x in copies if x.name==name);original=candidate.read_text()
+            for changed in [original.replace(line,line.replace("'max'", "'single'")),
+                            original.replace(line+'\n',''),
+                            original.replace(line,line+'\n'+line),
+                            original.replace(line,'    '+line)]:
+                candidate.write_text(changed)
+                with self.assertRaises(ValueError):p.check_queue_compatibility(copies)
