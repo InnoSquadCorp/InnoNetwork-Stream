@@ -110,6 +110,25 @@ class WorkflowTests(unittest.TestCase):
                 self.assertEqual(current.get(field),old.get(field),(key,field))
             old_steps=[s for s in old['steps'] if not s.get('uses','').startswith('actions/checkout@')]
             new_steps=[s for s in current['steps'] if not s.get('uses','').startswith('actions/checkout@')]
+            # Retain the original lane; only noninteractive, locked package
+            # flags may differ after the hosted macro-approval failure.
+            if key == 'platform-build':
+                old_steps = copy.deepcopy(old_steps)
+                build = next(s for s in old_steps if s['name'] == 'Build with xcodebuild')
+                flags = ['-skipMacroValidation', '-onlyUsePackageVersionsFromResolvedFile',
+                         '-clonedSourcePackagesDirPath .build']
+                new_build = next(s for s in new_steps if s['name'] == 'Build with xcodebuild')
+                lines = new_build['run'].splitlines(keepends=True)
+                for flag in flags:
+                    matches = [line for line in lines if line.strip().removesuffix('\\').strip() == flag]
+                    self.assertEqual(len(matches), 1, flag)
+                    lines.remove(matches[0])
+                self.assertEqual(''.join(lines), build['run'])
+                new_steps = copy.deepcopy(new_steps)
+                next(s for s in new_steps if s['name'] == 'Build with xcodebuild')['run'] = build['run']
+                names = [s['name'] for s in new_steps]
+                self.assertLess(names.index('Verify published InnoNetwork dependency'),
+                                names.index('Build with xcodebuild'))
             self.assertEqual(new_steps,old_steps,key)
     def test_codeql_has_one_change_owner_and_keeps_scheduled_security_scan(self):
         if 'codeql' not in self.old:return

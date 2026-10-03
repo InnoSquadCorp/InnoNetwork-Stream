@@ -196,6 +196,9 @@ jobs:
           xcodebuild \
             -scheme InnoNetwork-Stream-Package \
             -destination '${{ matrix.destination }}' \
+            -skipMacroValidation \
+            -onlyUsePackageVersionsFromResolvedFile \
+            -clonedSourcePackagesDirPath .build \
             -derivedDataPath '.build/platform-${{ matrix.runtime }}' \
             CODE_SIGNING_ALLOWED=NO \
             build

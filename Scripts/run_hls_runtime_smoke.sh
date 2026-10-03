@@ -93,7 +93,8 @@ python3 Scripts/serve_hls_runtime_fixtures.py \
   >"$server_log" 2>&1 &
 server_pid=$!
 
-for _ in {1..100}; do
+readiness_deadline=$((SECONDS + 30))
+while (( SECONDS < readiness_deadline )); do
   if [[ -s "$ready_file" ]]; then
     break
   fi
@@ -107,7 +108,7 @@ done
 
 if [[ ! -s "$ready_file" ]]; then
   cat "$server_log" >&2
-  echo "hls-runtime-smoke: fixture server readiness timed out" >&2
+  echo "hls-runtime-smoke: fixture server readiness timed out after 30 seconds" >&2
   exit 1
 fi
 
