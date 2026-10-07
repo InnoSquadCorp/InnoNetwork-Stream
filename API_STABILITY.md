@@ -87,8 +87,10 @@ starts. `init(configuration:)` remains available. The postconstruction
 isolated and accepts UIKit's ordinary escaping completion directly. This is an
 intentional pre-release concurrency-contract change; the restoration overload
 is Draft. A real `UIApplicationDelegate` fixture is compiled for iOS on both
-supported toolchain lanes. Generated semantic snapshots must be reviewed before
-this change's API gate is considered passed.
+supported toolchain lanes. The Xcode 27 semantic snapshot generated for
+`405c714` was reviewed against these three declarations and checked in;
+unrelated signatures are unchanged. Exact-head API and consumer CI must still
+pass before this change's validation gate is considered complete.
 
 ## Internal and operational surfaces
 

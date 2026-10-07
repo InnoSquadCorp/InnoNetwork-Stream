@@ -1,5 +1,9 @@
 # Changelog
 
+- Reconcile the semantic API snapshot with the reviewed pre-release background
+  completion initializer and main-actor restoration method, using Xcode 27
+  generated declarations without weakening the API drift gate.
+
 ## Unreleased bounded-lifecycle hardening
 
 - Bound Content Steering clone/output records and generated URL/group text;
