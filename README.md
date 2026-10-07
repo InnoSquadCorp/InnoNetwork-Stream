@@ -97,6 +97,10 @@ intentionally Apple-only and keeps the same deployment floors as InnoNetwork.
 - [Roadmap](docs/ROADMAP.md)
 - [Draft 1.0.0 release notes](docs/releases/1.0.0.md)
 
+## Sponsorship
+
+Support InnoNetwork-Stream development through [GitHub Sponsors](https://github.com/sponsors/InnoSquadCorp) or [Patreon](https://www.patreon.com/15188938/join).
+
 ## License
 
 InnoNetwork-Stream is open source under the [MIT License](LICENSE).
