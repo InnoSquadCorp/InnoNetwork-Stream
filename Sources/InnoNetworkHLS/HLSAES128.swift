@@ -80,10 +80,25 @@ struct HLSAES128KeyResolver: Sendable {
 /// sharing the VOD downloader's request policy, response validation, and
 /// secret-handling implementation.
 package actor HLSAES128KeyCache {
-    private let fetcher: HLSAES128KeyFetcher
-    private var keysByURL: [URL: Data] = [:]
+    private struct Entry {
+        let key: Data
+        let retainedByteCount: Int
+    }
 
-    package init(client: HLSHTTPClient) {
+    private let fetcher: HLSAES128KeyFetcher
+    private let maximumKeyCount: Int
+    private let maximumRetainedBytes: Int
+    private var keysByURL: [URL: Entry] = [:]
+    private var leastRecentlyUsedURLs: [URL] = []
+    private var retainedByteCount = 0
+
+    package init(
+        client: HLSHTTPClient,
+        maximumKeyCount: Int = 128,
+        maximumRetainedBytes: Int = 256 * 1_024
+    ) {
+        self.maximumKeyCount = max(1, min(maximumKeyCount, 128))
+        self.maximumRetainedBytes = max(0, min(maximumRetainedBytes, 256 * 1_024))
         self.fetcher = HLSAES128KeyFetcher(
             client: client,
             retryPolicy: nil,
@@ -93,12 +108,47 @@ package actor HLSAES128KeyCache {
     }
 
     package func key(for keyURL: URL) async throws -> Data {
-        if let key = keysByURL[keyURL] {
-            return key
+        try Task.checkCancellation()
+        if let entry = keysByURL[keyURL] {
+            markRecentlyUsed(keyURL)
+            return entry.key
         }
         let key = try await fetcher.fetch(keyURL)
-        keysByURL[keyURL] = key
+        try Task.checkCancellation()
+        let (entryBytes, overflow) = keyURL.absoluteString.utf8.count
+            .addingReportingOverflow(key.count)
+        guard !overflow, entryBytes <= maximumRetainedBytes else {
+            // A valid but unusually long signed URL must not grow the cache.
+            // It remains usable, with the same bounded key fetch on revisit.
+            return key
+        }
+        // A concurrent request may have filled this URL while fetching.
+        // Remove any prior entry before charging its replacement exactly once.
+        removeCachedKey(for: keyURL)
+        while keysByURL.count >= maximumKeyCount
+            || retainedByteCount > maximumRetainedBytes - entryBytes
+        {
+            guard let oldestURL = leastRecentlyUsedURLs.first else {
+                break
+            }
+            removeCachedKey(for: oldestURL)
+        }
+        keysByURL[keyURL] = Entry(key: key, retainedByteCount: entryBytes)
+        retainedByteCount += entryBytes
+        leastRecentlyUsedURLs.append(keyURL)
         return key
+    }
+
+    private func markRecentlyUsed(_ keyURL: URL) {
+        leastRecentlyUsedURLs.removeAll { $0 == keyURL }
+        leastRecentlyUsedURLs.append(keyURL)
+    }
+
+    private func removeCachedKey(for keyURL: URL) {
+        if let removed = keysByURL.removeValue(forKey: keyURL) {
+            retainedByteCount -= removed.retainedByteCount
+        }
+        leastRecentlyUsedURLs.removeAll { $0 == keyURL }
     }
 }
 

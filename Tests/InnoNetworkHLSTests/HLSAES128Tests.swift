@@ -1,10 +1,171 @@
 import CommonCrypto
 import Foundation
+import InnoNetwork
 import Testing
 
 @testable import InnoNetworkHLS
 
 extension HLSDownloaderTests {
+    @Test("Recording key caches evict old URLs and safely refetch them")
+    func recordingKeyCacheIsBounded() async throws {
+        let session = makeAES128Session()
+        defer {
+            session.invalidateAndCancel()
+            HLSURLProtocol.reset()
+        }
+        let cache = HLSAES128KeyCache(
+            client: HLSHTTPClient(
+                session: session,
+                requestContext: NetworkRequestContext(),
+                requestAdapter: { $0 }
+            ),
+            maximumKeyCount: 4
+        )
+        let keyURLs = try (0..<64).map {
+            try #require(URL(string: "https://media.example/rotation-\($0).key"))
+        }
+        for (index, url) in keyURLs.enumerated() {
+            let key = Data(repeating: UInt8(index), count: 16)
+            HLSURLProtocol.register(
+                .success(statusCode: 200, data: key, headers: [:]), for: url
+            )
+            #expect(try await cache.key(for: url) == key)
+        }
+        let newest = try #require(keyURLs.last)
+        #expect(try await cache.key(for: newest) == Data(repeating: 63, count: 16))
+        let first = try #require(keyURLs.first)
+        #expect(try await cache.key(for: first) == Data(repeating: 0, count: 16))
+        #expect(try await cache.key(for: newest) == Data(repeating: 63, count: 16))
+        let requests = HLSURLProtocol.capturedRequests().compactMap(\.url)
+        #expect(requests.count == 65)
+        #expect(requests.count { $0 == first } == 2)
+        #expect(requests.count { $0 == newest } == 1)
+    }
+
+    @Test("Recording key caches bound aggregate signed URL bytes independently of entry count")
+    func recordingKeyCacheBoundsURLBytes() async throws {
+        let session = makeAES128Session()
+        defer {
+            session.invalidateAndCancel()
+            HLSURLProtocol.reset()
+        }
+        let urls = try (0..<3).map {
+            try #require(URL(string:
+                "https://media.example/key-\($0).bin?signature=" + String(repeating: "a", count: 128)))
+        }
+        let first = urls[0]
+        let second = urls[1]
+        let third = urls[2]
+        let key = Data(repeating: 0x31, count: 16)
+        let entryBytes = first.absoluteString.utf8.count + key.count
+        let cache = HLSAES128KeyCache(
+            client: HLSHTTPClient(
+                session: session,
+                requestContext: NetworkRequestContext(),
+                requestAdapter: { $0 }
+            ),
+            maximumKeyCount: 128,
+            maximumRetainedBytes: entryBytes * 2
+        )
+        for url in urls {
+            HLSURLProtocol.register(
+                .success(statusCode: 200, data: key, headers: [:]), for: url
+            )
+        }
+        #expect(try await cache.key(for: first) == key)
+        #expect(try await cache.key(for: second) == key)
+        // A hit changes recency without charging URL bytes again.
+        #expect(try await cache.key(for: first) == key)
+        #expect(try await cache.key(for: third) == key)
+        #expect(try await cache.key(for: first) == key)
+        // The byte limit evicted the second URL even though only three of
+        // 128 possible entries were seen. Refilling must reclaim its old cost.
+        #expect(try await cache.key(for: second) == key)
+        #expect(try await cache.key(for: first) == key)
+        let requests = HLSURLProtocol.capturedRequests().compactMap(\.url)
+        #expect(requests.count == 4)
+        #expect(requests.count { $0 == first } == 1)
+        #expect(requests.count { $0 == second } == 2)
+        #expect(requests.count { $0 == third } == 1)
+    }
+
+    @Test("Concurrent key fills replace one byte-budget charge")
+    func recordingKeyCacheChargesConcurrentReplacementOnce() async throws {
+        let session = makeAES128Session()
+        let gate = AES128ConcurrentFillGate()
+        defer {
+            Task { await gate.releaseFirst() }
+            session.invalidateAndCancel()
+            HLSURLProtocol.reset()
+        }
+        let firstURL = try #require(URL(string: "https://media.example/key-1.bin"))
+        let secondURL = try #require(URL(string: "https://media.example/key-2.bin"))
+        let key = Data(repeating: 0x51, count: 16)
+        let cache = HLSAES128KeyCache(
+            client: HLSHTTPClient(
+                session: session,
+                requestContext: NetworkRequestContext(),
+                requestAdapter: { request in
+                    if request.url == firstURL {
+                        await gate.delayFirstRequest()
+                    }
+                    return request
+                }
+            ),
+            maximumRetainedBytes: (firstURL.absoluteString.utf8.count + key.count) * 2
+        )
+        for url in [firstURL, secondURL] {
+            HLSURLProtocol.register(
+                .success(statusCode: 200, data: key, headers: [:]), for: url
+            )
+        }
+        let firstFill = Task { try await cache.key(for: firstURL) }
+        await gate.waitForFirstRequest()
+        // The second request fills the cache while the first is suspended.
+        #expect(try await cache.key(for: firstURL) == key)
+        await gate.releaseFirst()
+        #expect(try await firstFill.value == key)
+        #expect(try await cache.key(for: secondURL) == key)
+        #expect(try await cache.key(for: firstURL) == key)
+        #expect(try await cache.key(for: secondURL) == key)
+        let requests = HLSURLProtocol.capturedRequests().compactMap(\.url)
+        #expect(requests.count { $0 == firstURL } == 2)
+        #expect(requests.count { $0 == secondURL } == 1)
+    }
+
+    @Test("Oversized signed key URLs bypass caching without evicting useful keys")
+    func recordingKeyCacheBypassesOversizedURL() async throws {
+        let session = makeAES128Session()
+        defer {
+            session.invalidateAndCancel()
+            HLSURLProtocol.reset()
+        }
+        let shortURL = try #require(URL(string: "https://media.example/key.bin"))
+        let longURL = try #require(URL(string:
+            "https://media.example/key.bin?signature=" + String(repeating: "b", count: 256)))
+        let key = Data(repeating: 0x41, count: 16)
+        let cache = HLSAES128KeyCache(
+            client: HLSHTTPClient(
+                session: session,
+                requestContext: NetworkRequestContext(),
+                requestAdapter: { $0 }
+            ),
+            maximumRetainedBytes: shortURL.absoluteString.utf8.count + key.count
+        )
+        for url in [shortURL, longURL] {
+            HLSURLProtocol.register(
+                .success(statusCode: 200, data: key, headers: [:]), for: url
+            )
+        }
+        #expect(try await cache.key(for: shortURL) == key)
+        #expect(try await cache.key(for: longURL) == key)
+        #expect(try await cache.key(for: longURL) == key)
+        #expect(try await cache.key(for: shortURL) == key)
+        let requests = HLSURLProtocol.capturedRequests().compactMap(\.url)
+        #expect(requests.count { $0 == shortURL } == 1)
+        #expect(requests.count { $0 == longURL } == 2)
+    }
+
     @Test("Empty decrypted media cannot publish an offline package", arguments: [false, true])
     func productionEmptyPlaintext(empty: Bool) async throws {
         let url = try #require(URL(string: "https://media.example/empty-plaintext.m3u8"))
@@ -1315,4 +1476,33 @@ private func aes128Encrypt(
     }
     ciphertext.count = outputLength
     return ciphertext
+}
+
+private actor AES128ConcurrentFillGate {
+    private var firstRequestStarted = false
+    private var firstRequestReleased = false
+    private var arrivalWaiter: CheckedContinuation<Void, Never>?
+    private var releaseWaiter: CheckedContinuation<Void, Never>?
+
+    func delayFirstRequest() async {
+        guard !firstRequestStarted else { return }
+        firstRequestStarted = true
+        arrivalWaiter?.resume()
+        arrivalWaiter = nil
+        if !firstRequestReleased {
+            await withCheckedContinuation { releaseWaiter = $0 }
+        }
+    }
+
+    func waitForFirstRequest() async {
+        if !firstRequestStarted {
+            await withCheckedContinuation { arrivalWaiter = $0 }
+        }
+    }
+
+    func releaseFirst() {
+        firstRequestReleased = true
+        releaseWaiter?.resume()
+        releaseWaiter = nil
+    }
 }
