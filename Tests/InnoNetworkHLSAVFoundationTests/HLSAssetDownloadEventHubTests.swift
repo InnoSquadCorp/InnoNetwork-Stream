@@ -1,7 +1,6 @@
 #if canImport(AVFoundation) && !os(tvOS)
 import Foundation
 import Testing
-import os
 
 @testable import InnoNetworkHLSAVFoundation
 
@@ -199,25 +198,6 @@ struct HLSAssetDownloadEventHubTests {
         }
 
         #expect(hub.retainedTerminalEventCount == 256)
-    }
-
-    @Test("all pending background completions are drained together")
-    func backgroundCompletionDrain() {
-        let store = HLSAssetDownloadBackgroundCompletionStore()
-        let completionCount = OSAllocatedUnfairLock(initialState: 0)
-
-        store.set {
-            completionCount.withLock { $0 += 1 }
-        }
-        store.set {
-            completionCount.withLock { $0 += 1 }
-        }
-
-        let pending = store.takeAll()
-        pending.forEach { $0() }
-
-        #expect(completionCount.withLock { $0 } == 2)
-        #expect(store.takeAll().isEmpty)
     }
 }
 #endif

@@ -42,11 +42,11 @@ The checked snapshots in `Scripts/symbols/*.allowlist` are the source of truth:
 | --- | ---: |
 | `InnoNetworkHLS` | 1,036 |
 | `InnoNetworkHLSLive` | 334 |
-| `InnoNetworkHLSAVFoundation` | 713 |
+| `InnoNetworkHLSAVFoundation` | 714 |
 | `InnoNetworkHLSAudio` | 65 |
-| **Total** | **2,148** |
+| **Total** | **2,149** |
 
-The 282 new name rows (macro, validated settings, workflow protocol,
+The 283 new name rows (macro, validated settings, workflow protocol,
 download task/observation contracts and pure discriminated documents) are
 **Draft**, not automatically promoted
 to Provisionally Stable by an allowlist update. Macro expansion/diagnostics,
@@ -54,13 +54,13 @@ external Debug/Release consumers, runtime ownership controls and the final
 supported-toolchain/platform gates must pass before promotion. See
 [the macro-first execution plan](docs/MACRO_FIRST_REDESIGN.md).
 
-The net increase of 281 name rows reflects documented families. One inherited
+The net increase of 282 name rows reflects documented families. One inherited
 flat playlist constructor is internal; 1,866 inherited rows remain. Typed
 selector overloads share name rows and require the semantic signature gate. The collector
 now includes `swift.macro`, so the primary declarative surface is gated too.
 
 `Scripts/check_public_api_contract.sh` regenerates Swift symbol graphs and
-checks `public-signatures.tsv` with 2,153 distinct signatures as well as 2,148
+checks `public-signatures.tsv` with the approved distinct semantic signatures as well as 2,149
 name rows. Signatures include overload USRs, typed declaration fragments,
 async/throws, actor attributes, generics, availability and explicit conformance
 relationships. Locations/comments do not affect the snapshot. Regenerate only
@@ -77,6 +77,18 @@ The name-based allowlist also
 rejects undeclared additions, removals, and renames. An intentional public API
 change must update the owning allowlist, its budget, this document, and the
 changelog in the same commit.
+
+## Background restoration pre-release correction
+
+`HLSAssetDownloadSession` adds a main-actor initializer accepting the host
+application's ordinary background completion closure before the native session
+starts. `init(configuration:)` remains available. The postconstruction
+`handleBackgroundSessionCompletion(_:completion:)` method is now main-actor
+isolated and accepts UIKit's ordinary escaping completion directly. This is an
+intentional pre-release concurrency-contract change; the restoration overload
+is Draft. A real `UIApplicationDelegate` fixture is compiled for iOS on both
+supported toolchain lanes. Generated semantic snapshots must be reviewed before
+this change's API gate is considered passed.
 
 ## Internal and operational surfaces
 

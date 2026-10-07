@@ -94,9 +94,7 @@ final class HLSAssetDownloadDelegate: NSObject, AVAssetDownloadDelegate {
     func urlSessionDidFinishEvents(
         forBackgroundURLSession session: URLSession
     ) {
-        backgroundCompletions.takeAll().forEach { completion in
-            completion()
-        }
+        backgroundCompletions.finishEvents()
     }
 
     func urlSession(
@@ -108,6 +106,7 @@ final class HLSAssetDownloadDelegate: NSObject, AVAssetDownloadDelegate {
                 SendableUnderlyingError(error)
             )
         }
+        backgroundCompletions.invalidate()
         invalidationGate.complete()
         onInvalidation()
     }
@@ -172,22 +171,86 @@ extension HLSAssetDownloadDelegate {
     }
 }
 
-final class HLSAssetDownloadBackgroundCompletionStore: Sendable {
-    private let completions = OSAllocatedUnfairLock<
-        [@Sendable () -> Void]
-    >(initialState: [])
+// UIKit supplies an ordinary non-Sendable closure. Keep that closure on the
+// main actor rather than asserting that it is safe to transfer between queues.
+@MainActor
+final class HLSAssetDownloadApplicationCompletion {
+    private var completion: (() -> Void)?
 
-    func set(_ completion: @escaping @Sendable () -> Void) {
-        completions.withLock {
-            $0.append(completion)
+    init(_ completion: @escaping () -> Void) {
+        self.completion = completion
+    }
+
+    func complete() {
+        let pending = completion
+        completion = nil
+        pending?()
+    }
+}
+
+final class HLSAssetDownloadBackgroundCompletionStore: Sendable {
+    typealias Completion = @MainActor @Sendable () -> Void
+
+    private struct State {
+        var completions: [Completion] = []
+        var isInvalidated = false
+    }
+
+    private let state: OSAllocatedUnfairLock<State>
+
+    init(completion: Completion? = nil) {
+        self.state = OSAllocatedUnfairLock(
+            initialState: State(completions: completion.map { [$0] } ?? [])
+        )
+    }
+
+    func set(_ completion: @escaping Completion) {
+        let shouldComplete = state.withLock { state in
+            if state.isInvalidated {
+                return true
+            }
+            state.completions.append(completion)
+            return false
+        }
+        if shouldComplete {
+            Self.deliver([completion])
         }
     }
 
-    func takeAll() -> [@Sendable () -> Void] {
-        completions.withLock { completions in
-            let pending = completions
-            completions.removeAll(keepingCapacity: true)
-            return pending
+    func finishEvents() {
+        let completions: [Completion] = state.withLock { state in
+            guard !state.isInvalidated else {
+                return []
+            }
+            // A finish without a registered handler cannot be associated
+            // with a future batch. Reconnection handlers must be installed
+            // before the native session is constructed.
+            let completions = state.completions
+            state.completions.removeAll(keepingCapacity: true)
+            return completions
+        }
+        Self.deliver(completions)
+    }
+
+    func invalidate() {
+        let completions: [Completion] = state.withLock { state in
+            state.isInvalidated = true
+            let completions = state.completions
+            state.completions.removeAll()
+            return completions
+        }
+        Self.deliver(completions)
+    }
+
+    static func deliver(_ completions: [Completion]) {
+        guard !completions.isEmpty else {
+            return
+        }
+        // UIKit's background-session handlers must run on the main thread.
+        // Always enqueue, including foreign/invalidating-session shortcuts,
+        // and never invoke application code while holding the state lock.
+        DispatchQueue.main.async {
+            completions.forEach { $0() }
         }
     }
 }

@@ -111,6 +111,12 @@ let package = Package(
             name: "InnoNetworkHLSAudio",
             swiftSettings: strictSettings
         ),
+        .target(
+            name: "HLSUIKitBackgroundSessionCompileFixture",
+            dependencies: ["InnoNetworkHLSAVFoundation"],
+            path: "Tests/CompileFixtures/HLSUIKitBackgroundSession",
+            swiftSettings: strictSettings
+        ),
         .testTarget(
             name: "InnoNetworkStreamMacroTests",
             dependencies: [

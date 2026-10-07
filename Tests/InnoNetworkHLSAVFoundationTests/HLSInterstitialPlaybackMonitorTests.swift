@@ -30,6 +30,81 @@ struct HLSInterstitialPlaybackMonitorTests {
         #expect(await iterator.next() == .currentEventChanged(nil))
     }
 
+    @Test("notifications posted in the subscription turn are retained")
+    func sameTurnNotificationsAreRetained() async {
+        let center = NotificationCenter()
+        let native = nativeMonitor()
+        let bridge = HLSInterstitialPlaybackMonitor(
+            monitor: native,
+            notificationCenter: center,
+            maximumBufferedEventCount: 2
+        )
+        let stream = bridge.events()
+        // No suspension between subscription and posting. With a two-event
+        // buffer these replace the initial snapshots in the opposite order,
+        // so the regression fails without ever waiting for a missing event.
+        center.post(
+            name: AVPlayerInterstitialEventMonitor.currentEventDidChangeNotification,
+            object: native
+        )
+        center.post(
+            name: AVPlayerInterstitialEventMonitor.eventsDidChangeNotification,
+            object: native
+        )
+        var iterator = stream.makeAsyncIterator()
+
+        #expect(await iterator.next() == .currentEventChanged(nil))
+        #expect(await iterator.next() == .scheduleChanged([]))
+    }
+
+    @Test("subscription ignores notifications from a different native monitor")
+    func foreignMonitorNotificationsAreIgnored() async {
+        let center = NotificationCenter()
+        let bridge = HLSInterstitialPlaybackMonitor(
+            monitor: nativeMonitor(),
+            notificationCenter: center,
+            maximumBufferedEventCount: 2
+        )
+        let stream = bridge.events()
+        let other = nativeMonitor()
+        center.post(
+            name: AVPlayerInterstitialEventMonitor.currentEventDidChangeNotification,
+            object: other
+        )
+        var iterator = stream.makeAsyncIterator()
+
+        #expect(await iterator.next() == .scheduleChanged([]))
+        #expect(await iterator.next() == .currentEventChanged(nil))
+    }
+
+    @Test("cancelling one subscription leaves other listeners active")
+    func independentSubscriptionCancellation() async {
+        let center = NotificationCenter()
+        let native = nativeMonitor()
+        let bridge = HLSInterstitialPlaybackMonitor(
+            monitor: native,
+            notificationCenter: center,
+            maximumBufferedEventCount: 2
+        )
+        let first = bridge.events()
+        let second = bridge.events()
+        let consumer = Task { for await _ in first {} }
+        consumer.cancel()
+        await consumer.value
+
+        center.post(
+            name: AVPlayerInterstitialEventMonitor.currentEventDidChangeNotification,
+            object: native
+        )
+        center.post(
+            name: AVPlayerInterstitialEventMonitor.eventsDidChangeNotification,
+            object: native
+        )
+        var iterator = second.makeAsyncIterator()
+        #expect(await iterator.next() == .currentEventChanged(nil))
+        #expect(await iterator.next() == .scheduleChanged([]))
+    }
+
     @Test("snapshots expose only bounded playback metadata")
     func snapshotsExposeBoundedMetadata() throws {
         let item = AVPlayerItem(url: try sourceURL())

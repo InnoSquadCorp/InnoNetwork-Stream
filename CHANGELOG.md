@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased bounded-lifecycle hardening
+
+- Bound Content Steering clone/output records and generated URL/group text;
+  bound original-pathway fallback without losing ordinary ordered failover.
+- Expand DEFINE values once against preceding definitions with retained-value
+  budgets, normalize exact-cap newline boundaries, and index parser groups.
+- Forward PART/MAP preload consumption cancellation and preserve snapshot
+  terminal results while registration/cancellation cross actor boundaries.
+- Deliver UIKit background completions on main and register restoration
+  handlers before native construction; install interstitial listeners before
+  returning a stream. The application callback API is now MainActor.
+
 ## Unreleased Core 6.1.0 integration
 
 - Pin both Stream and its external consumer to published InnoNetwork `6.1.0`
