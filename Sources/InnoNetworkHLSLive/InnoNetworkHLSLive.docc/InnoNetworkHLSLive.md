@@ -456,8 +456,9 @@ visible through one atomic directory move. Recovery is disabled by default,
 which preserves legacy cleanup. The resumable policy atomically replaces a
 bounded URL-free checkpoint at coherent complete-segment boundaries and keeps
 the owned hidden directory after ordinary interruption. Rolling multi-track
-recordings publish only after the current snapshot's retained tracks are
-aligned; the new checkpoint becomes durable before obsolete files are removed.
+recordings align retained tracks and publish after each complete primary
+segment, including within a large initial snapshot. The new checkpoint becomes
+durable before obsolete files are removed.
 Resume verifies
 the query-free source identity, selected variant and renditions, initialization
 map identity, exact file sizes, SHA-256 content digests, path confinement, and

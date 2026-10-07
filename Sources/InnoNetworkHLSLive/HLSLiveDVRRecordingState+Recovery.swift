@@ -115,7 +115,7 @@ extension HLSLiveDVRRecordingState {
         guard checkpoint.promotedPartCount >= 0,
             checkpoint.primary.segments.count
                 <= configuration.limits.maximumSegmentCount,
-            checkpoint.dateRanges.count <= 10_000,
+            checkpoint.dateRanges.count <= Self.maximumRetainedDateRangeCount,
             checkpoint.variantIdentity
                 == snapshot.selectedVariant?
                 .liveDVRCheckpointIdentity,
@@ -223,8 +223,11 @@ extension HLSLiveDVRRecordingState {
                 limits: configuration.limits
             )
         }
+        var restoredDateRangeIDs: Set<String> = []
         let restoredDateRanges = try checkpoint.dateRanges.map { record in
-            guard let model = record.model else {
+            guard let model = record.model,
+                restoredDateRangeIDs.insert(model.id).inserted
+            else {
                 throw HLSLiveDVRError.recoveryCorrupted
             }
             return model
@@ -298,6 +301,15 @@ extension HLSLiveDVRRecordingState {
             guard !omittedIDs.contains(dateRange.id) else {
                 return nil
             }
+            // Packaging can lead the primary segment boundary within one
+            // observed snapshot. Checkpoints must carry every packaged
+            // event's local metadata so recovery can validate its files;
+            // playback playlists still filter to their presentation window.
+            if let stored = interstitials.first(where: {
+                $0.id == dateRange.id
+            }) {
+                return stored.dateRange
+            }
             guard dateRange.startDate < endDate else {
                 return nil
             }
@@ -312,14 +324,7 @@ extension HLSLiveDVRRecordingState {
             guard dateRange.interstitial != nil else {
                 return dateRange
             }
-            guard
-                let stored = interstitials.first(where: {
-                    $0.id == dateRange.id
-                })
-            else {
-                throw HLSLiveDVRError.recoveryCorrupted
-            }
-            return stored.dateRange
+            throw HLSLiveDVRError.recoveryCorrupted
         }
     }
 
