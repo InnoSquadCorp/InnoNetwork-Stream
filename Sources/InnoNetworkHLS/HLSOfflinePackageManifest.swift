@@ -2,6 +2,23 @@ import Foundation
 
 struct HLSOfflinePackageManifest: Codable, Sendable {
     static let currentSchemaVersion = 3
+    // Package publication and reopening must agree on the same byte limit.
+    static let maximumEncodedBytes = 8 * 1_024 * 1_024
+
+    func encodedData(
+        maximumBytes: Int = HLSOfflinePackageManifest.maximumEncodedBytes
+    ) throws -> Data {
+        guard maximumBytes > 0 else {
+            throw HLSDownloadError.invalidOfflinePackage
+        }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try encoder.encode(self)
+        guard data.count <= min(maximumBytes, Self.maximumEncodedBytes) else {
+            throw HLSDownloadError.invalidOfflinePackage
+        }
+        return data
+    }
 
     struct Track: Codable, Equatable, Sendable {
         let kind: String

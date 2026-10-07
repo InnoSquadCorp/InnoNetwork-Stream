@@ -13,12 +13,14 @@ struct HLSOfflinePackageOperation: Sendable {
     private let diskCapacityChecker: HLSDiskCapacityChecker
     private let client: HLSHTTPClient
     private let clock: any HLSClock
+    private let maximumManifestBytes: Int
 
     init(
         client: HLSHTTPClient,
         configuration: HLSOfflinePackageConfiguration,
         diskCapacityChecker: HLSDiskCapacityChecker,
-        clock: any HLSClock
+        clock: any HLSClock,
+        maximumManifestBytes: Int = HLSOfflinePackageManifest.maximumEncodedBytes
     ) {
         self.planner = HLSOfflinePackagePlanner(
             client: client,
@@ -34,6 +36,7 @@ struct HLSOfflinePackageOperation: Sendable {
         self.diskCapacityChecker = diskCapacityChecker
         self.client = client
         self.clock = clock
+        self.maximumManifestBytes = maximumManifestBytes
     }
 
     func prepare(
@@ -366,9 +369,11 @@ struct HLSOfflinePackageOperation: Sendable {
                 resumedResourceTransferCount,
             files: scan.records
         )
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try encoder.encode(manifest).write(
+        // Fail before publication or resume cleanup if this package could not
+        // be reopened. Automatic resume retains the completed resource files.
+        try manifest.encodedData(
+            maximumBytes: maximumManifestBytes
+        ).write(
             to: workspaceURL.appendingPathComponent(
                 "manifest.json"
             ),
