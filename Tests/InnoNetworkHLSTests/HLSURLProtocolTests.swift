@@ -2,6 +2,30 @@ import Foundation
 import Testing
 
 extension HLSDownloaderTests {
+    @Test("a late stop from the previous registry cannot reduce current request counts")
+    func oldRequestStopDoesNotReduceNewGenerationCount() throws {
+        let source = try #require(URL(string: "https://media.example/generation"))
+        let response = HLSURLProtocol.ResponseSpec.unfinished(statusCode: 200, data: Data(), headers: [:])
+        let client = HLSProtocolEventRecorder()
+        let old = HLSURLProtocol(request: URLRequest(url: source), cachedResponse: nil, client: client)
+        let first = HLSURLProtocol(request: URLRequest(url: source), cachedResponse: nil, client: client)
+        let second = HLSURLProtocol(request: URLRequest(url: source), cachedResponse: nil, client: client)
+        defer {
+            old.stopLoading()
+            first.stopLoading()
+            second.stopLoading()
+            HLSURLProtocol.reset()
+        }
+        HLSURLProtocol.register(response, for: source)
+        old.startLoading()
+        HLSURLProtocol.reset()
+        HLSURLProtocol.register(response, for: source)
+        first.startLoading()
+        old.stopLoading()
+        second.startLoading()
+        #expect(HLSURLProtocol.maximumActiveRequestCount() == 2)
+    }
+
     @Test("redirect fixtures hand off without a contradictory cancellation")
     func redirectFixtureHandsOffOnce() throws {
         let source = try #require(URL(string: "https://media.example/redirect"))

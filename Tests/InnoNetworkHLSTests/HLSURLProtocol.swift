@@ -24,6 +24,12 @@ final class HLSURLProtocol: URLProtocol, @unchecked Sendable {
             headers: [String: String],
             delay: TimeInterval
         )
+        case gatedSuccess(
+            statusCode: Int,
+            data: Data,
+            headers: [String: String],
+            gate: HLSURLProtocolResponseGate
+        )
         case redirect(statusCode: Int, location: URL)
     }
 
@@ -33,9 +39,11 @@ final class HLSURLProtocol: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) private static var onStopLoading: (@Sendable (URL) -> Void)?
     nonisolated(unsafe) private static var activeRequestCount = 0
     nonisolated(unsafe) private static var maximumActiveRequestCountStorage = 0
+    nonisolated(unsafe) private static var requestGeneration = UUID()
     private static let lock = NSLock()
     private let lifecycleLock = NSLock()
     private var isActive = false
+    private var activeGeneration: UUID?
 
     static func register(
         _ response: ResponseSpec,
@@ -86,6 +94,7 @@ final class HLSURLProtocol: URLProtocol, @unchecked Sendable {
         onStopLoading = nil
         activeRequestCount = 0
         maximumActiveRequestCountStorage = 0
+        requestGeneration = UUID()
         lock.unlock()
     }
 
@@ -118,8 +127,9 @@ final class HLSURLProtocol: URLProtocol, @unchecked Sendable {
             Self.responses[url.absoluteString] = queuedResponses
         }
         let startLoadingHandler = Self.onStartLoading
+        let generation = Self.requestGeneration
         Self.lock.unlock()
-        markActive()
+        guard markActive(generation: generation) else { return }
         startLoadingHandler?(url)
 
         switch responseSpec {
@@ -163,6 +173,15 @@ final class HLSURLProtocol: URLProtocol, @unchecked Sendable {
             DispatchQueue.global().asyncAfter(
                 deadline: .now() + delay
             ) { [weak self] in
+                self?.deliver(
+                    statusCode: statusCode,
+                    data: data,
+                    headers: headers,
+                    finishesLoading: true
+                )
+            }
+        case .gatedSuccess(let statusCode, let data, let headers, let gate):
+            gate.arrive { [weak self] in
                 self?.deliver(
                     statusCode: statusCode,
                     data: data,
@@ -262,18 +281,22 @@ final class HLSURLProtocol: URLProtocol, @unchecked Sendable {
         }
     }
 
-    private func markActive() {
+    private func markActive(generation: UUID) -> Bool {
         lifecycleLock.lock()
-        isActive = true
-        lifecycleLock.unlock()
-
         Self.lock.lock()
+        defer {
+            Self.lock.unlock()
+            lifecycleLock.unlock()
+        }
+        guard generation == Self.requestGeneration else { return false }
+        isActive = true
+        activeGeneration = generation
         Self.activeRequestCount += 1
         Self.maximumActiveRequestCountStorage = max(
             Self.maximumActiveRequestCountStorage,
             Self.activeRequestCount
         )
-        Self.lock.unlock()
+        return true
     }
 
     private func isRequestActive() -> Bool {
@@ -287,16 +310,22 @@ final class HLSURLProtocol: URLProtocol, @unchecked Sendable {
     private func markFinished() {
         lifecycleLock.lock()
         let wasActive = isActive
+        let generation = activeGeneration
         isActive = false
+        activeGeneration = nil
         lifecycleLock.unlock()
         guard wasActive else {
             return
         }
         Self.lock.lock()
-        Self.activeRequestCount = max(
-            0,
-            Self.activeRequestCount - 1
-        )
+        // Session invalidation can deliver an old stop after the next test
+        // resets the registry. It must not decrement the new test's count.
+        if generation == Self.requestGeneration {
+            Self.activeRequestCount = max(
+                0,
+                Self.activeRequestCount - 1
+            )
+        }
         Self.lock.unlock()
     }
 }

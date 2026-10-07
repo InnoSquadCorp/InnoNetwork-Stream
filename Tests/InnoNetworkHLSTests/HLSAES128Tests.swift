@@ -6,6 +6,27 @@ import Testing
 @testable import InnoNetworkHLS
 
 extension HLSDownloaderTests {
+    @Test("response overlap gate holds the first request until the second enters")
+    func responseOverlapGateRequiresBothArrivals() {
+        let gate = HLSURLProtocolResponseGate()
+        gate.arrive {}
+        #expect(gate.heldResponseCount == 1)
+        #expect(!gate.didOverlap)
+        gate.arrive {}
+        #expect(gate.heldResponseCount == 0)
+        #expect(gate.didOverlap)
+    }
+
+    @Test("safety release cannot make serialized requests pass the overlap gate")
+    func responseOverlapGateRejectsSerialControl() {
+        let gate = HLSURLProtocolResponseGate()
+        gate.arrive {}
+        gate.releaseForSafety()
+        gate.arrive {}
+        #expect(gate.heldResponseCount == 0)
+        #expect(!gate.didOverlap)
+    }
+
     @Test("Recording key caches evict old URLs and safely refetch them")
     func recordingKeyCacheIsBounded() async throws {
         let session = makeAES128Session()
@@ -676,6 +697,16 @@ extension HLSDownloaderTests {
             session.invalidateAndCancel()
             HLSURLProtocol.reset()
         }
+        let overlapGate = HLSURLProtocolResponseGate()
+        let watchdog = Task {
+            try? await ContinuousClock().sleep(for: .seconds(10))
+            guard !Task.isCancelled else { return }
+            overlapGate.releaseForSafety()
+        }
+        defer {
+            watchdog.cancel()
+            overlapGate.releaseForSafety()
+        }
         HLSURLProtocol.register(
             .success(
                 statusCode: 200,
@@ -693,7 +724,7 @@ extension HLSDownloaderTests {
             for: playlistURL
         )
         HLSURLProtocol.register(
-            .delayedSuccess(
+            .gatedSuccess(
                 statusCode: 200,
                 data: Data(
                     """
@@ -706,16 +737,16 @@ extension HLSDownloaderTests {
                     """.utf8
                 ),
                 headers: [:],
-                delay: 0.1
+                gate: overlapGate
             ),
             for: mediaURL
         )
         HLSURLProtocol.register(
-            .delayedSuccess(
+            .gatedSuccess(
                 statusCode: 200,
                 data: key,
                 headers: ["Content-Length": "16"],
-                delay: 0.1
+                gate: overlapGate
             ),
             for: keyURL
         )
@@ -771,6 +802,7 @@ extension HLSDownloaderTests {
             try Data(contentsOf: localizedResourceURL)
                 == plaintext
         )
+        #expect(overlapGate.didOverlap)
         #expect(HLSURLProtocol.maximumActiveRequestCount() >= 2)
         #expect(
             HLSURLProtocol.capturedRequests().count {
@@ -806,6 +838,16 @@ extension HLSDownloaderTests {
             session.invalidateAndCancel()
             HLSURLProtocol.reset()
         }
+        let overlapGate = HLSURLProtocolResponseGate()
+        let watchdog = Task {
+            try? await ContinuousClock().sleep(for: .seconds(10))
+            guard !Task.isCancelled else { return }
+            overlapGate.releaseForSafety()
+        }
+        defer {
+            watchdog.cancel()
+            overlapGate.releaseForSafety()
+        }
         HLSURLProtocol.register(
             .success(
                 statusCode: 200,
@@ -823,7 +865,7 @@ extension HLSDownloaderTests {
             for: masterURL
         )
         HLSURLProtocol.register(
-            .delayedSuccess(
+            .gatedSuccess(
                 statusCode: 200,
                 data: Data(
                     """
@@ -836,16 +878,16 @@ extension HLSDownloaderTests {
                     """.utf8
                 ),
                 headers: [:],
-                delay: 0.1
+                gate: overlapGate
             ),
             for: mediaURL
         )
         HLSURLProtocol.register(
-            .delayedSuccess(
+            .gatedSuccess(
                 statusCode: 200,
                 data: key,
                 headers: ["Content-Length": "16"],
-                delay: 0.1
+                gate: overlapGate
             ),
             for: keyURL
         )
@@ -888,6 +930,7 @@ extension HLSDownloaderTests {
             return
         }
         #expect(try Data(contentsOf: destinationURL) == plaintext)
+        #expect(overlapGate.didOverlap)
         #expect(HLSURLProtocol.maximumActiveRequestCount() >= 2)
         #expect(
             HLSURLProtocol.capturedRequests().count {
