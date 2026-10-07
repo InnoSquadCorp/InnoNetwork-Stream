@@ -64,21 +64,20 @@ actor HLSContentSteeringResolver {
             return .unsteered(playlist)
         }
         guard settings.isEnabled else {
-            return Self.fallbackCatalog(
+            return try Self.fallbackCatalog(
                 for: playlist,
                 initialPathwayID: directive.initialPathwayID
             )
         }
         let manifest = try await cachedManifest(for: directive)
         try Task.checkCancellation()
-        guard let manifest,
-            let catalog = HLSPathwayCatalogBuilder.make(
-                playlist: playlist,
-                manifest: manifest
-            ),
-            !catalog.pathways.isEmpty
+        let catalog = manifest.flatMap {
+            HLSPathwayCatalogBuilder.make(playlist: playlist, manifest: $0)
+        }
+        try Task.checkCancellation()
+        guard let catalog, !catalog.pathways.isEmpty
         else {
-            return Self.fallbackCatalog(
+            return try Self.fallbackCatalog(
                 for: playlist,
                 initialPathwayID: directive.initialPathwayID
             )
@@ -308,57 +307,89 @@ actor HLSContentSteeringResolver {
     private static func fallbackCatalog(
         for playlist: HLSPlaylist,
         initialPathwayID: String?
-    ) -> HLSPathwayCatalog {
+    ) throws -> HLSPathwayCatalog {
+        try Task.checkCancellation()
+        let limits = HLSPathwayCatalogBuilder.Limits()
+        func initialOnly() throws -> HLSPathwayCatalog {
+            let preferred = initialPathwayID.flatMap { id in
+                playlist.variants.contains { ($0.pathwayID ?? HLSPathwayID.implicit) == id } ? id : nil
+            }
+            guard let id = preferred ?? playlist.variants.first.map({ $0.pathwayID ?? HLSPathwayID.implicit }) else {
+                return .unsteered(playlist)
+            }
+            let variants = playlist.variants.filter { ($0.pathwayID ?? HLSPathwayID.implicit) == id }
+            let iFrames = playlist.iFrameVariants.filter { ($0.pathwayID ?? HLSPathwayID.implicit) == id }
+            let renditions = referencedRenditions(variants: variants + iFrames, renditions: playlist.renditions)
+            try Task.checkCancellation()
+            // One original pathway reuses only records admitted by the input
+            // playlist bound; it cannot multiply a shared rendition group.
+            return HLSPathwayCatalog(pathways: [
+                HLSPathway(id: id, variants: variants, iFrameVariants: iFrames, renditions: renditions)
+            ])
+        }
         var pathwayIDs: [String] = []
+        var seen: Set<String> = []
         if let initialPathwayID {
             pathwayIDs.append(initialPathwayID)
+            seen.insert(initialPathwayID)
         }
         for variant in playlist.variants {
-            let pathwayID = variant.pathwayID ?? HLSPathwayID.implicit
-            if !pathwayIDs.contains(pathwayID) {
-                pathwayIDs.append(pathwayID)
+            let id = variant.pathwayID ?? HLSPathwayID.implicit
+            if seen.insert(id).inserted {
+                pathwayIDs.append(id)
+                if pathwayIDs.count > limits.maximumPathways { return try initialOnly() }
             }
         }
-        let pathways: [HLSPathway] = pathwayIDs.compactMap { pathwayID in
-            let variants = playlist.variants.filter {
-                ($0.pathwayID ?? HLSPathwayID.implicit) == pathwayID
+        var remaining = limits.maximumRecords
+        func reserve(_ count: Int) -> Bool {
+            guard count <= remaining else { return false }
+            remaining -= count
+            return true
+        }
+        guard reserve(playlist.variants.count), reserve(playlist.iFrameVariants.count) else {
+            return try initialOnly()
+        }
+        let variantsByID = Dictionary(grouping: playlist.variants) { $0.pathwayID ?? HLSPathwayID.implicit }
+        let iFramesByID = Dictionary(grouping: playlist.iFrameVariants) { $0.pathwayID ?? HLSPathwayID.implicit }
+        let renditionCounts = Dictionary(grouping: playlist.renditions, by: \.groupID).mapValues(\.count)
+        // Reserve every output reference before copying any group into each
+        // pathway. A small source group shared by many paths is not free.
+        for id in pathwayIDs {
+            try Task.checkCancellation()
+            let variants = variantsByID[id] ?? []
+            guard !variants.isEmpty else { continue }
+            let keys = referencedGroupIDs(variants: variants + (iFramesByID[id] ?? []))
+            for key in keys {
+                guard reserve(renditionCounts[key] ?? 0) else { return try initialOnly() }
             }
-            let iFrameVariants = playlist.iFrameVariants.filter {
-                ($0.pathwayID ?? HLSPathwayID.implicit) == pathwayID
-            }
-            guard !variants.isEmpty else {
-                return nil
-            }
+        }
+        let pathways: [HLSPathway] = try pathwayIDs.compactMap { id in
+            try Task.checkCancellation()
+            let variants = variantsByID[id] ?? []
+            let iFrames = iFramesByID[id] ?? []
+            guard !variants.isEmpty else { return nil }
             return HLSPathway(
-                id: pathwayID,
-                variants: variants,
-                iFrameVariants: iFrameVariants,
-                renditions: Self.referencedRenditions(
-                    variants: variants + iFrameVariants,
-                    renditions: playlist.renditions
-                )
+                id: id, variants: variants, iFrameVariants: iFrames,
+                renditions: referencedRenditions(variants: variants + iFrames, renditions: playlist.renditions)
             )
         }
-        guard !pathways.isEmpty else {
-            return .unsteered(playlist)
-        }
+        try Task.checkCancellation()
+        guard !pathways.isEmpty else { return .unsteered(playlist) }
         return HLSPathwayCatalog(pathways: pathways)
+    }
+
+    private static func referencedGroupIDs(variants: [HLSVariant]) -> Set<String> {
+        Set(variants.flatMap { variant in
+            [variant.audioGroupID, variant.subtitleGroupID, variant.videoGroupID,
+             variant.closedCaptions?.groupID].compactMap { $0 }
+        })
     }
 
     private static func referencedRenditions(
         variants: [HLSVariant],
         renditions: [HLSRendition]
     ) -> [HLSRendition] {
-        let groupIDs = Set(
-            variants.flatMap { variant in
-                [
-                    variant.audioGroupID,
-                    variant.subtitleGroupID,
-                    variant.videoGroupID,
-                    variant.closedCaptions?.groupID,
-                ].compactMap { $0 }
-            }
-        )
+        let groupIDs = referencedGroupIDs(variants: variants)
         return renditions.filter { groupIDs.contains($0.groupID) }
     }
 

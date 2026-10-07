@@ -166,6 +166,12 @@ public protocol HLSContentSteeringEventObserving: Sendable {
 /// admitted. Excess plans use the last manifest or the initial pathway instead
 /// of starting additional I/O. Cancelling one waiter never cancels another;
 /// cancelling the last waiter requests cancellation of the shared transfer.
+/// Catalog expansion admits at most 64 clones, 64 prioritized pathways and
+/// 16,384 variant/rendition records. Generated URLs are limited to 64 KiB each;
+/// generated URL/group text shares an 8 MiB budget. Oversized Steering catalogs
+/// use the original pathways in declared-initial-first order. If those original
+/// pathways would amplify records beyond the same catalog budget, only the
+/// original initial (or first available) pathway is retained.
 public struct HLSContentSteeringPack: Sendable {
     private let isEnabled: Bool
     private let maximumManifestBytes: Int
