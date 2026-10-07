@@ -99,7 +99,7 @@ intentionally Apple-only and keeps the same deployment floors as InnoNetwork.
 
 ## Sponsorship
 
-Support InnoNetwork-Stream development through [GitHub Sponsors](https://github.com/sponsors/InnoSquadCorp) or [Patreon](https://www.patreon.com/c/InnoSquad).
+Support InnoNetwork-Stream development through [GitHub Sponsors](https://github.com/sponsors/InnoSquadCorp) or [Patreon](https://www.patreon.com/15188938/join).
 
 ## License
 
