@@ -84,6 +84,7 @@ struct HLSCancellationHandoffTests {
             #EXT-X-TARGETDURATION:1
             #EXT-X-MEDIA-SEQUENCE:11
             #EXT-X-PART-INF:PART-TARGET=1
+            #EXT-X-SERVER-CONTROL:PART-HOLD-BACK=3
             """
         let hint = try snapshot(
             header + "\n#EXT-X-PRELOAD-HINT:TYPE=\(kind),URI=\"\(name)\"", source: source
