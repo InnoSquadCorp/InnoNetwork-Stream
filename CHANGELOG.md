@@ -12,6 +12,10 @@
   handlers before native construction; install interstitial listeners before
   returning a stream. The application callback API is now MainActor.
 
+- Exercise aggregate/individual external consumers in Debug and Release, and
+  compile a real UIKit background callback fixture on both Swift CI toolchains.
+  Keep dependency object-store corruption controls isolated from SwiftPM caches.
+
 ## Unreleased Core 6.1.0 integration
 
 - Pin both Stream and its external consumer to published InnoNetwork `6.1.0`

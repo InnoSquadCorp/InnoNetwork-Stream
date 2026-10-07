@@ -34,6 +34,13 @@ cleanup() {
 trap cleanup EXIT
 python3 Scripts/collect_public_symbols.py . --build-root "$scratch_path" > "$actual"
 
+# Preserve generated evidence even when a reviewed API change makes a gate
+# fail. These diagnostics never replace the checked-in approved snapshots.
+mkdir -p .build/api-contract-diagnostics
+cp "$actual" .build/api-contract-diagnostics/public-symbols.tsv
+python3 Scripts/collect_public_signatures.py . --build-root "$scratch_path" \
+  > .build/api-contract-diagnostics/public-signatures.tsv
+
 declare -a contracts=(
   "InnoNetworkHLS:hls.allowlist"
   "InnoNetworkHLSLive:hls-live.allowlist"

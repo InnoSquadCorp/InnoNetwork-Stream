@@ -29,10 +29,13 @@ for mode in aggregate individual; do
     | jq -er '.dependencies[] | select(.identity == "innonetwork") | .path')"
   [[ "$(git -C "$consumer_core_path" rev-parse --verify HEAD)" == "$expected_core_revision" ]] \
     || { echo "package-identity: active Core checkout differs from the Stream candidate" >&2; exit 1; }
-  INNONETWORK_STREAM_CONSUMER_MODE="$mode" bash Scripts/swiftpm.sh run \
-    --package-path Tests/PackageIdentity \
-    --scratch-path .build/package-identity-consumer \
-    --force-resolved-versions PackageIdentityConsumer
+  for configuration in debug release; do
+    INNONETWORK_STREAM_CONSUMER_MODE="$mode" bash Scripts/swiftpm.sh run \
+      --package-path Tests/PackageIdentity \
+      --scratch-path .build/package-identity-consumer \
+      --configuration "$configuration" \
+      --force-resolved-versions PackageIdentityConsumer
+  done
 done
 
 # The application-owned acceptance fixture also resolves the renamed package.
@@ -42,4 +45,4 @@ bash Scripts/swiftpm.sh package --package-path Tests/FairPlayAcceptance dump-pac
     == ["InnoNetwork-Stream"]
   ' >/dev/null
 
-echo "package-identity: OK (aggregate, individual products, FairPlay manifest)"
+echo "package-identity: OK (aggregate/individual Debug+Release, FairPlay manifest)"

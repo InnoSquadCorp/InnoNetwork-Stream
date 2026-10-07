@@ -157,9 +157,23 @@ class WorkflowTests(unittest.TestCase):
             # Keep the frozen legacy gates and explicitly enumerate the
             # reviewed SwiftPM, DocC, and diagnostic additions from PR #4.
             old_steps = copy.deepcopy(old_steps)
+            if key == 'lint':
+                old_steps.extend([
+                    {'name': 'Prepare formatting diagnostics', 'if': 'failure()',
+                     'run': 'mkdir -p .build/format-diagnostics\nbash Scripts/format.sh\n'
+                            'git diff -- Sources Tests > .build/format-diagnostics/swift-format.patch\n'},
+                    {'name': 'Preserve formatting diagnostics', 'if': 'failure()',
+                     'uses': 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
+                     'with': {'name': 'swift-format-diagnostics', 'path': '.build/format-diagnostics/',
+                              'if-no-files-found': 'ignore'}},
+                ])
             if key == 'build-and-test':
                 next(s for s in old_steps if s['name'] == 'Run tests')['run'] = (
                     'bash Scripts/swiftpm.sh test --force-resolved-versions --parallel')
+                old_steps.append({
+                    'name': 'Compile UIKit background integration',
+                    'run': 'bash Scripts/check_uikit_background_consumer.sh',
+                })
             if key == 'contracts':
                 validation = next(s for s in old_steps if s['name'] == 'Validate scripts and documentation')
                 validation['run'] = validation['run'].replace(
@@ -177,6 +191,12 @@ class WorkflowTests(unittest.TestCase):
                 next(s for s in old_steps if s['name'] == 'Validate public API')['run'] = (
                     'bash Scripts/check_public_api_contract.sh\n'
                     'bash Scripts/check_docc.sh --skip-build\n')
+                old_steps.append({
+                    'name': 'Preserve generated API diagnostics', 'if': 'always()',
+                    'uses': 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
+                    'with': {'name': 'public-api-diagnostics', 'path': '.build/api-contract-diagnostics/',
+                             'if-no-files-found': 'ignore'},
+                })
                 old_steps.append(failure_artifact('hls-runtime-diagnostics'))
             # Noninteractive locked package flags must occur exactly once;
             # all original xcodebuild arguments and other steps still match.

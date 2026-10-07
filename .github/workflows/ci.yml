@@ -83,6 +83,19 @@ jobs:
         run: sudo xcode-select -s /Applications/Xcode_26.0.1.app
       - name: Run swift-format lint
         run: bash Scripts/format.sh --lint
+      - name: Prepare formatting diagnostics
+        if: failure()
+        run: |
+          mkdir -p .build/format-diagnostics
+          bash Scripts/format.sh
+          git diff -- Sources Tests > .build/format-diagnostics/swift-format.patch
+      - name: Preserve formatting diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: swift-format-diagnostics
+          path: .build/format-diagnostics/
+          if-no-files-found: ignore
 
   build-and-test:
     needs: ci-plan
@@ -117,6 +130,8 @@ jobs:
         run: git diff --exit-code -- Package.resolved
       - name: Run tests
         run: bash Scripts/swiftpm.sh test --force-resolved-versions --parallel
+      - name: Compile UIKit background integration
+        run: bash Scripts/check_uikit_background_consumer.sh
 
   contracts:
     needs: ci-plan
@@ -156,6 +171,13 @@ jobs:
           bash Scripts/check_docc.sh --skip-build
       - name: Run HLS contract gates
         run: bash Scripts/run_hls_quality_gates.sh
+      - name: Preserve generated API diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: public-api-diagnostics
+          path: .build/api-contract-diagnostics/
+          if-no-files-found: ignore
       - name: Preserve HLS startup and runtime failures
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
