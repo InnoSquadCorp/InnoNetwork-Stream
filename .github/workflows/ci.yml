@@ -132,6 +132,8 @@ jobs:
         run: bash Scripts/swiftpm.sh test --force-resolved-versions --parallel
       - name: Compile UIKit background integration
         run: bash Scripts/check_uikit_background_consumer.sh
+      - name: Compile local HLS evidence exporter
+        run: bash Scripts/check_hls_evidence_consumer.sh
 
   contracts:
     needs: ci-plan
@@ -164,7 +166,8 @@ jobs:
           bash Scripts/tests/test_package_identity.sh
           bash Scripts/tests/test_run_affected_tests.sh
           python3 Scripts/tests/test_public_signatures.py
-          bash Scripts/validate_docs_release_state.sh --expect draft
+          python3 Scripts/tests/test_apple_hls_evidence.py
+          bash Scripts/validate_docs_release_state.sh
       - name: Validate public API
         run: |
           bash Scripts/check_public_api_contract.sh

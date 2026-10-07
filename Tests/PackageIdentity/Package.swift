@@ -23,10 +23,10 @@ let package = Package(
     name: "StreamPackageIdentityConsumer",
     platforms: [.macOS(.v14)],
     dependencies: [
-        .package(path: "../.."),
+        .package(name: "InnoNetwork-Stream", path: "../.."),
         .package(
             url: "https://github.com/InnoSquadCorp/InnoNetwork.git",
-            exact: "6.1.0"
+            exact: "6.1.1"
         ),
     ],
     targets: [

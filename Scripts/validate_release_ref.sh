@@ -78,11 +78,9 @@ notes="docs/releases/$release_tag.md"
 [[ "$(git -C "$repo_root" show "$tag_commit:$notes" 2>/dev/null | sed -n '1p')" == '<!-- release-status: ready -->' ]] \
   || fail "$notes must exist and begin with the ready marker"
 
-if [[ "$release_tag" == "1.0.0" ]]; then
-  bash "$repo_root/Scripts/validate_docs_release_state.sh" \
-    --expect ready \
-    --ref "$tag_commit"
-fi
+version="$(git -C "$repo_root" show "$tag_commit:RELEASE_VERSION")"
+[[ "$release_tag" == "$version" ]] || fail "tag differs from RELEASE_VERSION"
+bash "$repo_root/Scripts/validate_docs_release_state.sh" --expect ready --ref "$tag_commit"
 
 echo "release-ref: OK ($release_tag at $tag_commit)"
 

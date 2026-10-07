@@ -1,115 +1,59 @@
-# API Stability (1.0 Draft)
+# API Stability (6.x candidate)
 
-InnoNetwork-Stream preserves the HLS product and module names that previously shipped
-from InnoNetwork. No `1.0.0` tag exists yet, so `main` is a development
-snapshot rather than a released dependency.
+`6.1.1` is the first planned stable Stream release. Nothing in this document
+asserts that its tag has been published. The release contract below takes effect
+only after the maintainer approves and publishes that candidate.
 
-## Stable package boundary
+## Proposed 6.1.1 supported surface
 
-The following package-level decisions are intended to become Stable at 1.0.0:
+The reviewed `Scripts/symbols/*.allowlist` and `public-signatures.tsv` define the
+public declaration baseline: 2,149 name rows and 2,154 semantic signatures.
+The supported workflows are pure playlist parsing/planning, VOD downloads,
+offline packages, live observation/DVR, AVFoundation playback/background asset
+integration, application-owned FairPlay integration, decoded audio, and the
+bounded metadata catalog. The six macro-first definitions and their manual
+validated equivalents are included. `advanced()` normalization remains supported.
+No public declaration is silently made unsupported merely because it originated
+in the pre-release Draft redesign.
 
-- the `innonetwork-stream` package identity and `InnoNetwork-Stream` display
-  name, repository name, and all-in-one library product
-- the `InnoNetworkHLS`, `InnoNetworkHLSLive`,
-  `InnoNetworkHLSAVFoundation`, and `InnoNetworkHLSAudio` product and module
-  names
-- Apple-only platform support with iOS 16, macOS 14, tvOS 16, watchOS 9, and
-  visionOS 1 minimum deployment targets
-- a dependency on the InnoNetwork 6 major line for bounded transport, URL
-  admission, retry, trust, and observability contracts
+The four module/product names, aggregate `InnoNetwork-Stream` product, and Apple
+deployment floors (iOS 16, macOS 14, tvOS 16, watchOS 9, visionOS 1) are the package
+boundary. Core is a separate dependency pinned exactly to `6.1.1` at
+`44e4ca28c50c03f817231a077c0f3bdfdbc859c8`; updating it requires explicit review.
 
-Removing a product, renaming a module, raising a deployment floor, or moving
-to a new InnoNetwork major requires an InnoNetwork-Stream major release.
+After publication, removals, incompatible concurrency/signature changes, raised
+platform floors, and changed operation-ownership semantics require a Stream
+major release. Additive APIs require reviewed signature/allowlist updates and
+release notes. Consumers should handle unknown enum cases where supported.
 
-The package was called `InnoStream` before its first release. Local consumers
-must change their package path/URL and `package:` argument; the four module
-imports remain unchanged. The all-in-one product groups those modules but does
-not introduce a hyphenated Swift module or re-export wrapper.
+## Pre-release breaking migrations
 
-## Provisionally Stable declarations
+- Replace public flat `HLSPlaylist(...)` construction with `HLSPlaylistParser`
+  and its discriminated media/multivariant documents.
+- Move media products from the Core package declaration to Stream; the four
+  module imports remain unchanged.
+- Request adapters must preserve a bodyless GET and Core admission/trust rules.
+- Background completion registration is MainActor-isolated and accepts UIKit's
+  ordinary escaping closure. Use the restoration initializer to register the
+  handler before the native session can deliver restored events.
+- Retain foreground operation owners explicitly. Cancelling observations does
+  not cancel owned work; use the operation's cancellation API.
 
-The initial baseline's 1,867 inherited declarations are Provisionally Stable candidates for the
-initial 1.x line. There is no published Stream 1.0 contract yet: the authorized
-macro-first redesign may change pre-release APIs with explicit migration
-evidence. After stabilization, minor releases may add declarations, add cases
-to non-frozen enums, and refine behavior with release notes, but must not
-remove or rename public declarations. Consumers that exhaustively switch over
-public enums should include `@unknown default`.
+See [migration examples](docs/MACRO_FIRST_MIGRATION.md). Existing compiled
+consumers of unreleased revisions may need these changes; Core source is not
+modified by this release preparation.
 
-The checked snapshots in `Scripts/symbols/*.allowlist` are the source of truth:
+## Scope and evidence limits
 
-| Module | Public declarations |
-| --- | ---: |
-| `InnoNetworkHLS` | 1,036 |
-| `InnoNetworkHLSLive` | 334 |
-| `InnoNetworkHLSAVFoundation` | 714 |
-| `InnoNetworkHLSAudio` | 65 |
-| **Total** | **2,149** |
+The contract covers documented behavior and supported inputs, not arbitrary HLS
+backends, DRM entitlements, CDN availability, device timing, or application UI.
+Catalog persistence adapters, FairPlay credentials/KSM, and native device
+background/locked-storage acceptance remain application-owned responsibilities.
+Internal symbols, test hooks, script layout, and symbol counts alone are not
+compatibility promises. Checkpoint/offline schema changes require explicit
+recovery and migration review.
 
-The 283 new name rows (macro, validated settings, workflow protocol,
-download task/observation contracts and pure discriminated documents) are
-**Draft**, not automatically promoted
-to Provisionally Stable by an allowlist update. Macro expansion/diagnostics,
-external Debug/Release consumers, runtime ownership controls and the final
-supported-toolchain/platform gates must pass before promotion. See
-[the macro-first execution plan](docs/MACRO_FIRST_REDESIGN.md).
-
-The net increase of 282 name rows reflects documented families. One inherited
-flat playlist constructor is internal; 1,866 inherited rows remain. Typed
-selector overloads share name rows and require the semantic signature gate. The collector
-now includes `swift.macro`, so the primary declarative surface is gated too.
-
-`Scripts/check_public_api_contract.sh` regenerates Swift symbol graphs and
-checks `public-signatures.tsv` with the approved distinct semantic signatures as well as 2,149
-name rows. Signatures include overload USRs, typed declaration fragments,
-async/throws, actor attributes, generics, availability and explicit conformance
-relationships. Locations/comments do not affect the snapshot. Regenerate only
-after intentional semantic review; drift is never automatically accepted.
-The nine offline-owner additions expose `start`, bounded independent `events`
-and `receipt` observations, explicit cancellation, state and redacted failure
-reporting. Releasing the owner cancels unfinished work; cancelling an observer
-does not. Existing caller-owned async and legacy stream ownership are unchanged.
-The initial snapshot is generated on Xcode 27/Swift 6.4. Xcode 26 parity is an
-external gate, not inferred from a declaration count. Fixture controls verify
-that removing semantic fields changes the result without source-location noise.
-
-The name-based allowlist also
-rejects undeclared additions, removals, and renames. An intentional public API
-change must update the owning allowlist, its budget, this document, and the
-changelog in the same commit.
-
-## Background restoration pre-release correction
-
-`HLSAssetDownloadSession` adds a main-actor initializer accepting the host
-application's ordinary background completion closure before the native session
-starts. `init(configuration:)` remains available. The postconstruction
-`handleBackgroundSessionCompletion(_:completion:)` method is now main-actor
-isolated and accepts UIKit's ordinary escaping completion directly. This is an
-intentional pre-release concurrency-contract change; the restoration overload
-is Draft. A real `UIApplicationDelegate` fixture is compiled for iOS on both
-supported toolchain lanes. The Xcode 27 semantic snapshot generated for
-`405c714` was reviewed against these three declarations and checked in;
-unrelated signatures are unchanged. Exact-head API and consumer CI must still
-pass before this change's validation gate is considered complete.
-
-## Internal and operational surfaces
-
-Package-internal declarations, test fixtures, scripts, workflow layout, and
-the concrete implementation behind public protocols are not compatibility
-contracts. Release gates may evolve without a major version when their
-observable package behavior remains compatible.
-
-## Version pinning
-
-After 1.0.0 is published, applications using Provisionally Stable declarations
-should prefer a minor-bound range:
-
-```swift
-.package(
-    url: "https://github.com/InnoSquadCorp/InnoNetwork-Stream.git",
-    .upToNextMinor(from: "1.0.0")
-)
-```
-
-Use `exact: "1.0.0"` for reproducible release builds that must not accept a
-minor update automatically.
+A green PR run is development evidence. Final publication additionally requires
+coherent release-state documents, a canonical-main candidate, approved local
+Apple-tool evidence for actual SDK outputs, and post-tag remote consumer checks.
+The new Core 6.1.1 candidate has not inherited the older 6.1.0 run's acceptance.

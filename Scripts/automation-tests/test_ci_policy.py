@@ -174,6 +174,10 @@ class WorkflowTests(unittest.TestCase):
                     'name': 'Compile UIKit background integration',
                     'run': 'bash Scripts/check_uikit_background_consumer.sh',
                 })
+                old_steps.append({
+                    'name': 'Compile local HLS evidence exporter',
+                    'run': 'bash Scripts/check_hls_evidence_consumer.sh',
+                })
             if key == 'contracts':
                 validation = next(s for s in old_steps if s['name'] == 'Validate scripts and documentation')
                 validation['run'] = validation['run'].replace(
@@ -187,7 +191,8 @@ class WorkflowTests(unittest.TestCase):
                     'bash Scripts/validate_docs_release_state.sh --expect draft\n',
                     'bash Scripts/tests/test_run_affected_tests.sh\n'
                     'python3 Scripts/tests/test_public_signatures.py\n'
-                    'bash Scripts/validate_docs_release_state.sh --expect draft\n')
+                    'python3 Scripts/tests/test_apple_hls_evidence.py\n'
+                    'bash Scripts/validate_docs_release_state.sh\n')
                 next(s for s in old_steps if s['name'] == 'Validate public API')['run'] = (
                     'bash Scripts/check_public_api_contract.sh\n'
                     'bash Scripts/check_docc.sh --skip-build\n')
@@ -314,6 +319,13 @@ class WorkflowTests(unittest.TestCase):
                 'run': 'bash Scripts/validate_release_ref.sh',
             }
             preflight = next(i for i, s in enumerate(steps) if s['name'] == 'Run full release preflight')
+            steps[preflight]['env'] = {
+                'APPLE_HLS_APPROVED_EVIDENCE_SHA256': '${{ vars.APPLE_HLS_APPROVED_EVIDENCE_SHA256 }}',
+                'APPLE_HLS_APPROVED_BY': '${{ vars.APPLE_HLS_APPROVED_BY }}',
+            }
+            artifact = next(s for s in steps if s['name'] == 'Upload release validation artifacts')
+            artifact['with']['path'] = artifact['with']['path'].replace(
+                '.build/local-release-preflight/apple-hls/', 'ReleaseEvidence/apple-hls/')
             steps[preflight + 1:preflight + 1] = [failure_artifact('release-hls-runtime-diagnostics'), revalidate]
             before_publish = copy.deepcopy(revalidate)
             before_publish['name'] = 'Revalidate release identity immediately before publication'

@@ -3,6 +3,20 @@ import Foundation
 import InnoNetworkHLS
 
 struct HLSLiveDVRCheckpointStore: Sendable {
+    // Internal I/O dependencies let recovery tests fail exact durability boundaries.
+    // Production defaults preserve the atomic-write and synchronization ordering.
+    struct Persistence: Sendable {
+        var writeCheckpoint: @Sendable (Data, URL) throws -> Void = { data, url in
+            try data.write(to: url, options: .atomic)
+        }
+        var synchronizeFile: @Sendable (URL) throws -> Void = { url in
+            try HLSLiveDVRCheckpointStore.synchronizeFile(at: url)
+        }
+        var synchronizeDirectory: @Sendable (URL) throws -> Void = { url in
+            try HLSLiveDVRCheckpointStore.synchronizeDirectory(at: url)
+        }
+    }
+
     private static let maximumCheckpointBytes = 8 * 1024 * 1024
     private static let maximumFileRecordCount = 40000
 
@@ -11,8 +25,13 @@ struct HLSLiveDVRCheckpointStore: Sendable {
     private let ownerURL: URL
     private let checkpointURL: URL
     private let ownerData: Data
+    private let persistence: Persistence
 
-    init(destinationURL: URL) {
+    init(
+        destinationURL: URL,
+        persistence: Persistence = Persistence()
+    ) {
+        self.persistence = persistence
         let rootURL =
             destinationURL
             .deletingLastPathComponent()
@@ -140,10 +159,10 @@ struct HLSLiveDVRCheckpointStore: Sendable {
                 throw HLSLiveDVRError.recoveryCorrupted
             }
             try synchronizeResources(newFiles)
-            try data.write(to: checkpointURL, options: .atomic)
+            try persistence.writeCheckpoint(data, checkpointURL)
             Self.applyOwnedStorageAttributes(to: checkpointURL)
-            try Self.synchronizeFile(at: checkpointURL)
-            try Self.synchronizeDirectory(at: rootURL)
+            try persistence.synchronizeFile(checkpointURL)
+            try persistence.synchronizeDirectory(rootURL)
         } catch let error as HLSLiveDVRError {
             throw error
         } catch {
@@ -295,7 +314,7 @@ struct HLSLiveDVRCheckpointStore: Sendable {
         for directory in directories.sorted(
             by: { $0.path.count > $1.path.count }
         ) {
-            try Self.synchronizeDirectory(at: directory)
+            try persistence.synchronizeDirectory(directory)
         }
     }
 
@@ -308,7 +327,7 @@ struct HLSLiveDVRCheckpointStore: Sendable {
             else {
                 throw HLSLiveDVRError.recoveryCorrupted
             }
-            try Self.synchronizeFile(at: fileURL)
+            try persistence.synchronizeFile(fileURL)
         }
         try synchronizeResourceDirectories(for: files)
     }

@@ -56,6 +56,9 @@ jobs:
           RELEASE_FETCH_MAIN: '1'
         run: bash Scripts/validate_release_candidate.sh
       - name: Run full release preflight
+        env:
+          APPLE_HLS_APPROVED_EVIDENCE_SHA256: ${{ vars.APPLE_HLS_APPROVED_EVIDENCE_SHA256 }}
+          APPLE_HLS_APPROVED_BY: ${{ vars.APPLE_HLS_APPROVED_BY }}
         run: bash Scripts/run_local_release_preflight.sh --full
       - name: Preserve HLS startup and runtime failures
         if: failure()
@@ -95,7 +98,7 @@ jobs:
           path: |
             .build/release-artifacts/InnoNetwork-Stream-${{ github.ref_name }}.tar.gz
             .build/release-artifacts/SHA256SUMS
-            .build/local-release-preflight/apple-hls/
+            ReleaseEvidence/apple-hls/
           if-no-files-found: error
       - name: Revalidate release identity immediately before publication
         if: github.event_name == 'push'

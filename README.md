@@ -7,13 +7,15 @@ InnoNetwork-Stream (formerly InnoStream) is the media-streaming companion split
 from InnoNetwork 6. It keeps the existing module and product names so
 application imports do not change.
 
-`1.0.0` is currently an unreleased draft. The dependency declaration below is
+`6.1.1` is an unpublished release candidate. The dependency declaration below is
 the intended post-release form, not evidence that the tag is available today.
+Local official-tool acceptance is documented in [Local HLS evidence](docs/LOCAL_HLS_EVIDENCE.md);
+real-device prerequisites are in [Device acceptance](docs/DEVICE_ACCEPTANCE.md).
 
 ```swift
 .package(
     url: "https://github.com/InnoSquadCorp/InnoNetwork-Stream.git",
-    .upToNextMajor(from: "1.0.0")
+    .upToNextMajor(from: "6.1.1")
 )
 ```
 
@@ -46,8 +48,8 @@ Alternatively, choose only the individual products the application needs:
 | `InnoNetworkHLSAudio` | Decoded-audio output and pacing |
 
 The root package and aggregate/individual consumer pin published InnoNetwork
-`6.1.0` exactly. `Package.resolved` records tag commit
-`79ff9f535a0a15ad8b52ce49cb5a4b1ea1dfec16` and the reviewed transitive versions.
+`6.1.1` exactly. `Package.resolved` records tag commit
+`44e4ca28c50c03f817231a077c0f3bdfdbc859c8` and the reviewed transitive versions.
 CI and CodeQL use the published graph. The dependency gate checks the exact
 manifest requirement, tag version/revision, active graph and actual checkouts,
 including when SwiftPM reuses cached state.
@@ -67,8 +69,8 @@ INNONETWORK_LOCAL_PATH=/path/to/InnoNetwork bash Scripts/swiftpm.sh test
 ```
 
 Unset `INNONETWORK_LOCAL_PATH` before validating the published graph. A local
-path or branch cannot satisfy release validation. Stream `1.0.0` remains an
-unreleased Draft; Core publication does not authorize a Stream release. See the
+path or branch cannot satisfy release validation. Stream `6.1.1` remains an
+unpublished candidate; Core publication does not authorize a Stream release. See the
 [Core dependency contract](docs/CORE_DEVELOPMENT.md).
 
 Consumers of the earlier unreleased `InnoStream` checkout must update its
@@ -98,7 +100,7 @@ bash Scripts/swiftpm.sh test --filter InnoNetworkHLSAudioTests
 Strict Swift 6 concurrency is enabled for every target. The package is
 intentionally Apple-only and keeps the same deployment floors as InnoNetwork.
 
-## Macro-first download workflows (Draft)
+## Macro-first download workflows (6.1.1 candidate)
 
 Declare a workflow with checked constant limits, then start its explicitly
 owned operation. No requests start during macro expansion or configuration.
@@ -141,19 +143,19 @@ constructs settings. For dynamic settings or compiler-plugin recovery, use
 `HLSDownloadConfiguration.validated(...)` / `HLSDownloadDefining` as the
 advanced equivalent; the older `advanced(...)` API retains documented clamping.
 
-The compiler plugin shares SwiftSyntax 604.0.x with InnoNetwork 6.1.0. Runtime
+The compiler plugin shares SwiftSyntax 604.0.x with InnoNetwork 6.1.1. Runtime
 targets never import SwiftSyntax. Macro expressions accept positive decimal
 integer literals; resource limits fit every supported platform's signed
 32-bit `Int`, output limits use `Int64`, and concurrency is `1...8`.
 Keep Xcode's package/plugin trust approval for local development; reviewed,
 locked CI may use the narrow `-skipMacroValidation` flag, not a global trust
 setting or package-plugin bypass. Both macro expansion diagnostics and actual
-external consumer compilation are required before stabilizing this Draft API.
+external consumer compilation are required for final candidate qualification.
 
 See [the ordered implementation plan](docs/MACRO_FIRST_REDESIGN.md) for
 local execution evidence and the remaining external release gates.
 
-## Macro-first offline packages (Draft)
+## Macro-first offline packages (6.1.1 candidate)
 
 Use a package instead of concatenating a single file when preserving the HLS
 presentation and selected audio/subtitle timelines matters. This async operation
@@ -193,7 +195,7 @@ removed by late cancellation. The legacy `downloader.download(...)` stream still
 cancels its producer when observation terminates. These ownership contracts are
 intentionally different; the async convenience above remains caller-owned.
 
-## Live, DVR, native playback and metadata (Draft)
+## Live, DVR, native playback and metadata (6.1.1 candidate)
 
 ```swift
 import AVFoundation
@@ -249,10 +251,10 @@ and [failure/incident contracts](docs/FAILURE_AND_INCIDENT_CONTRACT.md).
 - [API stability](API_STABILITY.md)
 - [Migration from InnoNetwork](docs/MIGRATION_FROM_INNONETWORK.md)
 - [Package and repository naming](docs/PACKAGE_NAMING.md)
-- [InnoNetwork 6.0.0 compatibility](docs/INNONETWORK_6_COMPATIBILITY.md)
+- [Historical InnoNetwork 6.0.0 compatibility](docs/INNONETWORK_6_COMPATIBILITY.md)
 - [Release policy](docs/RELEASE_POLICY.md)
 - [Roadmap](docs/ROADMAP.md)
-- [Draft 1.0.0 release notes](docs/releases/1.0.0.md)
+- [6.1.1 candidate release notes](docs/releases/6.1.1.md)
 
 ## License
 

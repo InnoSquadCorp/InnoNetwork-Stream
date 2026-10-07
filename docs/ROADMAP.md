@@ -1,28 +1,18 @@
 # Roadmap
 
-## 1.0.0 Release Boundary
+## Release Boundary
 
-InnoNetwork-Stream is independently versioned from InnoNetwork. Its first release is
-therefore `1.0.0`, not `6.0.0`, and the follow-up minor is `1.1.0`, not
-`6.1.0`. The 1.0 draft preserves the four HLS product and module names while
-moving their package ownership out of InnoNetwork.
+The first planned stable Stream release is `6.1.1`, matching the owner's
+chosen Network release number. Stream remains independently versioned; this
+number does not make future Core upgrades or Stream releases automatic.
+Core is pinned to the published `6.1.1` tag. Release qualification is tied to
+the new Stream candidate, not to earlier Core 6.1.0 CI results.
 
-No 1.1 candidate below is a blocker for 1.0. The 1.0 exit gate remains the
-documented clean remote resolution order: publish the compatible InnoNetwork
-version, validate InnoNetwork-Stream without a local override, publish
-InnoNetwork-Stream 1.0.0, and then build a clean external consumer from both tags.
-Current development follows the Core 6.1 branch described in
-[Core development](CORE_DEVELOPMENT.md); its branch lock must return to a
-published Core version before this release gate can pass.
+Optional features below do not block 6.1.1.
+The required gates are documented in [Release Policy](RELEASE_POLICY.md),
+including approved local Apple-tool evidence on actual SDK-produced packages.
 
-The authorized pre-release macro-first redesign implements some foundations
-listed below in the 1.0 Draft. Local implementation and validation are recorded
-in [the redesign plan](MACRO_FIRST_REDESIGN.md) and
-[local evidence](MACRO_FIRST_LOCAL_VALIDATION.md), followed by the
-[production-candidate hardening record](PRODUCTION_HARDENING_2026_10_02.md).
-These are not Stable promotion, native device acceptance or remote release evidence.
-
-## 1.1.0 Candidate Scope
+## Follow-up Scope
 
 The first minor should harden real playback and offline operations without
 turning InnoNetwork-Stream into a player UI, CDN, packager, or DRM credential owner.
@@ -31,16 +21,13 @@ named adopter or a reproducible media fixture.
 
 ### Priority 0 — adoption and durable offline state
 
-1. **Promote only adopter-proven declarations.** Use Capto plus at least one
-   additional media consumer to identify the declarations that applications
-   use directly and without SPI. Of the initial 1,867 inherited name rows,
-   1,866 remain; 282 new rows are Draft (2,148 total, 2,153 distinct signatures).
-   Promotion is
-   per coherent workflow—playlist parsing, live reload, playback, asset
-   download, FairPlay, or decoded audio—not a bulk declaration-count goal.
+1. **Use adopter evidence before expanding the API.** The proposed 6.1.1
+   baseline contains 2,149 public name rows and 2,154 distinct signatures,
+   documented in API Stability. Future additions should serve a named application
+   or reproducible media case; declaration count is not an expansion goal.
 2. **Managed asset-catalog persistence.** The current
    `HLSAssetDownloadLibrary` is a bounded Codable value and deliberately leaves
-   file persistence to the application. The 1.0 Draft now provides optional
+   file persistence to the application. The 6.1.1 candidate now provides optional
    `@HLSCatalogDefinition`/`HLSMediaCatalog` bounded metadata transactions,
    version migration and caller-reported reconciliation for app files, offline
    packages and native assets. Actual atomic durability and exclusive-writer/CAS
@@ -52,7 +39,7 @@ named adopter or a reproducible media fixture.
 
 ### Priority 1 — bounded operational insight
 
-1. **Playback incident snapshots.** The 1.0 Draft's `HLSIncidentBuffer` already
+1. **Playback incident snapshots.** The 6.1.1 candidate's `HLSIncidentBuffer` already
    offers bounded, correlated typed-scalar composition with drop/truncation
    accounting; `HLSFailureReport` excludes arbitrary descriptions/URLs/payloads.
    Automatic native event ingestion and exporter integration remain future work.
@@ -82,10 +69,10 @@ named adopter or a reproducible media fixture.
   redaction fixtures, dropped-event accounting, and zero-media-payload tests.
 - HLS behavior changes run the Apple conformance fixtures and supported-runtime
   smoke in addition to Swift tests and all-platform builds.
-- Stable promotion requires clean consumer builds against the published 1.0
-  baseline and the proposed 1.1 surface.
+- Stable promotion requires clean consumer builds against the published 6.1.1
+  baseline and the proposed follow-up surface.
 
-### Explicitly outside 1.1
+### Explicitly outside the next minor
 
 - Player chrome, queue UX, Picture in Picture policy, AirPlay UI, analytics
   dashboards, and CDN control planes belong to applications or dedicated

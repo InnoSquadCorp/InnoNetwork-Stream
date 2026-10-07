@@ -7,6 +7,7 @@ cd "$repo_root"
 mode="quick"
 dependency_arguments=()
 preflight_label="local-release-preflight"
+apple_evidence="${APPLE_HLS_EVIDENCE_DIRECTORY:-ReleaseEvidence/apple-hls}"
 for argument in "$@"; do
 case "$argument" in
   --development) dependency_arguments=(--development); preflight_label="local-development-preflight" ;;
@@ -33,6 +34,11 @@ if [[ -z "$swift_version" ]] \
   exit 69
 fi
 
+# Fail early on missing/unapproved local evidence before expensive release builds.
+if [[ "$mode" == "full" ]]; then
+  python3 Scripts/apple_hls_evidence.py verify --bundle "$apple_evidence"
+fi
+
 resolved_before="$(shasum -a 256 Package.resolved)"
 bash Scripts/check_innonetwork_dependency.sh ${dependency_arguments[@]+"${dependency_arguments[@]}"}
 [[ "$(shasum -a 256 Package.resolved)" == "$resolved_before" ]] \
@@ -47,6 +53,8 @@ python3 Scripts/tests/test_swiftpm_scratch.py
 bash Scripts/check_public_api_contract.sh ${dependency_arguments[@]+"${dependency_arguments[@]}"}
 bash Scripts/check_docc.sh --skip-build
 bash Scripts/tests/test_package_identity.sh
+bash Scripts/check_hls_evidence_consumer.sh
+python3 Scripts/tests/test_apple_hls_evidence.py
 bash Scripts/tests/test_run_affected_tests.sh
 python3 Scripts/tests/test_public_signatures.py
 bash -n Scripts/*.sh
@@ -56,7 +64,7 @@ bash Scripts/swiftpm.sh test --force-resolved-versions --parallel
 if [[ "$mode" == "full" ]]; then
   bash Scripts/run_hls_quality_gates.sh \
     --skip-build \
-    --require-apple-tools \
+    --apple-evidence "$apple_evidence" \
     --require-runtime-smoke \
     --apple-report-root .build/local-release-preflight/apple-hls
 

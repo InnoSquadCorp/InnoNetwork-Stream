@@ -1,4 +1,4 @@
-# Macro-first migration (unreleased 1.0 Draft)
+# Macro-first migration (unpublished 6.1.1 candidate)
 
 ## Live, DVR and native playback
 
@@ -20,9 +20,9 @@ not an actor hop or generated foreground lifetime.
 
 ## Parser and VOD migration
 
-There is no published Stream 1.0 API to rewrite. These breaking migrations apply
-to local/pre-release adopters; InnoNetwork 6.0.0 and media/checkpoint schemas do
-not change. No application source migration is performed by this repository.
+There is no previously published stable Stream API to rewrite. These breaking migrations apply
+to local/pre-release adopters; Core source and media/checkpoint schemas do
+not change; the dependency separately moves to published Core 6.1.1. No application source migration is performed by this repository.
 
 | Previous path | Primary path | Ownership and failure contract |
 | --- | --- | --- |
@@ -53,3 +53,11 @@ plaintext fail instead of publishing incomplete presentations. VOD and DVR range
 responses require valid Content-Range syntax and consistent received byte counts,
 including open-ended responses without Content-Length. Existing healthy streams,
 media/checkpoint schemas, Core trust policy and ownership boundaries are unchanged.
+
+## Background completion concurrency
+
+For 6.1.1, call `handleBackgroundSessionCompletion(_:completion:)` from the main
+actor and pass UIKit's ordinary escaping completion. When reconnecting a session,
+use `init(configuration:backgroundSessionCompletion:)` so registration precedes
+restored event delivery. The previous nonisolated `@Sendable` callback signature
+is a pre-release breaking change, reflected in the reviewed semantic API snapshot.

@@ -40,7 +40,7 @@ fi
 
 # The published candidate is an exact tag contract, not a floating 6.x range.
 if [[ ${#gate_arguments[@]} -eq 0 ]]; then
-  jq '(.pins[] | select(.identity == "innonetwork") | .state.version) = "6.1.1"' \
+  jq '(.pins[] | select(.identity == "innonetwork") | .state.version) = "0.0.0"' \
     "$repo_root/Package.resolved" > "$scratch/Package.resolved"
   if env -u INNONETWORK_LOCAL_PATH bash "$gate" "$scratch" \
     > "$scratch/wrong-version.log" 2>&1; then
@@ -57,7 +57,7 @@ if [[ ${#gate_arguments[@]} -eq 0 ]]; then
   fi
   grep -Fq "one published InnoNetwork pin" "$scratch/published-rejects-branch.log"
   cp "$repo_root/Package.resolved" "$scratch/Package.resolved"
-  sed 's/exact: "6.1.0"/from: "6.1.0"/' \
+  sed 's/exact: "6.1.1"/from: "6.1.1"/' \
     "$repo_root/Package.swift" > "$scratch/Package.swift"
   if env -u INNONETWORK_LOCAL_PATH bash "$gate" "$scratch" \
     > "$scratch/floating-manifest.log" 2>&1; then

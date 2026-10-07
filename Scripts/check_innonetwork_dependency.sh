@@ -28,8 +28,8 @@ command -v jq >/dev/null 2>&1 || fail "jq is required"
 resolved_before="$(shasum -a 256 Package.resolved)"
 network_url="https://github.com/InnoSquadCorp/InnoNetwork.git"
 development_branch="codex/core-stream-followup"
-published_version="6.1.0"
-published_revision="79ff9f535a0a15ad8b52ce49cb5a4b1ea1dfec16"
+published_version="6.1.1"
+published_revision="44e4ca28c50c03f817231a077c0f3bdfdbc859c8"
 
 jq -e --arg url "$network_url" --arg mode "$dependency_mode" --arg branch "$development_branch" \
   --arg version "$published_version" --arg revision "$published_revision" '

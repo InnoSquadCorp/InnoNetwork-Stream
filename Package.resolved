@@ -1,13 +1,13 @@
 {
-  "originHash" : "c61791c6ba1a55e56de00002056ef245ae1b2fa23aa893e11ac9682c142f2a84",
+  "originHash" : "f060827f8c224626557b76ed1840592dc2f89d2db9dff5a9e647efa02a92a851",
   "pins" : [
     {
       "identity" : "innonetwork",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/InnoSquadCorp/InnoNetwork.git",
       "state" : {
-        "revision" : "79ff9f535a0a15ad8b52ce49cb5a4b1ea1dfec16",
-        "version" : "6.1.0"
+        "revision" : "44e4ca28c50c03f817231a077c0f3bdfdbc859c8",
+        "version" : "6.1.1"
       }
     },
     {

@@ -9,8 +9,8 @@ https://github.com/InnoSquadCorp/InnoNetwork-Stream.git
 
 Its SwiftPM package display name and all-in-one library product are
 `InnoNetwork-Stream`. The canonical package identity is `innonetwork-stream`.
-The package is independently versioned; its first release remains `1.0.0`
-and pins the published InnoNetwork `6.1.0` dependency exactly.
+The package is independently versioned; its first release remains `6.1.1`
+and pins the published InnoNetwork `6.1.1` dependency exactly.
 
 ## Consumer contract
 
@@ -84,6 +84,6 @@ user's separate authorization, `InnoSquadCorp/InnoNetwork-Stream` was created
 as a public repository and connected as `origin`. The existing MIT license
 and `Copyright (c) 2026 InnoSquad` notice were preserved.
 
-Repository creation and source publication do not create a stable `1.0.0`
+Repository creation and source publication do not create a stable `6.1.1`
 tag or Release. That release remains Draft, pending the documented remote
 CI/platform gates. No old `InnoStream` repository redirect is assumed.

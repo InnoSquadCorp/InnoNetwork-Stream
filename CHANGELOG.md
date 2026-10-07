@@ -1,5 +1,14 @@
 # Changelog
 
+## 6.1.1 Candidate (unpublished)
+
+- Align the planned Stream version and exact Core dependency to 6.1.1.
+- Replace draft-only release checks with state-independent fixture controls.
+- Require independently approved local evidence on real SDK offline/DVR outputs.
+- Strengthen observable key-preload cancellation and persistence fault controls.
+- Define the proposed 6.x API contract and keep unexecuted device/tool gates explicit.
+
+
 - Reconcile the semantic API snapshot with the reviewed pre-release background
   completion initializer and main-actor restoration method, using Xcode 27
   generated declarations without weakening the API drift gate.
@@ -20,10 +29,10 @@
   compile a real UIKit background callback fixture on both Swift CI toolchains.
   Keep dependency object-store corruption controls isolated from SwiftPM caches.
 
-## Unreleased Core 6.1.0 integration
+## Unreleased Core 6.1.1 integration
 
-- Pin both Stream and its external consumer to published InnoNetwork `6.1.0`
-  at `79ff9f535a0a15ad8b52ce49cb5a4b1ea1dfec16`, and align the compiler plugin
+- Pin both Stream and its external consumer to published InnoNetwork `6.1.1`
+  at `44e4ca28c50c03f817231a077c0f3bdfdbc859c8`, and align the compiler plugin
   with Core’s SwiftSyntax 604.0.x dependency. Restore published-only CI gates.
 - Consolidate checkout 7.0.1 and coupled CodeQL 4.38.2 action updates while
   preserving selective CI, metadata revalidation and immutable release checks.
@@ -93,7 +102,7 @@
   effective limits. Add a foreground watch owner and independent bounded DVR
   observations/receipts while preserving native background and audio ownership.
 
-These changes have not been tagged. `1.0.0` remains a draft until the release
+These changes have not been tagged. `6.1.1` remains a draft until the release
 state, remote dependency, Apple-platform, and HLS conformance gates pass.
 
 - Breaking pre-release change: make contradictory flat playlist construction
