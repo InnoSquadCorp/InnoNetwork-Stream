@@ -1,30 +1,67 @@
 name: CI
+run-name: >-
+  ${{ (github.event_name == 'pull_request' && (((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name && github.event.label.name != 'release-validation') || (github.event.action == 'edited' && !github.event.changes.base))) && format('CI metadata-only v1 pr:{0} head:{1} base:{2} action:{3} source:{4}', github.event.pull_request.number, github.event.pull_request.head.sha, github.event.pull_request.base.sha, github.event.action, github.workflow_sha) || (github.event_name == 'pull_request' && format('CI validation v2 pr:{0} head:{1} base:{2} source:{3} release:{4} asan:{5} concurrency:{6}', github.event.pull_request.number, github.event.pull_request.head.sha, github.event.pull_request.base.sha, github.sha, contains(github.event.pull_request.labels.*.name, 'release-validation'), false, false) || format('CI validation / {0} / {1}', github.event_name, github.ref)) }}
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
   push:
     branches:
       - main
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ !(github.event_name == 'pull_request' && (((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name && github.event.label.name != 'release-validation') || (github.event.action == 'edited' && !github.event.changes.base))) }}
+  queue: ${{ (github.event_name == 'pull_request' && (((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name && github.event.label.name != 'release-validation') || (github.event.action == 'edited' && !github.event.changes.base))) && 'max' || 'single' }}
 
 permissions:
   contents: read
 
 jobs:
+  ci-plan:
+    name: CI Plan
+    if: ${{ !(github.event_name == 'pull_request' && (((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name && github.event.label.name != 'release-validation') || (github.event.action == 'edited' && !github.event.changes.base))) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      plan: ${{ steps.plan.outputs.plan }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Plan exact changed paths
+        id: plan
+        run: python3 -B Scripts/ci-policy.py plan --event "$GITHUB_EVENT_PATH" --output .build/ci-plan.json
+
+  policy:
+    name: CI Policy
+    needs: ci-plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify planning and workflow contracts
+        run: |
+          python3 -B -m unittest discover -s Scripts/automation-tests -v
+          python3 -B Scripts/check-ci-workflows.py
+
   dependency-review:
+    needs: ci-plan
+    if: fromJSON(needs.ci-plan.outputs.plan).jobs.dependency-review
     name: Dependency Review
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Review dependency changes
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
@@ -32,18 +69,24 @@ jobs:
           fail-on-scopes: runtime, development, unknown
 
   lint:
+    needs: ci-plan
+    if: fromJSON(needs.ci-plan.outputs.plan).jobs.lint
     name: Lint (swift-format)
     runs-on: macos-15
     timeout-minutes: 15
     steps:
       - name: Checkout InnoNetwork-Stream
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Select Xcode 26.0.1
         run: sudo xcode-select -s /Applications/Xcode_26.0.1.app
       - name: Run swift-format lint
         run: bash Scripts/format.sh --lint
 
   build-and-test:
+    needs: ci-plan
+    if: fromJSON(needs.ci-plan.outputs.plan).jobs.build-and-test
     name: Build and Test (SwiftPM) — Xcode ${{ matrix.xcode.label }}
     runs-on: ${{ matrix.xcode.runner }}
     timeout-minutes: 50
@@ -59,31 +102,37 @@ jobs:
             path: /Applications/Xcode.app
     steps:
       - name: Checkout InnoNetwork-Stream
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Select Xcode
         run: sudo xcode-select -s ${{ matrix.xcode.path }}
       - name: Show toolchain versions
         run: |
           xcodebuild -version
           xcrun swift --version
-      - name: Verify locked InnoNetwork development dependency
-        run: bash Scripts/check_innonetwork_dependency.sh --development
+      - name: Verify published InnoNetwork dependency
+        run: bash Scripts/check_innonetwork_dependency.sh
       - name: Verify dependency lock did not drift
         run: git diff --exit-code -- Package.resolved
       - name: Run tests
         run: bash Scripts/swiftpm.sh test --force-resolved-versions --parallel
 
   contracts:
+    needs: ci-plan
+    if: fromJSON(needs.ci-plan.outputs.plan).jobs.contracts
     name: Docs / API / HLS Contract
     runs-on: xcode-27
     timeout-minutes: 60
     steps:
       - name: Checkout InnoNetwork-Stream
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Select Xcode 27
         run: sudo xcode-select -s /Applications/Xcode.app
-      - name: Verify locked InnoNetwork development dependency
-        run: bash Scripts/check_innonetwork_dependency.sh --development
+      - name: Verify published InnoNetwork dependency
+        run: bash Scripts/check_innonetwork_dependency.sh
       - name: Validate scripts and documentation
         run: |
           bash -n Scripts/*.sh Scripts/tests/*.sh
@@ -103,7 +152,7 @@ jobs:
           bash Scripts/validate_docs_release_state.sh --expect draft
       - name: Validate public API
         run: |
-          bash Scripts/check_public_api_contract.sh --development
+          bash Scripts/check_public_api_contract.sh
           bash Scripts/check_docc.sh --skip-build
       - name: Run HLS contract gates
         run: bash Scripts/run_hls_quality_gates.sh
@@ -116,6 +165,8 @@ jobs:
           if-no-files-found: ignore
 
   platform-build:
+    needs: ci-plan
+    if: fromJSON(needs.ci-plan.outputs.plan).jobs.platform-build
     name: Apple Platform Build (${{ matrix.runtime }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 50
@@ -148,18 +199,23 @@ jobs:
             triple: arm64-apple-xros1.0
     steps:
       - name: Checkout InnoNetwork-Stream
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Select Xcode 26.0.1
         run: sudo xcode-select -s /Applications/Xcode_26.0.1.app
-      - name: Verify locked InnoNetwork development dependency
-        run: bash Scripts/check_innonetwork_dependency.sh --development
+      - name: Verify published InnoNetwork dependency
+        run: bash Scripts/check_innonetwork_dependency.sh
       - name: Build with xcodebuild
         if: matrix.builder == 'xcodebuild'
         run: |
+          dependency_scratch="$(python3 Scripts/swiftpm_scratch_path.py "$PWD")"
           xcodebuild \
             -skipMacroValidation \
             -scheme InnoNetwork-Stream-Package \
             -destination '${{ matrix.destination }}' \
+            -onlyUsePackageVersionsFromResolvedFile \
+            -clonedSourcePackagesDirPath "$dependency_scratch" \
             -derivedDataPath '.build/platform-${{ matrix.runtime }}' \
             CODE_SIGNING_ALLOWED=NO \
             build
@@ -167,8 +223,44 @@ jobs:
         if: matrix.builder == 'swiftpm-cross'
         run: |
           bash Scripts/build_apple_platform_targets.sh \
-            --development \
             '${{ matrix.runtime }}' \
             '${{ matrix.sdk }}' \
             '${{ matrix.triple }}' \
             '.build/platform-${{ matrix.runtime }}'
+
+  codeql:
+    name: CodeQL
+    needs: ci-plan
+    if: fromJSON(needs.ci-plan.outputs.plan).jobs.codeql
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    uses: ./.github/workflows/codeql.yml
+
+  ci-required:
+    name: CI Required
+    if: ${{ always() }}
+    needs: ['ci-plan', 'policy', 'dependency-review', 'lint', 'build-and-test', 'contracts', 'platform-build', 'codeql']
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      checks: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Require every selected validation
+        if: ${{ !(github.event_name == 'pull_request' && (((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name && github.event.label.name != 'release-validation') || (github.event.action == 'edited' && !github.event.changes.base))) }}
+        env:
+          CI_PLAN: ${{ needs.ci-plan.outputs.plan }}
+          CI_NEEDS: ${{ toJSON(needs) }}
+        run: python3 -B Scripts/ci-policy.py evaluate
+      - name: Verify prior validation for metadata
+        if: ${{ (github.event_name == 'pull_request' && (((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name && github.event.label.name != 'release-validation') || (github.event.action == 'edited' && !github.event.changes.base))) }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -B Scripts/verify-ci-metadata.py --check 'CI Required'

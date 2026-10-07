@@ -3,9 +3,9 @@
 Validation date: 2026-09-30 (Asia/Seoul)
 
 This is the historical published-6.0 compatibility record. Current development
-uses a reviewed Core 6.1 branch and an exact locked revision; see
+pins published Core 6.1.0 and its exact tag revision; see
 [Core development](CORE_DEVELOPMENT.md). The results below do not certify that
-development branch or authorize its publication.
+published 6.1.0 graph or authorize Stream publication.
 
 InnoNetwork-Stream's `1.0.0` draft consumes the published InnoNetwork `6.0.0` tag at
 `9d8053d5f921ebf5c38cc2f816efe90c7db4a450`. The manifest continues to admit

@@ -16,6 +16,14 @@ import time
 from urllib.parse import urlsplit
 
 
+class LoopbackHTTPServer(http.server.ThreadingHTTPServer):
+    def server_bind(self) -> None:
+        # Numeric loopback fixtures need no reverse DNS. HTTPServer otherwise
+        # calls getfqdn here, delaying readiness when runner DNS is unavailable.
+        socketserver.TCPServer.server_bind(self)
+        self.server_name, self.server_port = self.server_address[:2]
+
+
 class LivePreloadState:
     def __init__(self) -> None:
         self._lock = threading.Lock()
@@ -318,15 +326,6 @@ def write_ready_file(path: Path, base_url: str) -> None:
     os.replace(temporary, path)
 
 
-class LoopbackFixtureServer(http.server.ThreadingHTTPServer):
-    def server_bind(self) -> None:
-        # HTTPServer otherwise calls getfqdn synchronously before readiness.
-        # An explicit loopback fixture needs neither DNS nor a hostname alias.
-        socketserver.TCPServer.server_bind(self)
-        self.server_name = "127.0.0.1"
-        self.server_port = self.server_address[1]
-
-
 def main() -> None:
     started = time.monotonic()
     print(f"hls-runtime-server: starting pid={os.getpid()} python={sys.version.split()[0]}", flush=True)
@@ -346,13 +345,14 @@ def main() -> None:
             f"{arguments.ready_file}"
         )
 
+    print("hls-runtime-server: binding loopback socket", file=sys.stderr, flush=True)
     FixtureRequestHandler.preload_state = LivePreloadState()
     FixtureRequestHandler.gap_state = LiveGapState()
     handler = functools.partial(
         FixtureRequestHandler,
         directory=str(fixture_root),
     )
-    server = LoopbackFixtureServer(("127.0.0.1", 0), handler)
+    server = LoopbackHTTPServer(("127.0.0.1", 0), handler)
     server.daemon_threads = True
     port = server.server_address[1]
     write_ready_file(arguments.ready_file, f"http://127.0.0.1:{port}")

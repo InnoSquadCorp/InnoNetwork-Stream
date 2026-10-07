@@ -195,10 +195,8 @@ final class HLSURLProtocol: URLProtocol, @unchecked Sendable {
                 wasRedirectedTo: redirectedRequest,
                 redirectResponse: response
             )
-            client?.urlProtocol(
-                self,
-                didFailWithError: URLError(.cancelled)
-            )
+            // The redirect hands ownership to the next protocol instance.
+            // A subsequent failure races that handoff and cancels the new task.
             markFinished()
         case .none:
             client?.urlProtocol(

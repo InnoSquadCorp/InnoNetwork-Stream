@@ -25,7 +25,7 @@ if let localInnoNetworkPath = ProcessInfo.processInfo.environment[
 } else {
     innoNetworkDependency = .package(
         url: "https://github.com/InnoSquadCorp/InnoNetwork.git",
-        branch: "codex/core-stream-followup"
+        exact: "6.1.0"
     )
 }
 
@@ -64,7 +64,7 @@ let package = Package(
         innoNetworkDependency,
         .package(
             url: "https://github.com/swiftlang/swift-syntax.git",
-            .upToNextMinor(from: "603.0.0")
+            .upToNextMinor(from: "604.0.0")
         ),
     ],
     targets: [

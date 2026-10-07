@@ -28,8 +28,11 @@ command -v jq >/dev/null 2>&1 || fail "jq is required"
 resolved_before="$(shasum -a 256 Package.resolved)"
 network_url="https://github.com/InnoSquadCorp/InnoNetwork.git"
 development_branch="codex/core-stream-followup"
+published_version="6.1.0"
+published_revision="79ff9f535a0a15ad8b52ce49cb5a4b1ea1dfec16"
 
-jq -e --arg url "$network_url" --arg mode "$dependency_mode" --arg branch "$development_branch" '
+jq -e --arg url "$network_url" --arg mode "$dependency_mode" --arg branch "$development_branch" \
+  --arg version "$published_version" --arg revision "$published_revision" '
   [.pins[] | select(.identity == "innonetwork")] as $pins |
   ($pins | length) == 1 and
   ($pins[0] | .kind == "remoteSourceControl" and .location == $url and
@@ -37,7 +40,7 @@ jq -e --arg url "$network_url" --arg mode "$dependency_mode" --arg branch "$deve
     (if $mode == "development" then
       .state.branch == $branch and .state.version == null
     else
-      (.state.version | type == "string" and test("^6\\.[0-9]+\\.[0-9]+$")) and
+      .state.version == $version and .state.revision == $revision and
       .state.branch == null
     end))
 ' Package.resolved >/dev/null \
@@ -46,11 +49,13 @@ jq -e --arg url "$network_url" --arg mode "$dependency_mode" --arg branch "$deve
 network_version="$(jq -r '.pins[] | select(.identity == "innonetwork") | .state.version // "unspecified"' Package.resolved)"
 network_revision="$(jq -r '.pins[] | select(.identity == "innonetwork") | .state.revision' Package.resolved)"
 manifest="$(bash "$script_root/swiftpm.sh" package dump-package)"
-printf '%s\n' "$manifest" | jq -e --arg mode "$dependency_mode" --arg branch "$development_branch" '
+printf '%s\n' "$manifest" | jq -e --arg mode "$dependency_mode" --arg branch "$development_branch" \
+  --arg version "$published_version" '
   [.dependencies[].sourceControl[]? | select(.identity == "innonetwork")] as $nodes |
   ($nodes | length) == 1 and
   (if $mode == "development" then $nodes[0].requirement.branch == [$branch]
-   else $nodes[0].requirement.branch == null and $nodes[0].requirement.revision == null end)
+   else $nodes[0].requirement.exact == [$version] and
+     $nodes[0].requirement.branch == null and $nodes[0].requirement.revision == null end)
 ' >/dev/null || fail "manifest does not match the $dependency_mode dependency contract"
 graph="$(bash "$script_root/swiftpm.sh" package --force-resolved-versions show-dependencies --format json)"
 

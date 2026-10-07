@@ -45,23 +45,19 @@ Alternatively, choose only the individual products the application needs:
 | `InnoNetworkHLSAVFoundation` | Playback, asset download and FairPlay |
 | `InnoNetworkHLSAudio` | Decoded-audio output and pacing |
 
-The package requires InnoNetwork 6 for bounded HTTP transfer, retry policy,
-request context, trust, redirect, metrics, and observability contracts. It
-currently develops against the InnoNetwork `codex/core-stream-followup` branch,
-which extends the 6.1 candidate in Core PR #132. The checked-in `Package.resolved`
-records the exact tested commit and transitive versions. CI and CodeQL validate
-this remote branch and its lock; they do not automatically advance to its latest
-commit. This development configuration cannot pass the published-dependency
-release gate.
-An explicit dependency gate verifies active remote versions and revisions
-against the resolved graph and checkouts, including when SwiftPM reuses cached state.
+The root package and aggregate/individual consumer pin published InnoNetwork
+`6.1.0` exactly. `Package.resolved` records tag commit
+`79ff9f535a0a15ad8b52ce49cb5a4b1ea1dfec16` and the reviewed transitive versions.
+CI and CodeQL use the published graph. The dependency gate checks the exact
+manifest requirement, tag version/revision, active graph and actual checkouts,
+including when SwiftPM reuses cached state.
 
-Validate and test the current development dependency with:
+Validate and test the published dependency with:
 
 ```bash
-env -u INNONETWORK_LOCAL_PATH bash Scripts/check_innonetwork_dependency.sh --development
+env -u INNONETWORK_LOCAL_PATH bash Scripts/check_innonetwork_dependency.sh
 env -u INNONETWORK_LOCAL_PATH bash Scripts/swiftpm.sh test --force-resolved-versions --parallel
-env -u INNONETWORK_LOCAL_PATH bash Scripts/run_local_release_preflight.sh --quick --development
+env -u INNONETWORK_LOCAL_PATH bash Scripts/run_local_release_preflight.sh --quick
 ```
 
 When developing both packages together, select a local checkout explicitly:
@@ -70,12 +66,10 @@ When developing both packages together, select a local checkout explicitly:
 INNONETWORK_LOCAL_PATH=/path/to/InnoNetwork bash Scripts/swiftpm.sh test
 ```
 
-Unset `INNONETWORK_LOCAL_PATH` before checking the remote development branch.
-Before release, replace the branch requirement in both manifests with the
-published compatible Core version, resolve and review the lock, then run release
-preflight without `--development`. The migration back to a public tag includes
-the external macro-first consumer and HLS runtime checks. See the
-[Core development contract](docs/CORE_DEVELOPMENT.md).
+Unset `INNONETWORK_LOCAL_PATH` before validating the published graph. A local
+path or branch cannot satisfy release validation. Stream `1.0.0` remains an
+unreleased Draft; Core publication does not authorize a Stream release. See the
+[Core dependency contract](docs/CORE_DEVELOPMENT.md).
 
 Consumers of the earlier unreleased `InnoStream` checkout must update its
 repository/path and the `.product(..., package:)` argument to
@@ -91,8 +85,8 @@ and publication boundaries. Local validation does not imply a published release.
 For incremental local feedback, select reverse-dependent suites from an explicit
 baseline: `bash Scripts/run_affected_tests.sh --base <commit>`. Inspect the plan
 with `--dry-run`. Development milestones require
-`bash Scripts/run_local_release_preflight.sh --full --development`. This does
-not replace the version-only `--full` release preflight after Core publication.
+`bash Scripts/run_local_release_preflight.sh --full` against the exact published
+Core pin, including external consumers and HLS runtime checks.
 
 ```bash
 bash Scripts/swiftpm.sh test --filter InnoNetworkHLSTests
@@ -147,7 +141,7 @@ constructs settings. For dynamic settings or compiler-plugin recovery, use
 `HLSDownloadConfiguration.validated(...)` / `HLSDownloadDefining` as the
 advanced equivalent; the older `advanced(...)` API retains documented clamping.
 
-The compiler plugin shares SwiftSyntax 603.0.x with InnoNetwork 6. Runtime
+The compiler plugin shares SwiftSyntax 604.0.x with InnoNetwork 6.1.0. Runtime
 targets never import SwiftSyntax. Macro expressions accept positive decimal
 integer literals; resource limits fit every supported platform's signed
 32-bit `Int`, output limits use `Int64`, and concurrency is `1...8`.

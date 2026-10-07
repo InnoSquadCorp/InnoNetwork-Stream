@@ -12,9 +12,9 @@
 
 ## Dependency order
 
-InnoNetwork-Stream 1.0 depends on InnoNetwork 6.0. The publication order is therefore:
+InnoNetwork-Stream 1.0 pins InnoNetwork 6.1.0 exactly. The publication order is therefore:
 
-1. publish and verify InnoNetwork `6.0.0`
+1. publish and verify InnoNetwork `6.1.0`
 2. resolve InnoNetwork-Stream without `INNONETWORK_LOCAL_PATH`
 3. publish and verify InnoNetwork-Stream `1.0.0`
 4. migrate downstream applications only after both tags are available
@@ -27,7 +27,7 @@ requires `INNONETWORK_LOCAL_PATH` to be unset and rejects automatic dependency
 resolution or lock changes. Update the lock intentionally when validating a
 new supported InnoNetwork release.
 
-`Scripts/check_innonetwork_dependency.sh` verifies the remote InnoNetwork 6
+`Scripts/check_innonetwork_dependency.sh` verifies the exact InnoNetwork 6.1.0 manifest and approved tag
 pin and every active remote dependency's resolved graph and checkout revision. A
 cached SwiftPM workspace does not substitute for a valid checked-in pin.
 

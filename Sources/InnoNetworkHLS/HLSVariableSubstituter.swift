@@ -317,6 +317,11 @@ enum HLSVariableSubstituter {
         private(set) var value = ""
         private var byteCount = 0
 
+        init(maximumBytes: Int, reportedLimit: Int) {
+            self.maximumBytes = maximumBytes
+            self.reportedLimit = reportedLimit
+        }
+
         var remainingBytes: Int { maximumBytes - byteCount }
 
         mutating func append(_ text: some StringProtocol) throws {

@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased Core 6.1.0 integration
+
+- Pin both Stream and its external consumer to published InnoNetwork `6.1.0`
+  at `79ff9f535a0a15ad8b52ce49cb5a4b1ea1dfec16`, and align the compiler plugin
+  with Core’s SwiftSyntax 604.0.x dependency. Restore published-only CI gates.
+- Consolidate checkout 7.0.1 and coupled CodeQL 4.38.2 action updates while
+  preserving selective CI, metadata revalidation and immutable release checks.
+- Fix bounded variable-output initialization on the supported Swift 6.2 lane.
+
 ## Unreleased iterative hardening
 
 - Start Steering TTL and Retry-After waits after receipt, share same-context
@@ -94,6 +103,8 @@ state, remote dependency, Apple-platform, and HLS conformance gates pass.
   and individual macro consumers, and use narrow locked-graph macro validation
   handling for Xcode CI. Correct historical test disposition reporting.
 
+- Wait for the live playlist producer and relay to terminate before returning
+  from DVR stop/discard, preventing requests after caller-owned session cleanup.
 - Split the four HLS products from InnoNetwork 6 into an independently
   versioned package while preserving their module names.
 - Depend on InnoNetwork's public bounded-transfer and retry-execution

@@ -352,6 +352,7 @@ public struct HLSLiveDVRRecorder: Sendable {
                 HLSLivePlaylistSnapshot,
                 Error
             >
+        let producer = liveClient.makeSnapshotStream(from: sourceURL)
         var snapshotRelayTask: Task<Void, Never>?
         if let control {
             let (stream, continuation) =
@@ -361,12 +362,9 @@ public struct HLSLiveDVRRecorder: Sendable {
                 >.makeStream(
                     bufferingPolicy: .bufferingNewest(1)
                 )
-            let client = liveClient
             let task = Task {
                 do {
-                    for try await snapshot in client.snapshots(
-                        from: sourceURL
-                    ) {
+                    for try await snapshot in producer.stream {
                         continuation.yield(snapshot)
                     }
                     continuation.finish()
@@ -380,10 +378,14 @@ public struct HLSLiveDVRRecorder: Sendable {
             snapshots = stream
             snapshotRelayTask = task
         } else {
-            snapshots = liveClient.snapshots(from: sourceURL)
+            snapshots = producer.stream
         }
-        defer {
-            snapshotRelayTask?.cancel()
+        let relay = snapshotRelayTask
+        func finishSnapshots() async {
+            relay?.cancel()
+            producer.task.cancel()
+            await relay?.value
+            await producer.task.value
         }
         do {
             recordingLoop: for try await snapshot in snapshots {
@@ -587,6 +589,7 @@ public struct HLSLiveDVRRecorder: Sendable {
                 }
             }
         } catch is CancellationError {
+            await finishSnapshots()
             _ = await preloadCoordinator?.cancelAll()
             await interstitialPackager.cancelPreloads()
             if let control,
@@ -596,10 +599,12 @@ public struct HLSLiveDVRRecorder: Sendable {
             }
             throw CancellationError()
         } catch let error as HLSLiveDVRError {
+            await finishSnapshots()
             _ = await preloadCoordinator?.cancelAll()
             await interstitialPackager.cancelPreloads()
             throw error
         } catch let error as HLSDownloadError {
+            await finishSnapshots()
             _ = await preloadCoordinator?.cancelAll()
             await interstitialPackager.cancelPreloads()
             switch error {
@@ -611,11 +616,13 @@ public struct HLSLiveDVRRecorder: Sendable {
                 throw HLSLiveDVRError.transferFailed
             }
         } catch {
+            await finishSnapshots()
             _ = await preloadCoordinator?.cancelAll()
             await interstitialPackager.cancelPreloads()
             throw HLSLiveDVRError.transferFailed
         }
 
+        await finishSnapshots()
         if let statistics = await preloadCoordinator?.cancelAll() {
             state.preloadStatistics = statistics
         }

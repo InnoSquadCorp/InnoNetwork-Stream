@@ -10,7 +10,7 @@ https://github.com/InnoSquadCorp/InnoNetwork-Stream.git
 Its SwiftPM package display name and all-in-one library product are
 `InnoNetwork-Stream`. The canonical package identity is `innonetwork-stream`.
 The package is independently versioned; its first release remains `1.0.0`
-and consumes the published InnoNetwork `6.0.0` dependency.
+and pins the published InnoNetwork `6.1.0` dependency exactly.
 
 ## Consumer contract
 

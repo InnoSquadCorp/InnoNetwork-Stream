@@ -100,7 +100,8 @@ python3 Scripts/serve_hls_runtime_fixtures.py \
   >"$server_log" 2>&1 &
 server_pid=$!
 
-base_url="$(python3 Scripts/wait_hls_fixture_ready.py "$ready_file" "$server_pid" "$server_log")"
+base_url="$(python3 Scripts/wait_hls_fixture_ready.py \
+  "$ready_file" "$server_pid" "$server_log" --timeout 30)"
 playlist_url="$base_url/audio-fmp4/index.m3u8"
 live_preload_url="$base_url/live-preload/index.m3u8"
 live_map_rotation_url="$base_url/live-map-rotation/index.m3u8"

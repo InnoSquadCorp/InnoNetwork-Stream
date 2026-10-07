@@ -19,7 +19,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -36,6 +36,7 @@ jobs:
           bash Scripts/tests/test_validate_hls_with_apple_tools.sh
           bash Scripts/tests/test_package_identity.sh
       - name: Validate tagged release ref
+        id: release-ref
         if: github.event_name == 'push'
         env:
           RELEASE_TAG: ${{ github.ref_name }}
@@ -43,6 +44,8 @@ jobs:
           RELEASE_REMOTE: origin
           RELEASE_MAIN_REF: refs/remotes/origin/main
           RELEASE_FETCH_MAIN: '1'
+          RELEASE_VERIFY_REMOTE: '1'
+          RELEASE_EXPECTED_SHA: ${{ github.sha }}
         run: bash Scripts/validate_release_ref.sh
       - name: Validate manual release candidate
         if: github.event_name == 'workflow_dispatch'
@@ -61,10 +64,20 @@ jobs:
           name: release-hls-runtime-diagnostics
           path: .build/hls-runtime-diagnostics/
           if-no-files-found: ignore
+      - name: Revalidate the tested release identity
+        if: github.event_name == 'push'
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TAG_REF: ${{ github.ref }}
+          RELEASE_EXPECTED_SHA: ${{ steps.release-ref.outputs.commit_sha }}
+          RELEASE_EXPECTED_TAG_OBJECT: ${{ steps.release-ref.outputs.tag_object }}
+          RELEASE_VERIFY_REMOTE: '1'
+        run: bash Scripts/validate_release_ref.sh
       - name: Prepare tagged source archive
         if: github.event_name == 'push'
         env:
           RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_COMMIT_SHA: ${{ steps.release-ref.outputs.commit_sha }}
         run: |
           mkdir -p .build/release-artifacts
           archive=".build/release-artifacts/InnoNetwork-Stream-$RELEASE_TAG.tar.gz"
@@ -72,7 +85,7 @@ jobs:
             --format=tar.gz \
             --prefix="InnoNetwork-Stream-$RELEASE_TAG/" \
             --output="$archive" \
-            "$RELEASE_TAG"
+            "$RELEASE_COMMIT_SHA"
           (cd .build/release-artifacts && shasum -a 256 "$(basename "$archive")" > SHA256SUMS)
       - name: Upload release validation artifacts
         if: github.event_name == 'push'
@@ -84,6 +97,15 @@ jobs:
             .build/release-artifacts/SHA256SUMS
             .build/local-release-preflight/apple-hls/
           if-no-files-found: error
+      - name: Revalidate release identity immediately before publication
+        if: github.event_name == 'push'
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TAG_REF: ${{ github.ref }}
+          RELEASE_EXPECTED_SHA: ${{ steps.release-ref.outputs.commit_sha }}
+          RELEASE_EXPECTED_TAG_OBJECT: ${{ steps.release-ref.outputs.tag_object }}
+          RELEASE_VERIFY_REMOTE: '1'
+        run: bash Scripts/validate_release_ref.sh
       - name: Publish GitHub release
         if: github.event_name == 'push'
         env:

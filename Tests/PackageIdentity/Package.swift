@@ -26,7 +26,7 @@ let package = Package(
         .package(path: "../.."),
         .package(
             url: "https://github.com/InnoSquadCorp/InnoNetwork.git",
-            branch: "codex/core-stream-followup"
+            exact: "6.1.0"
         ),
     ],
     targets: [

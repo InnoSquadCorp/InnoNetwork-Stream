@@ -101,6 +101,7 @@ package struct HLSHTTPClient: Sendable {
         }
         let transfer: BoundedNetworkTransfer
         do {
+            try Task.checkCancellation()
             transfer = try await session.boundedTransfer(
                 for: adaptedRequest,
                 context: requestContext,
