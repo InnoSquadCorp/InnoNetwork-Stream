@@ -32,7 +32,8 @@ struct HLSCancellationHandoffTests {
         #expect(await control.outstandingPlaybackSnapshotRequestCount == 0)
         for _ in 0..<8 {
             let next = HLSLiveDVRPlaybackSnapshotRequest(
-                destinationDirectoryURL: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+                destinationDirectoryURL: FileManager.default.temporaryDirectory.appendingPathComponent(
+                    UUID().uuidString)
             )
             try await control.registerPlaybackSnapshotRequest(next)
         }
@@ -61,8 +62,7 @@ struct HLSCancellationHandoffTests {
         let registration = Task { try await control.registerPlaybackSnapshotRequest(request) }
         await gate.waitUntilEntered()
         #expect(await gate.hasEntered)
-        if succeeds { await request.succeed(receipt) }
-        else { await request.fail(.playbackSnapshotUnavailable) }
+        if succeeds { await request.succeed(receipt) } else { await request.fail(.playbackSnapshotUnavailable) }
         await gate.release()
         try await registration.value
         if succeeds {
@@ -116,9 +116,10 @@ struct HLSCancellationHandoffTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let workspace = try HLSLiveDVRWorkspace.make(for: root.appendingPathComponent("result"))
         let writer = HLSLiveDVRResourceWriter(client: client.resourceClient, configuration: configuration)
-        let coordinator = try #require(writer.makePreloadCoordinator(
-            workspace: workspace, context: writer.makeContext(workspace: workspace)
-        ))
+        let coordinator = try #require(
+            writer.makePreloadCoordinator(
+                workspace: workspace, context: writer.makeContext(workspace: workspace)
+            ))
         // Safety release prevents a failing old implementation from hanging.
         // All ordering assertions use the entered barrier, not this timeout.
         let watchdog = Task {
@@ -210,8 +211,7 @@ private actor DVRPreloadCancellationGate {
                 entered = true
                 starts.forEach { $0.resume() }
                 starts.removeAll()
-                if released { continuation.resume(throwing: Failure.safetyRelease) }
-                else { blocker = continuation }
+                if released { continuation.resume(throwing: Failure.safetyRelease) } else { blocker = continuation }
             }
         } onCancel: {
             Task { await self.cancel() }

@@ -379,10 +379,13 @@ actor HLSContentSteeringResolver {
     }
 
     private static func referencedGroupIDs(variants: [HLSVariant]) -> Set<String> {
-        Set(variants.flatMap { variant in
-            [variant.audioGroupID, variant.subtitleGroupID, variant.videoGroupID,
-             variant.closedCaptions?.groupID].compactMap { $0 }
-        })
+        Set(
+            variants.flatMap { variant in
+                [
+                    variant.audioGroupID, variant.subtitleGroupID, variant.videoGroupID,
+                    variant.closedCaptions?.groupID,
+                ].compactMap { $0 }
+            })
     }
 
     private static func referencedRenditions(

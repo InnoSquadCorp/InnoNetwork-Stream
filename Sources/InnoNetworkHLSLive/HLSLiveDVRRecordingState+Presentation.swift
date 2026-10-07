@@ -431,17 +431,19 @@ extension HLSLiveDVRRecordingState {
             }
             nextStartByClass[className] = range.startDate
         }
-        return Set(ranges.compactMap { range in
-            let end = range.endDate ?? range.duration.map {
-                range.startDate.addingTimeInterval($0)
-            } ?? implicitEndsByID[range.id]
-            guard let end, end.timeIntervalSinceReferenceDate.isFinite,
-                end <= retainedStart
-            else {
-                return nil
-            }
-            return range.id
-        })
+        return Set(
+            ranges.compactMap { range in
+                let end =
+                    range.endDate ?? range.duration.map {
+                        range.startDate.addingTimeInterval($0)
+                    } ?? implicitEndsByID[range.id]
+                guard let end, end.timeIntervalSinceReferenceDate.isFinite,
+                    end <= retainedStart
+                else {
+                    return nil
+                }
+                return range.id
+            })
     }
 
 }

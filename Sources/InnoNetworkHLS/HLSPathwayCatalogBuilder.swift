@@ -266,8 +266,7 @@ enum HLSPathwayCatalogBuilder {
         var mappings: [GroupKey: String] = [:]
         for variant in variants {
             let captionGroup: String?
-            if case .group(let groupID) = variant.closedCaptions { captionGroup = groupID }
-            else { captionGroup = nil }
+            if case .group(let groupID) = variant.closedCaptions { captionGroup = groupID } else { captionGroup = nil }
             let groups: [(HLSRenditionKind, String?)] = [
                 (.audio, variant.audioGroupID), (.subtitles, variant.subtitleGroupID),
                 (.video, variant.videoGroupID), (.closedCaptions, captionGroup),

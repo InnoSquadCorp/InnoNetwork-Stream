@@ -446,14 +446,15 @@ public struct HLSLiveDVRRecorder: Sendable {
                 }
                 var pendingRenditions: [(index: Int, candidates: [HLSLiveSegment], offset: Int)] = []
                 for (request, renditionSnapshot) in renditionSnapshots {
-                    pendingRenditions.append((
-                        request.index,
-                        try state.renditionCandidates(
-                            in: renditionSnapshot,
-                            at: request.index
-                        ),
-                        0
-                    ))
+                    pendingRenditions.append(
+                        (
+                            request.index,
+                            try state.renditionCandidates(
+                                in: renditionSnapshot,
+                                at: request.index
+                            ),
+                            0
+                        ))
                 }
                 for segment in candidates {
                     let previousBoundary = state
@@ -505,10 +506,12 @@ public struct HLSLiveDVRRecorder: Sendable {
                             primaryDuration: state.recordedDuration
                         )
                         for renditionSegment in segmentsToRetain {
-                            guard state.canRetainRendition(
-                                renditionSegment,
-                                at: pending.index
-                            ) else {
+                            guard
+                                state.canRetainRendition(
+                                    renditionSegment,
+                                    at: pending.index
+                                )
+                            else {
                                 if usesRollingRetention {
                                     throw HLSLiveDVRError.unsupportedFeature(
                                         .incompleteExternalRendition

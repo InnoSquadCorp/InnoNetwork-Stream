@@ -50,8 +50,10 @@ extension HLSDownloaderTests {
             HLSURLProtocol.reset()
         }
         let urls = try (0..<3).map {
-            try #require(URL(string:
-                "https://media.example/key-\($0).bin?signature=" + String(repeating: "a", count: 128)))
+            try #require(
+                URL(
+                    string:
+                        "https://media.example/key-\($0).bin?signature=" + String(repeating: "a", count: 128)))
         }
         let first = urls[0]
         let second = urls[1]
@@ -141,8 +143,10 @@ extension HLSDownloaderTests {
             HLSURLProtocol.reset()
         }
         let shortURL = try #require(URL(string: "https://media.example/key.bin"))
-        let longURL = try #require(URL(string:
-            "https://media.example/key.bin?signature=" + String(repeating: "b", count: 256)))
+        let longURL = try #require(
+            URL(
+                string:
+                    "https://media.example/key.bin?signature=" + String(repeating: "b", count: 256)))
         let key = Data(repeating: 0x41, count: 16)
         let cache = HLSAES128KeyCache(
             client: HLSHTTPClient(

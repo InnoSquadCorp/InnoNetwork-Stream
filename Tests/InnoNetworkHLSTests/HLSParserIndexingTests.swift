@@ -14,7 +14,8 @@ struct HLSParserIndexingTests {
             lines.append("#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"\(group)\",NAME=\"Audio\"")
             lines.append("#EXT-X-MEDIA:TYPE=VIDEO,GROUP-ID=\"\(group)\",NAME=\"Video\"")
             lines.append("#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID=\"\(group)\",NAME=\"Subtitles\",URI=\"s\(index).m3u8\"")
-            lines.append("#EXT-X-MEDIA:TYPE=CLOSED-CAPTIONS,GROUP-ID=\"\(group)\",NAME=\"Captions\",INSTREAM-ID=\"CC1\"")
+            lines.append(
+                "#EXT-X-MEDIA:TYPE=CLOSED-CAPTIONS,GROUP-ID=\"\(group)\",NAME=\"Captions\",INSTREAM-ID=\"CC1\"")
             lines.append(
                 "#EXT-X-STREAM-INF:BANDWIDTH=1000,AUDIO=\"\(group)\",VIDEO=\"\(group)\",SUBTITLES=\"\(group)\",CLOSED-CAPTIONS=\"\(group)\""
             )
