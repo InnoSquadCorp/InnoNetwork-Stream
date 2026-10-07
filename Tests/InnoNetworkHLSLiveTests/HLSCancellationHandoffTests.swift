@@ -206,7 +206,7 @@ private actor DVRPreloadCancellationGate {
     func waitForCancellation() async throws {
         try await withTaskCancellationHandler {
             try Task.checkCancellation()
-            try await withCheckedThrowingContinuation { continuation in
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                 entered = true
                 starts.forEach { $0.resume() }
                 starts.removeAll()
