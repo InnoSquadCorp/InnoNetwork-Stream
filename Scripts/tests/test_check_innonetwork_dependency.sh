@@ -98,22 +98,9 @@ if env -u INNONETWORK_LOCAL_PATH bash "$gate" ${gate_arguments[@]+"${gate_argume
 fi
 
 cp "$repo_root/Package.resolved" "$scratch/Package.resolved"
-# A correct HEAD alone does not prove a relocated alternate object store exists.
-dependency_path="$(cd "$scratch" && bash "$repo_root/Scripts/swiftpm.sh" package \
-  --force-resolved-versions show-dependencies --format json \
-  | jq -r '.dependencies[] | select(.identity == "innonetwork") | .path')"
-alternate="$(git -C "$dependency_path" rev-parse --git-path objects/info/alternates)"
-[[ "$alternate" == /* ]] || alternate="$dependency_path/$alternate"
-[[ -f "$alternate" ]] || { echo "dependency test: expected local SwiftPM alternate" >&2; exit 1; }
-cp "$alternate" "$scratch/alternate.before"
-printf '%s\n' "$scratch/missing-object-store" > "$alternate"
-if env -u INNONETWORK_LOCAL_PATH bash "$gate" ${gate_arguments[@]+"${gate_arguments[@]}"} "$scratch" \
-  > "$scratch/broken-alternate.log" 2>&1; then
-  echo "dependency test: missing alternate object store unexpectedly passed" >&2
-  exit 1
-fi
-grep -Fq "dependency cache integrity failed" "$scratch/broken-alternate.log"
-cp "$scratch/alternate.before" "$alternate"
+# Exercise the same read-only integrity check with a disposable synthetic
+# object store. SwiftPM checkout metadata can be read-only; never mutate it.
+bash "$repo_root/Scripts/tests/test_git_dependency_integrity.sh"
 
 if INNONETWORK_LOCAL_PATH="$repo_root" bash "$gate" ${gate_arguments[@]+"${gate_arguments[@]}"} "$scratch" \
   > "$scratch/local-override.log" 2>&1; then

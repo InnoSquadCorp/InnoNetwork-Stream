@@ -93,7 +93,7 @@ while IFS= read -r node; do
   observed_revision="$(git -C "$dependency_path" rev-parse --verify HEAD)"
   [[ "$observed_revision" == "$locked_revision" ]] \
     || fail "$identity dependency checkout does not match the locked revision"
-  git -C "$dependency_path" fsck --no-reflogs --connectivity-only --no-dangling >/dev/null \
+  bash "$script_root/check_git_dependency_integrity.sh" "$dependency_path" \
     || fail "$identity dependency cache integrity failed; preserve it and use a fresh scoped scratch path"
 done <<< "$active_nodes"
 [[ "$(shasum -a 256 Package.resolved)" == "$resolved_before" ]] \
