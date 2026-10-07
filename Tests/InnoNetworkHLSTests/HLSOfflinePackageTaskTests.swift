@@ -76,7 +76,7 @@ extension HLSDownloaderTests {
             operation?.cancel()
             gate.finish(.success(()))
         }
-        weak let weakOwner = operation
+        weak var weakOwner = operation
         let stream = try #require(operation).events()
         try await offlineEventually { entered.withLock { $0 } }
         if releaseOwner { operation = nil } else { operation?.cancel() }

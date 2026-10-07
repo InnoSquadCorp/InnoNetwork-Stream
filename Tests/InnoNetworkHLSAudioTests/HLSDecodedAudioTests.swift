@@ -300,7 +300,7 @@ struct HLSDecodedAudioTests {
             playerItem: playerItem,
             configuration: try .float32()
         )
-        weak let weakOutput = output
+        weak var weakOutput = output
 
         #expect(playerItem.outputs.count == originalOutputCount + 1)
         output = nil
