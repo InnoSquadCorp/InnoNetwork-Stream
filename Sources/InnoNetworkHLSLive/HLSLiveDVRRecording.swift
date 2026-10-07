@@ -14,6 +14,15 @@ actor HLSLiveDVRRecordingControl {
     private var playbackSnapshotRequests: [HLSLiveDVRPlaybackSnapshotRequest] = []
     private var outstandingPlaybackSnapshotRequestIDs: Set<ObjectIdentifier> = []
     private var didFinish = false
+    private let snapshotReservationObserver: (@Sendable () async -> Void)?
+
+    init(snapshotReservationObserver: (@Sendable () async -> Void)? = nil) {
+        self.snapshotReservationObserver = snapshotReservationObserver
+    }
+
+    var outstandingPlaybackSnapshotRequestCount: Int {
+        outstandingPlaybackSnapshotRequestIDs.count
+    }
 
     func request(
         _ requestedIntent: HLSLiveDVRRecordingIntent
@@ -46,9 +55,7 @@ actor HLSLiveDVRRecordingControl {
     func registerPlaybackSnapshotRequest(
         _ request: HLSLiveDVRPlaybackSnapshotRequest
     ) async throws {
-        guard await request.shouldProcess else {
-            throw CancellationError()
-        }
+        try Task.checkCancellation()
         guard !didFinish else {
             throw HLSLiveDVRError.playbackSnapshotUnavailable
         }
@@ -64,6 +71,15 @@ actor HLSLiveDVRRecordingControl {
         outstandingPlaybackSnapshotRequestIDs.insert(
             ObjectIdentifier(request)
         )
+        // Publish the reservation before crossing actor boundaries, so a
+        // concurrent cancellation can always find and remove its queue slot.
+        await snapshotReservationObserver?()
+        if !(await request.shouldProcess) {
+            // A receipt or failure may have won while registration suspended.
+            // Release any pending slot; the caller observes the actual terminal
+            // resolution through request.value(), including late-cancel success.
+            cancelPlaybackSnapshotRequest(request)
+        }
     }
 
     func cancelPlaybackSnapshotRequest(
@@ -315,7 +331,8 @@ public final class HLSLiveDVRRecording: Sendable {
         return try await withTaskCancellationHandler {
             try Task.checkCancellation()
             try await control.registerPlaybackSnapshotRequest(request)
-            try Task.checkCancellation()
+            // The request owns terminal arbitration: a committed snapshot may
+            // win cancellation. Its cancellation handler also removes the slot.
             return try await request.value()
         } onCancel: {
             Task {
