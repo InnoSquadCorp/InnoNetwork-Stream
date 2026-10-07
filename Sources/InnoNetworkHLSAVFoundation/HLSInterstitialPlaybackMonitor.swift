@@ -118,8 +118,13 @@ public final class HLSInterstitialPlaybackMonitor {
                 // NotificationCenter guarantees delivery on the supplied
                 // main queue. Map AVFoundation objects here instead of
                 // transferring non-Sendable notification payloads to a task.
+                // The synchronous queue contract supplies the isolation that
+                // Foundation's observer callback type cannot express. Keep
+                // this escape local; the notification must never be stored
+                // or captured by an asynchronous operation.
+                nonisolated(unsafe) let deliveredNotification = notification
                 MainActor.assumeIsolated {
-                    receive(notification)
+                    receive(deliveredNotification)
                 }
             }
         }
