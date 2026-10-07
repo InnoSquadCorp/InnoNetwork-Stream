@@ -15,9 +15,12 @@ enum HLSVariableSubstituter {
         multivariantVariables: [String: String]?,
         maximumBytes: Int
     ) throws -> HLSVariableExpansion {
+        guard maximumBytes > 0 else {
+            throw HLSDownloadError.playlistTooLarge(limit: maximumBytes)
+        }
         let lines =
             playlist
-            .components(separatedBy: .newlines)
+            .split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
         let queryItems =
             URLComponents(
@@ -25,8 +28,10 @@ enum HLSVariableSubstituter {
                 resolvingAgainstBaseURL: true
             )?.queryItems ?? []
         var variables: [String: String] = [:]
+        var variableByteCount = 0
         var output: [String] = []
         var outputByteCount = 0
+        var pendingEmptyLineCount = 0
         var containsDefinitions = false
         var containsImports = false
         var containsQueryParameters = false
@@ -45,7 +50,7 @@ enum HLSVariableSubstituter {
                 }
 
                 let name: String
-                let value: String
+                let rawValue: String
                 switch selectors[0] {
                 case "NAME":
                     guard
@@ -57,7 +62,7 @@ enum HLSVariableSubstituter {
                         throw HLSDownloadError.invalidPlaylist
                     }
                     name = declaredName
-                    value = declaredValue
+                    rawValue = declaredValue
                 case "IMPORT":
                     guard
                         attributes["VALUE"] == nil,
@@ -68,7 +73,7 @@ enum HLSVariableSubstituter {
                         throw HLSDownloadError.invalidPlaylist
                     }
                     name = importedName
-                    value = importedValue
+                    rawValue = importedValue
                     containsImports = true
                 case "QUERYPARAM":
                     guard
@@ -83,7 +88,7 @@ enum HLSVariableSubstituter {
                         throw HLSDownloadError.invalidPlaylist
                     }
                     name = queryName
-                    value = queryValue
+                    rawValue = queryValue
                     containsQueryParameters = true
                 default:
                     throw HLSDownloadError.invalidPlaylist
@@ -91,22 +96,58 @@ enum HLSVariableSubstituter {
 
                 guard
                     isValidVariableName(name),
-                    variables.updateValue(value, forKey: name) == nil
+                    variables[name] == nil
                 else {
                     throw HLSDownloadError.invalidPlaylist
                 }
+
+                // Definitions remain retained even when they never appear in
+                // output. Bound their combined names and values independently
+                // of the normalized playlist, before expanding another value.
+                let nameByteCount = name.utf8.count
+                guard nameByteCount <= maximumBytes - variableByteCount else {
+                    throw HLSDownloadError.playlistTooLarge(limit: maximumBytes)
+                }
+                let remainingVariableBytes = maximumBytes - variableByteCount - nameByteCount
+                let value: String
+                if selectors[0] == "NAME" {
+                    // VALUE is a quoted-string: resolve references against
+                    // earlier definitions now, never recursively after append.
+                    value = try substituteReferences(
+                        in: rawValue,
+                        variables: variables,
+                        maximumBytes: remainingVariableBytes,
+                        reportedLimit: maximumBytes
+                    )
+                } else {
+                    value = rawValue
+                }
+                let valueByteCount = value.utf8.count
+                guard valueByteCount <= remainingVariableBytes else {
+                    throw HLSDownloadError.playlistTooLarge(limit: maximumBytes)
+                }
+                variableByteCount += nameByteCount + valueByteCount
+                variables[name] = value
                 continue
             }
 
-            // Include the newline in the reservation, before building a line.
+            // Trailing blank lines (including the final split component after
+            // LF or CRLF) are absent from normalized output. Charge them only
+            // if a later non-definition line makes them interior blank lines.
+            if line.isEmpty {
+                pendingEmptyLineCount += 1
+                continue
+            }
+
+            // Include newlines in the reservation, before building a line.
             // The final-output bound alone cannot stop multiplicative variable
             // references from allocating a huge intermediate string.
-            guard outputByteCount < maximumBytes else {
-                throw HLSDownloadError.playlistTooLarge(limit: maximumBytes)
-            }
-            let remainingBytes = maximumBytes - outputByteCount - 1
+            let unreservedBytes = maximumBytes - outputByteCount
+            let remainingBytes =
+                pendingEmptyLineCount < unreservedBytes
+                ? unreservedBytes - pendingEmptyLineCount - 1 : 0
             let expandedLine: String
-            if !line.isEmpty, !line.hasPrefix("#") {
+            if !line.hasPrefix("#") {
                 expandedLine = try substituteReferences(
                     in: line,
                     variables: variables,
@@ -127,14 +168,17 @@ enum HLSVariableSubstituter {
             guard expandedByteCount <= remainingBytes else {
                 throw HLSDownloadError.playlistTooLarge(limit: maximumBytes)
             }
+            if expandedLine.isEmpty {
+                pendingEmptyLineCount += 1
+                continue
+            }
             // The reservation proves both additions fit before arithmetic.
-            outputByteCount += expandedByteCount + 1
+            outputByteCount += pendingEmptyLineCount + expandedByteCount + 1
+            output.append(contentsOf: repeatElement("", count: pendingEmptyLineCount))
+            pendingEmptyLineCount = 0
             output.append(expandedLine)
         }
 
-        while output.last?.isEmpty == true {
-            output.removeLast()
-        }
         return HLSVariableExpansion(
             contents: output.joined(separator: "\n") + "\n",
             variables: variables,

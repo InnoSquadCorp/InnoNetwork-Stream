@@ -6,6 +6,11 @@ enum HLSMultivariantPlaylistParser {
         renditions: [HLSRendition],
         relativeTo sourceURL: URL
     ) throws -> [HLSVariant] {
+        let renditionGroups = Set(
+            renditions.lazy.map {
+                RenditionGroupKey(kind: $0.kind, groupID: $0.groupID)
+            }
+        )
         var variants: [HLSVariant] = []
         for index in lines.indices {
             let line = lines[index]
@@ -58,11 +63,11 @@ enum HLSMultivariantPlaylistParser {
             }
             try validateReferencedGroups(
                 attributes,
-                renditions: renditions
+                renditionGroups: renditionGroups
             )
             let closedCaptions = try parseClosedCaptions(
                 attributes,
-                renditions: renditions
+                renditionGroups: renditionGroups
             )
             let resolution = HLSPlaylistAttributeDecoder.parseResolution(
                 attributes["RESOLUTION"]
@@ -147,7 +152,8 @@ enum HLSMultivariantPlaylistParser {
         renditions: [HLSRendition],
         relativeTo sourceURL: URL
     ) throws -> [HLSVariant] {
-        try lines.compactMap { line -> HLSVariant? in
+        let videoGroups = Set(renditions.lazy.filter { $0.kind == .video }.map(\.groupID))
+        return try lines.compactMap { line -> HLSVariant? in
             guard line.hasPrefix("#EXT-X-I-FRAME-STREAM-INF:") else {
                 return nil
             }
@@ -199,9 +205,7 @@ enum HLSMultivariantPlaylistParser {
                 throw HLSDownloadError.invalidPlaylist
             }
             if let videoGroupID = attributes["VIDEO"],
-                !renditions.contains(where: {
-                    $0.kind == .video && $0.groupID == videoGroupID
-                })
+                !videoGroups.contains(videoGroupID)
             {
                 throw HLSDownloadError.invalidPlaylist
             }
@@ -431,7 +435,7 @@ enum HLSMultivariantPlaylistParser {
 
     private static func validateReferencedGroups(
         _ attributes: HLSAttributeList,
-        renditions: [HLSRendition]
+        renditionGroups: Set<RenditionGroupKey>
     ) throws {
         for reference in [
             (name: "AUDIO", kind: HLSRenditionKind.audio),
@@ -442,9 +446,9 @@ enum HLSMultivariantPlaylistParser {
                 continue
             }
             guard
-                renditions.contains(where: {
-                    $0.kind == reference.kind && $0.groupID == groupID
-                })
+                renditionGroups.contains(
+                    RenditionGroupKey(kind: reference.kind, groupID: groupID)
+                )
             else {
                 throw HLSDownloadError.invalidPlaylist
             }
@@ -453,7 +457,7 @@ enum HLSMultivariantPlaylistParser {
 
     private static func parseClosedCaptions(
         _ attributes: HLSAttributeList,
-        renditions: [HLSRendition]
+        renditionGroups: Set<RenditionGroupKey>
     ) throws -> HLSClosedCaptionReference? {
         guard let value = attributes["CLOSED-CAPTIONS"] else {
             return nil
@@ -463,9 +467,9 @@ enum HLSMultivariantPlaylistParser {
         }
         guard
             attributes.isQuoted("CLOSED-CAPTIONS"),
-            renditions.contains(where: {
-                $0.kind == .closedCaptions && $0.groupID == value
-            })
+            renditionGroups.contains(
+                RenditionGroupKey(kind: .closedCaptions, groupID: value)
+            )
         else {
             throw HLSDownloadError.invalidPlaylist
         }
