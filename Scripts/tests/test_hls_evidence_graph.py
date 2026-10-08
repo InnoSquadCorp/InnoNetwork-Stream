@@ -47,12 +47,18 @@ class GraphTests(unittest.TestCase):
         with self.assertRaises(ValueError):g.check(self.root,self.graph)
 
     def test_repeated_dependency_is_checked_once_but_conflicts_fail(self):
+        # macOS commonly exposes temporary directories through /var aliases.
+        # Exercise an alias on every platform and observe the canonical checkout.
+        alias = self.root.parent/'core-alias'
+        alias.symlink_to(self.dep, target_is_directory=True)
+        self.dep = alias
+        self.node['path'] = str(alias)
         self.graph['dependencies'][0]['dependencies'].append(copy.deepcopy(self.node))
         original = subprocess.check_output
         with patch.object(g.subprocess, 'check_output', wraps=original) as calls:
             g.check(self.root, self.graph)
         heads = [call for call in calls.call_args_list
-                 if 'HEAD' in call.args[0] and str(self.dep) in call.args[0]]
+                 if 'HEAD' in call.args[0] and str(self.dep.resolve()) in call.args[0]]
         self.assertEqual(len(heads), 1)
         self.graph['dependencies'][0]['dependencies'][1]['path'] = str(self.root/'other')
         with self.assertRaises(ValueError): g.check(self.root, self.graph)
