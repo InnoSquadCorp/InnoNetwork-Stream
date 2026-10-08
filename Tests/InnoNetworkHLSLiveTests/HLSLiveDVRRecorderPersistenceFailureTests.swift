@@ -71,7 +71,8 @@ extension HLSLivePlaylistClientTests {
         let requests = HLSLiveURLProtocol.capturedRequests().compactMap(\.url)
         #expect(requests.contains(resumedSourceURL))
         let mediaRequests = requests.filter { $0.pathExtension == "ts" }.map(\.lastPathComponent)
-        let expectedRequests = boundary == .beforeReplacement
+        let expectedRequests =
+            boundary == .beforeReplacement
             ? ["segment-1.ts", "segment-2.ts", "segment-3.ts", "segment-3.ts", "segment-4.ts"]
             : ["segment-1.ts", "segment-2.ts", "segment-3.ts", "segment-4.ts"]
         #expect(mediaRequests == expectedRequests)
