@@ -23,6 +23,7 @@ EVIDENCE_PREFIX = 'ReleaseEvidence/apple-hls/'
 CASES = tuple(f'{mode}-{kind}' for mode in ('offline', 'dvr')
               for kind in ('transport-stream', 'fragmented-mp4', 'audio-fmp4'))
 MAX_FILES, MAX_FILE, MAX_TOTAL = 2000, 64 * 1024 * 1024, 256 * 1024 * 1024
+MAX_ENTRIES, MAX_DEPTH = 4000, 24
 SOURCE_INPUTS = ('Tests/InnoNetworkHLSTests/HLSMediaFixtures.swift',)
 
 
@@ -35,7 +36,7 @@ def sha(data):
 
 
 def git(root, *args):
-    return subprocess.check_output(['git', '-C', str(root), *args], stderr=subprocess.PIPE).strip()
+    return subprocess.check_output(['git', '-C', str(root), *args], stderr=subprocess.PIPE).rstrip(b'\n')
 
 
 def load_json(path):
@@ -69,9 +70,29 @@ def safe_file(root, relative):
     return result
 
 
+def bounded_entries(root):
+    # Bound enumeration before sorting or hashing, including empty directories.
+    stack, count = [(root, 0)], 0
+    while stack:
+        directory, depth = stack.pop()
+        with os.scandir(directory) as entries:
+            for entry in entries:
+                count += 1
+                if count > MAX_ENTRIES or depth + 1 > MAX_DEPTH:
+                    fail('evidence exceeds directory entry/depth budget')
+                path = Path(entry.path)
+                if entry.is_symlink():
+                    fail('symlink in evidence')
+                if entry.is_dir(follow_symlinks=False):
+                    stack.append((path, depth + 1))
+                elif not entry.is_file(follow_symlinks=False):
+                    fail('nonregular evidence entry')
+                yield path
+
+
 def inventory(root, exclude_manifest=True):
     result, total = {}, 0
-    for path in sorted(root.rglob('*')):
+    for path in bounded_entries(root):
         if path.is_symlink():
             fail('symlink in evidence')
         if not path.is_file():
@@ -161,6 +182,38 @@ def execute(command, root, log, env=None, timeout=900):
         fail(f'command failed ({result.returncode}); inspect {log.name}')
 
 
+def generate_sdk_outputs(root, bundle):
+    inputs, outputs = bundle / 'inputs', bundle / 'outputs'
+    execute([sys.executable, 'Scripts/materialize_hls_conformance_fixtures.py',
+             SOURCE_INPUTS[0], str(inputs)], root, bundle / 'materialization.log')
+    shutil.copytree(root / 'Tests/Fixtures/HLSRuntime/audio-fmp4', inputs / 'audio-fmp4')
+    env = dict(os.environ, HLS_EVIDENCE_INPUT_ROOT=str(inputs))
+    env.pop('INNONETWORK_LOCAL_PATH', None)
+    execute(['xcrun', 'swift', '--version'], root, bundle / 'swift-version.log', env)
+    execute(['xcodebuild', '-version'], root, bundle / 'xcode-version.log', env)
+    execute(['bash', 'Scripts/check_innonetwork_dependency.sh'], root, bundle / 'dependency.log', env)
+    execute(['bash', 'Scripts/check_hls_evidence_consumer.sh', 'prepare'], root, bundle / 'consumer-resolution.log', env, timeout=3600)
+    shutil.copyfile(root / 'Package.resolved', bundle / 'candidate-Package.resolved')
+    shutil.copyfile(root / 'Tests/HLSReleaseEvidence/Package.resolved', bundle / 'consumer-Package.resolved')
+    candidate_pins = load_json(root / 'Package.resolved')['pins']
+    consumer_pins = load_json(root / 'Tests/HLSReleaseEvidence/Package.resolved')['pins']
+    if sorted(candidate_pins, key=lambda p: p['identity']) != sorted(consumer_pins, key=lambda p: p['identity']):
+        fail('exporter dependency graph differs from candidate lock; resolve deliberately before collection')
+    prepared = load_json(root / '.build/release-evidence-prepared.json')
+    command = [prepared['binary_path'], str(outputs)]
+    execute(command, root, bundle / 'generation.log', env, timeout=3600)
+    execute(['bash', 'Scripts/check_hls_evidence_consumer.sh', 'verify'], root, bundle / 'consumer-post-generation.log', env, timeout=3600)
+    provenance = load_json(root / '.build/release-evidence-consumer-provenance.json')
+    provenance.pop('binary_path', None)  # Local paths are not needed by release reviewers.
+    (bundle / 'consumer-provenance.json').write_text(json.dumps(provenance, sort_keys=True) + '\n')
+    playlists = load_json(outputs / 'playlists.json')
+    if set(playlists) != set(CASES):
+        fail('SDK exporter did not produce every required offline/DVR case')
+    inventory(bundle)
+    check_local_output_playlists(bundle)
+    return playlists
+
+
 def collect(args):
     root, bundle = args.root.resolve(), args.bundle.absolute()
     require_clean(root)
@@ -182,30 +235,7 @@ def collect(args):
     bundle.mkdir(parents=True)
     inputs, outputs, reports = (bundle / p for p in ('inputs', 'outputs', 'reports'))
     inputs.mkdir(); outputs.mkdir(); reports.mkdir()
-    execute([sys.executable, 'Scripts/materialize_hls_conformance_fixtures.py',
-             SOURCE_INPUTS[0], str(inputs)], root, bundle / 'materialization.log')
-    shutil.copytree(root / 'Tests/Fixtures/HLSRuntime/audio-fmp4', inputs / 'audio-fmp4')
-    env = dict(os.environ, HLS_EVIDENCE_INPUT_ROOT=str(inputs))
-    env.pop('INNONETWORK_LOCAL_PATH', None)
-    execute(['xcrun', 'swift', '--version'], root, bundle / 'swift-version.log', env)
-    execute(['xcodebuild', '-version'], root, bundle / 'xcode-version.log', env)
-    execute(['bash', 'Scripts/check_innonetwork_dependency.sh'], root, bundle / 'dependency.log', env)
-    execute(['bash', 'Scripts/check_hls_evidence_consumer.sh'], root, bundle / 'consumer-resolution.log', env, timeout=3600)
-    shutil.copyfile(root / 'Package.resolved', bundle / 'candidate-Package.resolved')
-    shutil.copyfile(root / 'Tests/HLSReleaseEvidence/Package.resolved', bundle / 'consumer-Package.resolved')
-    candidate_pins = load_json(root / 'Package.resolved')['pins']
-    consumer_pins = load_json(root / 'Tests/HLSReleaseEvidence/Package.resolved')['pins']
-    if sorted(candidate_pins, key=lambda p: p['identity']) != sorted(consumer_pins, key=lambda p: p['identity']):
-        fail('exporter dependency graph differs from candidate lock; resolve deliberately before collection')
-    command = ['bash', 'Scripts/swiftpm.sh', 'run', '--package-path', 'Tests/HLSReleaseEvidence',
-               '--scratch-path', '.build/release-evidence-exporter', '--configuration', 'release', '--force-resolved-versions', 'HLSReleaseEvidence', str(outputs)]
-    execute(command, root, bundle / 'generation.log', env, timeout=3600)
-    execute(['bash', 'Scripts/check_hls_evidence_consumer.sh'], root, bundle / 'consumer-post-generation.log', env, timeout=3600)
-    shutil.copyfile(root / '.build/release-evidence-consumer-provenance.json', bundle / 'consumer-provenance.json')
-    playlists = load_json(outputs / 'playlists.json')
-    if set(playlists) != set(CASES):
-        fail('SDK exporter did not produce every required offline/DVR case')
-    check_local_output_playlists(bundle)
+    playlists = generate_sdk_outputs(root, bundle)
     checker, results = report_checker(root), []
     for case in CASES:
         playlist = safe_file(outputs, playlists[case])
@@ -240,6 +270,22 @@ def collect(args):
     (bundle / 'manifest.json').write_bytes(data)
     print(f'Local evidence collected, NOT APPROVED: manifest SHA256 {sha(data)}')
     print('A maintainer must review source/inputs/tool versions/raw reports before approving this digest.')
+
+
+def smoke(args):
+    root, bundle = args.root.resolve(), args.bundle.absolute()
+    require_clean(root)
+    before = source_fingerprint(root, 'HEAD')
+    if bundle.exists():
+        fail('smoke destination already exists')
+    for name in ('inputs', 'outputs'):
+        (bundle/name).mkdir(parents=True)
+    playlists = generate_sdk_outputs(root, bundle)
+    require_clean(root)
+    if source_fingerprint(root, 'HEAD') != before:
+        fail('source changed during SDK-output smoke')
+    print(f'hls-sdk-output-smoke: OK ({len(playlists)} actual offline/DVR outputs)')
+    print('Official Apple HLS conformance: NOT RUN by this smoke check.')
 
 
 def verify(args):
@@ -318,6 +364,12 @@ def verify(args):
     if sorted(candidate_lock['pins'], key=lambda p: p['identity']) != sorted(consumer_lock['pins'], key=lambda p: p['identity']):
         fail('evidence consumer dependency graph differs')
     provenance = load_json(safe_file(bundle, 'consumer-provenance.json'))
+    if not re.fullmatch(r'[0-9a-f]{64}', provenance.get('binary_sha256', '')):
+        fail('missing executed exporter binary hash')
+    for key, filename in (('candidate_lock_sha256', 'candidate-Package.resolved'),
+                          ('consumer_lock_sha256', 'consumer-Package.resolved')):
+        if provenance.get(key) != sha(safe_file(bundle, filename).read_bytes()):
+            fail('prepared exporter lock fingerprint differs')
     if provenance.get('source_commit') != commit or not provenance.get('active_clean_pins'):
         fail('missing clean active consumer graph evidence')
     pins = {p['identity']: p for p in candidate_lock['pins']}
@@ -343,13 +395,15 @@ def main():
     collect_p.add_argument('--reporter', default='hlsreport')
     collect_p.add_argument('--tool-release', required=True)
     collect_p.add_argument('--submitter', required=True)
+    smoke_p = sub.add_parser('smoke')
+    smoke_p.add_argument('--bundle', type=Path, required=True)
     verify_p = sub.add_parser('verify')
     verify_p.add_argument('--bundle', type=Path, default=Path('ReleaseEvidence/apple-hls'))
     verify_p.add_argument('--approved-digest', default=os.environ.get('APPLE_HLS_APPROVED_EVIDENCE_SHA256', ''))
     verify_p.add_argument('--approved-by', default=os.environ.get('APPLE_HLS_APPROVED_BY', ''))
     args = p.parse_args()
     try:
-        (collect if args.command == 'collect' else verify)(args)
+        {'collect': collect, 'verify': verify, 'smoke': smoke}[args.command](args)
     except (ValueError, OSError, KeyError, TypeError, subprocess.SubprocessError) as error:
         print(f'apple-hls-evidence: FAIL: {error}', file=sys.stderr)
         raise SystemExit(1)

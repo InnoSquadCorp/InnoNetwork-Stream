@@ -100,6 +100,12 @@ actor HLSLiveKeyPreloadCoordinator {
         }
     }
 
+    // Internal lifecycle observation for deterministic handoff tests. Taking a
+    // snapshot does not wait, cancel, or change scheduling/deduplication state.
+    func scheduledTaskSnapshot() -> [Task<Void, Never>] {
+        scheduled.values.map(\.task)
+    }
+
     func cancelAll() {
         for task in scheduled.values {
             task.task.cancel()

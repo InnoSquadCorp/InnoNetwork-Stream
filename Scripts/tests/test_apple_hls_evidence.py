@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location('evidence', ROOT / 'Scripts/apple_hls_evidence.py')
@@ -54,7 +55,10 @@ class EvidenceTests(unittest.TestCase):
         for lock in ('candidate-Package.resolved','consumer-Package.resolved'):
             shutil.copyfile(self.root/'Package.resolved',self.bundle/lock)
         (self.bundle/'consumer-provenance.json').write_text(json.dumps({
-            'source_commit':self.commit, 'active_clean_pins':json.loads((self.root/'Package.resolved').read_text())['pins']}))
+            'source_commit':self.commit, 'binary_sha256':'0'*64,
+            'candidate_lock_sha256':e.sha((self.root/'Package.resolved').read_bytes()),
+            'consumer_lock_sha256':e.sha((self.root/'Package.resolved').read_bytes()),
+            'active_clean_pins':json.loads((self.root/'Package.resolved').read_text())['pins']}))
         for log in ('dependency.log', 'consumer-resolution.log', 'consumer-post-generation.log', 'generation.log', 'materialization.log', 'swift-version.log', 'xcode-version.log'):
 
 
@@ -91,6 +95,10 @@ class EvidenceTests(unittest.TestCase):
         self.verify()
         self.run_git('add','ReleaseEvidence'); self.run_git('-c','commit.gpgsign=false','commit','-qm','evidence only')
         self.verify()
+        # Porcelain starts with a space for a tracked worktree modification.
+        # Evidence-only edits remain permitted when their new digest is approved.
+        (self.bundle/'generation.log').write_text('updated synthetic control\n')
+        self.approve(); self.verify()
 
     def test_independent_approval_is_required(self):
         self.args.approved_digest = ''; self.reject()
@@ -122,6 +130,16 @@ class EvidenceTests(unittest.TestCase):
         file=self.bundle/'consumer-resolution.log';data=file.read_bytes();file.unlink();self.approve();self.reject()
         file.write_bytes(data)
         file=self.bundle/'consumer-Package.resolved';file.write_text('{"pins":[]}');self.approve();self.reject()
+
+    def test_approved_manifest_still_requires_complete_exporter_provenance(self):
+        file=self.bundle/'consumer-provenance.json'
+        original=json.loads(file.read_text())
+        for key,value in [('binary_sha256',''),('candidate_lock_sha256','0'*64),
+                          ('consumer_lock_sha256','0'*64),('source_commit','0'*40),
+                          ('active_clean_pins',[])]:
+            changed=dict(original);changed[key]=value
+            file.write_text(json.dumps(changed));self.approve();self.reject()
+        file.write_text(json.dumps(original));self.approve();self.verify()
 
     def test_external_or_missing_output_reference_is_rejected(self):
         file=self.bundle/'outputs/offline-transport-stream/index.m3u8'
@@ -166,5 +184,60 @@ class EvidenceTests(unittest.TestCase):
         with self.assertRaises((ValueError,OSError)): e.collect(args)
         self.assertFalse((target/'manifest.json').exists())
 
+
+class SmokeTests(unittest.TestCase):
+    def test_missing_fixture_fails_before_any_apple_command(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)/'repo';bundle=Path(directory)/'smoke'
+            (root/'Scripts').mkdir(parents=True)
+            shutil.copyfile(ROOT/'Scripts/materialize_hls_conformance_fixtures.py',
+                            root/'Scripts/materialize_hls_conformance_fixtures.py')
+            args=argparse.Namespace(root=root,bundle=bundle)
+            output=io.StringIO()
+            actual_execute=e.execute
+            with patch.object(e,'require_clean'), patch.object(e,'source_fingerprint',return_value='same'), \
+                    patch.object(e,'execute',wraps=actual_execute) as calls, contextlib.redirect_stdout(output):
+                with self.assertRaisesRegex(ValueError,'materialization.log'): e.smoke(args)
+            self.assertEqual(len(calls.call_args_list),1)
+            self.assertIn('materialize_hls_conformance_fixtures.py',str(calls.call_args.args[0]))
+            self.assertFalse((bundle/'manifest.json').exists())
+            self.assertNotIn('OK',output.getvalue())
+            self.assertIn('fixture source is missing:',(bundle/'materialization.log').read_text())
+
+    def test_generation_failure_has_no_acceptance_manifest_or_success(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory); bundle=root/'smoke'
+            args=argparse.Namespace(root=root,bundle=bundle)
+            output=io.StringIO()
+            with patch.object(e,'require_clean'), patch.object(e,'source_fingerprint',return_value='same'), \
+                    patch.object(e,'generate_sdk_outputs',side_effect=ValueError('generator failed')), \
+                    contextlib.redirect_stdout(output):
+                with self.assertRaises(ValueError): e.smoke(args)
+            self.assertFalse((bundle/'manifest.json').exists())
+            self.assertNotIn('OK',output.getvalue())
+
+
+class InventoryTests(unittest.TestCase):
+    def test_empty_directories_and_depth_are_bounded(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in ('a', 'b', 'c'): (root/name).mkdir()
+            with patch.object(e, 'MAX_ENTRIES', 2):
+                with self.assertRaises(ValueError): e.inventory(root)
+            (root/'a/deep/deeper').mkdir(parents=True)
+            with patch.object(e, 'MAX_DEPTH', 2):
+                with self.assertRaises(ValueError): e.inventory(root)
+
+    def test_file_and_byte_limits_remain_enforced(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            for name in ('a','b','c'): (root/name).write_bytes(b'123')
+            for limit,value in [('MAX_FILES',2),('MAX_FILE',2),('MAX_TOTAL',8)]:
+                with patch.object(e,limit,value):
+                    with self.assertRaises(ValueError): e.inventory(root)
+            actual=e.inventory(root)
+            for name in ('a','b','c'): (root/name).unlink()
+            for name in ('c','b','a'): (root/name).write_bytes(b'123')
+            self.assertEqual(actual,e.inventory(root))
 
 if __name__ == '__main__': unittest.main()

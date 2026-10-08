@@ -11,6 +11,7 @@ public struct HLSLiveDVRRecorder: Sendable {
     private let liveClient: HLSLivePlaylistClient
     private let resourceWriter: HLSLiveDVRResourceWriter
     private let configuration: HLSLiveDVRConfiguration
+    private let checkpointPersistence: HLSLiveDVRCheckpointStore.Persistence
 
     /// Creates a recorder backed by the default live client.
     public init(
@@ -28,6 +29,21 @@ public struct HLSLiveDVRRecorder: Sendable {
         client: HLSLivePlaylistClient,
         configuration: HLSLiveDVRConfiguration = .safeDefaults()
     ) {
+        self.init(
+            client: client,
+            configuration: configuration,
+            checkpointPersistence: HLSLiveDVRCheckpointStore.Persistence()
+        )
+    }
+
+    // Tests inject I/O failures at the real recorder's commit boundary. Public
+    // construction always uses the store's unchanged production operations.
+    init(
+        client: HLSLivePlaylistClient,
+        configuration: HLSLiveDVRConfiguration,
+        checkpointPersistence: HLSLiveDVRCheckpointStore.Persistence
+    ) {
+        self.checkpointPersistence = checkpointPersistence
         self.liveClient = client
         self.resourceWriter = HLSLiveDVRResourceWriter(
             client: client.resourceClient,
@@ -297,14 +313,16 @@ public struct HLSLiveDVRRecorder: Sendable {
             throw HLSLiveDVRError.recoveryDisabled
         case (.resumable, .fresh):
             let store = HLSLiveDVRCheckpointStore(
-                destinationURL: destinationDirectoryURL
+                destinationURL: destinationDirectoryURL,
+                persistence: checkpointPersistence
             )
             checkpointStore = store
             pendingCheckpoint = nil
             workspace = try store.prepareFresh()
         case (.resumable, .resume):
             let store = HLSLiveDVRCheckpointStore(
-                destinationURL: destinationDirectoryURL
+                destinationURL: destinationDirectoryURL,
+                persistence: checkpointPersistence
             )
             let recovery = try store.resume(sourceURL: sourceURL)
             checkpointStore = store

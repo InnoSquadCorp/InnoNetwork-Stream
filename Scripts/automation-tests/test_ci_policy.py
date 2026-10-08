@@ -175,8 +175,14 @@ class WorkflowTests(unittest.TestCase):
                     'run': 'bash Scripts/check_uikit_background_consumer.sh',
                 })
                 old_steps.append({
-                    'name': 'Compile local HLS evidence exporter',
-                    'run': 'bash Scripts/check_hls_evidence_consumer.sh',
+                    'name': 'Generate and reopen SDK HLS outputs',
+                    'run': 'python3 Scripts/apple_hls_evidence.py smoke --bundle .build/hls-sdk-output-smoke',
+                })
+                old_steps.append({
+                    'name': 'Preserve SDK output diagnostics', 'if': 'failure()',
+                    'uses': 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
+                    'with': {'name': 'hls-sdk-output-${{ matrix.xcode.label }}',
+                             'path': '.build/hls-sdk-output-smoke/', 'if-no-files-found': 'ignore'},
                 })
             if key == 'contracts':
                 validation = next(s for s in old_steps if s['name'] == 'Validate scripts and documentation')
@@ -191,7 +197,7 @@ class WorkflowTests(unittest.TestCase):
                     'bash Scripts/validate_docs_release_state.sh --expect draft\n',
                     'bash Scripts/tests/test_run_affected_tests.sh\n'
                     'python3 Scripts/tests/test_public_signatures.py\n'
-                    'python3 Scripts/tests/test_apple_hls_evidence.py\n'
+                    'python3 -B -m unittest discover -s Scripts/tests -p \"test_*hls_evidence*.py\" -v\n'
                     'bash Scripts/validate_docs_release_state.sh\n')
                 next(s for s in old_steps if s['name'] == 'Validate public API')['run'] = (
                     'bash Scripts/check_public_api_contract.sh\n'

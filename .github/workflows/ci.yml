@@ -132,8 +132,15 @@ jobs:
         run: bash Scripts/swiftpm.sh test --force-resolved-versions --parallel
       - name: Compile UIKit background integration
         run: bash Scripts/check_uikit_background_consumer.sh
-      - name: Compile local HLS evidence exporter
-        run: bash Scripts/check_hls_evidence_consumer.sh
+      - name: Generate and reopen SDK HLS outputs
+        run: python3 Scripts/apple_hls_evidence.py smoke --bundle .build/hls-sdk-output-smoke
+      - name: Preserve SDK output diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hls-sdk-output-${{ matrix.xcode.label }}
+          path: .build/hls-sdk-output-smoke/
+          if-no-files-found: ignore
 
   contracts:
     needs: ci-plan
@@ -166,7 +173,7 @@ jobs:
           bash Scripts/tests/test_package_identity.sh
           bash Scripts/tests/test_run_affected_tests.sh
           python3 Scripts/tests/test_public_signatures.py
-          python3 Scripts/tests/test_apple_hls_evidence.py
+          python3 -B -m unittest discover -s Scripts/tests -p "test_*hls_evidence*.py" -v
           bash Scripts/validate_docs_release_state.sh
       - name: Validate public API
         run: |

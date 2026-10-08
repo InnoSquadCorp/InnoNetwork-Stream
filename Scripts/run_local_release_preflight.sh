@@ -53,8 +53,10 @@ python3 Scripts/tests/test_swiftpm_scratch.py
 bash Scripts/check_public_api_contract.sh ${dependency_arguments[@]+"${dependency_arguments[@]}"}
 bash Scripts/check_docc.sh --skip-build
 bash Scripts/tests/test_package_identity.sh
-bash Scripts/check_hls_evidence_consumer.sh
-python3 Scripts/tests/test_apple_hls_evidence.py
+sdk_smoke="$(mktemp -d "${TMPDIR:-/tmp}/stream-sdk-smoke.XXXXXX")"
+trap 'rm -rf "$sdk_smoke"' EXIT
+python3 Scripts/apple_hls_evidence.py smoke --bundle "$sdk_smoke/bundle"
+python3 -B -m unittest discover -s Scripts/tests -p "test_*hls_evidence*.py" -v
 bash Scripts/tests/test_run_affected_tests.sh
 python3 Scripts/tests/test_public_signatures.py
 bash -n Scripts/*.sh

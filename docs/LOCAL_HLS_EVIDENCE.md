@@ -42,10 +42,32 @@ A pre-existing destination is rejected to preserve prior reports. Archive or
 move old evidence deliberately before recollecting; the collector never removes
 it. Official-tool or exporter failure leaves diagnostics but no passing manifest.
 The collector builds the public SDK exporter in Release, checks its resolved
-pins against the candidate lock, executes all six cases, runs both Apple tools,
+pins against the candidate lock, executes the prepared binary for all six cases,
+runs both Apple tools,
 and retains raw JSON/HTML/stdout plus original inputs and SDK outputs. It also
 records the exact source commit, all tracked source-tree entries, input hashes,
 tool executable hashes/version label, platform, and execution time.
+
+## SDK output smoke without Apple tools
+
+Both Xcode lanes use the same generation path as collection. To exercise it
+without official Apple validators, use a new output directory:
+
+```
+python3 Scripts/apple_hls_evidence.py smoke --bundle .build/hls-sdk-output-smoke
+```
+
+This compiles once, generates and reopens six SDK outputs, checks local media
+references, and verifies the prepared binary, source commit, candidate/consumer
+locks and clean dependency graph after execution. It writes no acceptance
+manifest and explicitly reports that official conformance did not run.
+
+`check_hls_evidence_consumer.sh prepare` seeds candidate pins and builds the
+exporter. Its `verify` mode only inspects the prepared binary/lock/graph and
+checkouts; it never resolves, rebuilds or repairs them. Graph verification checks
+each unique dependency checkout once per verification, rejecting conflicting
+identities or paths. All evidence, graph and orchestration controls run through
+the same discovery command in CI and preflight.
 
 ## Approval and CI trust boundary
 
@@ -86,7 +108,9 @@ python3 Scripts/apple_hls_evidence.py verify \
 `--full` preflight and Release use this verified evidence. Missing approval,
 missing evidence, another commit/tree, modified/materialized inputs, extra or
 missing output/report files, symlinks, failed tools, fixed-fixture-only reports,
-and Must Fix issues fail closed. Output explicitly says **APPROVED LOCAL
+and Must Fix issues fail closed. Enumeration is limited to 4,000 entries and
+24 levels, with at most 2,000 files, 64 MiB per file and 256 MiB total; empty
+directories count toward the entry/depth limits. Output explicitly says **APPROVED LOCAL
 EXECUTION**, never “tools executed in this CI run.” Core/Swift/API/consumer/runtime
 and platform checks still run normally. No `skip` or unverified-success switch is
 provided.
@@ -95,9 +119,9 @@ provided.
 
 No official Apple execution has been performed for this implementation draft.
 Python fixtures are explicitly synthetic validator-protocol tests and must never
-be used as release evidence. Nested exporter compilation is wired into both
-Xcode CI lanes; this VM has no Swift/Xcode, so its compile/runtime outcome remains
-unverified until an authorized Apple run.
+be used as release evidence. Actual SDK-output generation is wired into both Xcode CI lanes. This VM has no
+Swift/Xcode; the revised generator still needs an authorized Apple CI run.
+Synthetic orchestration controls do not establish successful SDK execution.
 
 If no authorized environment can execute the tools, evidence cannot be invented.
 The owner must decide a documented release-policy exception rather than marking
