@@ -65,12 +65,27 @@ private struct Export {
                         diskCapacityPolicy: .disabled),
                     startPosition: .currentWindow)
             ).record(from: source, to: output.appendingPathComponent(dvrID))
-            _ = try HLSLocalPlaybackPackageSnapshot(source: dvr.playbackSource)
+            try reopenLocalPlaylist(dvr.playbackSource)
             playlists[dvrID] = relativePath(dvr.entryPlaylistURL, under: output)
         }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .prettyPrinted]
         try encoder.encode(playlists).write(to: output.appendingPathComponent("playlists.json"), options: .atomic)
+    }
+
+    private static func reopenLocalPlaylist(_ source: HLSLocalPlaybackSource) throws {
+        // This is a separate consumer package: validate through public APIs.
+        let local = try HLSLocalPlaybackSource(
+            packageDirectoryURL: source.packageDirectoryURL,
+            entryPlaylistURL: source.entryPlaylistURL)
+        let handle = try FileHandle(forReadingFrom: local.entryPlaylistURL)
+        defer { try? handle.close() }
+        let limit = 2 * 1_024 * 1_024
+        let data = try handle.read(upToCount: limit + 1) ?? Data()
+        guard data.count <= limit, let text = String(data: data, encoding: .utf8) else {
+            throw URLError(.cannotParseResponse)
+        }
+        _ = try PlaylistResolver().resolve(text, relativeTo: local.entryPlaylistURL)
     }
 
     private static func relativePath(_ file: URL, under root: URL) -> String {
