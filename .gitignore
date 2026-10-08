@@ -108,3 +108,6 @@ iOSInjectionProject/
 # DocC Documentation Build
 docs-build/
 __pycache__/
+
+# Exact remote fixture lock shipped with the library skill
+!/skills/innonetwork-stream/assets/consumer/Package.resolved
