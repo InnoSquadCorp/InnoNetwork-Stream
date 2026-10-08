@@ -18,10 +18,12 @@ private final class EvidenceFixtureProtocol: URLProtocol, @unchecked Sendable {
             else { throw URLError(.badURL) }
             let file = Self.root.appendingPathComponent(String(url.path.dropFirst()))
             let data = try Data(contentsOf: file)
-            guard let response = HTTPURLResponse(
-                url: url, statusCode: 200, httpVersion: "HTTP/1.1",
-                headerFields: ["Content-Length": String(data.count)]
-            ) else { throw URLError(.badServerResponse) }
+            guard
+                let response = HTTPURLResponse(
+                    url: url, statusCode: 200, httpVersion: "HTTP/1.1",
+                    headerFields: ["Content-Length": String(data.count)]
+                )
+            else { throw URLError(.badServerResponse) }
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
             client?.urlProtocol(self, didLoad: data)
             client?.urlProtocolDidFinishLoading(self)
@@ -61,7 +63,8 @@ private struct Export {
             let dvr = try await HLSLiveDVRRecorder(
                 client: HLSLivePlaylistClient(session: session),
                 configuration: .advanced(
-                    limits: HLSLiveDVRLimitPack(maximumDuration: 60, maximumSegmentCount: 100,
+                    limits: HLSLiveDVRLimitPack(
+                        maximumDuration: 60, maximumSegmentCount: 100,
                         diskCapacityPolicy: .disabled),
                     startPosition: .currentWindow)
             ).record(from: source, to: output.appendingPathComponent(dvrID))
