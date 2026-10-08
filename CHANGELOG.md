@@ -2,6 +2,10 @@
 
 ## 6.1.1 Candidate (unpublished)
 
+- Add the library-owned `innonetwork-stream` AI skill for planned stable 6.1.x,
+  with exact candidate/Core pins, shared Codex/Claude guidance and an external
+  consumer validator. This does not qualify the eventual release tag.
+
 - Align the planned Stream version and exact Core dependency to 6.1.1.
 - Replace draft-only release checks with state-independent fixture controls.
 - Require independently approved local evidence on real SDK offline/DVR outputs.

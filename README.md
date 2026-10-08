@@ -78,6 +78,14 @@ repository/path and the `.product(..., package:)` argument to
 `InnoNetwork-Stream`. Existing individual product names and Swift imports are
 unchanged. No old public tag or GitHub redirect is assumed to exist.
 
+## AI library skill
+
+The library-owned [InnoNetwork-Stream skill](skills/README.md) supports the planned
+stable 6.1.x line from an exact 6.1.1 candidate commit. It includes shared Codex
+and Claude Code guidance, public consumer tests and a remote dependency validator.
+The central plugin collects this source as a pinned snapshot; see the
+[validation record](skills/validation.md) for the tested baseline and limits.
+
 ## Development
 
 The [production-candidate review and evidence](docs/PRODUCTION_HARDENING_2026_10_02.md)
