@@ -3,6 +3,10 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 [[ "${INNONETWORK_LOCAL_PATH+x}" != x ]] || { echo 'Evidence exporter requires published Core' >&2; exit 64; }
+# A nested package does not inherit its local dependency's lock. Seed the
+# candidate pins before resolving; SwiftPM may update the consumer origin hash,
+# but the comparison below rejects any changed pin before build/export.
+cp Package.resolved Tests/HLSReleaseEvidence/Package.resolved
 bash Scripts/swiftpm.sh package --package-path Tests/HLSReleaseEvidence \
   --scratch-path .build/release-evidence-exporter resolve
 python3 - <<'PY'
