@@ -68,6 +68,19 @@ package struct HLSHTTPClient: Sendable {
                 request,
                 context: context
             )
+            try Task.checkCancellation()
+            // Retry eligibility is derived from the original bodyless GET.
+            // Authentication and URL adaptation must not change that contract.
+            guard adaptedRequest.httpMethod == "GET",
+                adaptedRequest.httpBody == nil,
+                adaptedRequest.httpBodyStream == nil
+            else {
+                throw NetworkError.configuration(
+                    reason: .invalidRequest(
+                        "HLS request policies must preserve bodyless GET semantics."
+                    )
+                )
+            }
         } catch {
             await requestPolicy.emit(
                 .requestFailed(
@@ -137,6 +150,9 @@ package struct HLSHTTPClient: Sendable {
 
     package static func isCancellation(_ error: Error) -> Bool {
         if error is CancellationError || Task.isCancelled {
+            return true
+        }
+        if case .cancelled = error as? NetworkError {
             return true
         }
         let cocoaError = error as NSError

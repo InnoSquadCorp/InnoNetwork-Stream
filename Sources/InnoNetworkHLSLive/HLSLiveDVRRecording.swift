@@ -1,4 +1,5 @@
 import Foundation
+import InnoNetworkHLS
 
 enum HLSLiveDVRRecordingIntent: Sendable {
     case stopAndCommit
@@ -13,6 +14,15 @@ actor HLSLiveDVRRecordingControl {
     private var playbackSnapshotRequests: [HLSLiveDVRPlaybackSnapshotRequest] = []
     private var outstandingPlaybackSnapshotRequestIDs: Set<ObjectIdentifier> = []
     private var didFinish = false
+    private let snapshotReservationObserver: (@Sendable () async -> Void)?
+
+    init(snapshotReservationObserver: (@Sendable () async -> Void)? = nil) {
+        self.snapshotReservationObserver = snapshotReservationObserver
+    }
+
+    var outstandingPlaybackSnapshotRequestCount: Int {
+        outstandingPlaybackSnapshotRequestIDs.count
+    }
 
     func request(
         _ requestedIntent: HLSLiveDVRRecordingIntent
@@ -45,9 +55,7 @@ actor HLSLiveDVRRecordingControl {
     func registerPlaybackSnapshotRequest(
         _ request: HLSLiveDVRPlaybackSnapshotRequest
     ) async throws {
-        guard await request.shouldProcess else {
-            throw CancellationError()
-        }
+        try Task.checkCancellation()
         guard !didFinish else {
             throw HLSLiveDVRError.playbackSnapshotUnavailable
         }
@@ -63,6 +71,15 @@ actor HLSLiveDVRRecordingControl {
         outstandingPlaybackSnapshotRequestIDs.insert(
             ObjectIdentifier(request)
         )
+        // Publish the reservation before crossing actor boundaries, so a
+        // concurrent cancellation can always find and remove its queue slot.
+        await snapshotReservationObserver?()
+        if !(await request.shouldProcess) {
+            // A receipt or failure may have won while registration suspended.
+            // Release any pending slot; the caller observes the actual terminal
+            // resolution through request.value(), including late-cancel success.
+            cancelPlaybackSnapshotRequest(request)
+        }
     }
 
     func cancelPlaybackSnapshotRequest(
@@ -229,6 +246,20 @@ actor HLSLiveDVRPlaybackSnapshotRequest {
 /// Legacy recordings remove staging; a resumable recording preserves its last
 /// complete-segment checkpoint when one exists.
 public final class HLSLiveDVRRecording: Sendable {
+    private let channel: HLSOperationChannel<HLSLiveDVREvent, HLSLiveDVRReceipt>
+    public var id: UUID { channel.id }
+    public var state: HLSDownloadTaskState { channel.state }
+    public var failureReport: HLSFailureReport? {
+        channel.failure.map { .classify($0, backend: .liveDVR, operationID: id) }
+    }
+
+    /// Independent bounded observation. Cancellation does not discard work.
+    public func observations() throws -> AsyncThrowingStream<HLSOperationObservation<HLSLiveDVREvent>, Error> {
+        try channel.subscribe()
+    }
+
+    /// Authoritative committed receipt, independent of event consumption.
+    public func receipt() async throws -> HLSLiveDVRReceipt { try await channel.value() }
     /// Bounded progress and completion events for this recording.
     ///
     /// Stopping iteration does not stop the recording. Use
@@ -241,10 +272,12 @@ public final class HLSLiveDVRRecording: Sendable {
 
     init(
         events: AsyncThrowingStream<HLSLiveDVREvent, Error>,
+        channel: HLSOperationChannel<HLSLiveDVREvent, HLSLiveDVRReceipt>,
         control: HLSLiveDVRRecordingControl,
         task: Task<HLSLiveDVRReceipt, Error>
     ) {
         self.events = events
+        self.channel = channel
         self.control = control
         self.task = task
     }
@@ -298,7 +331,8 @@ public final class HLSLiveDVRRecording: Sendable {
         return try await withTaskCancellationHandler {
             try Task.checkCancellation()
             try await control.registerPlaybackSnapshotRequest(request)
-            try Task.checkCancellation()
+            // The request owns terminal arbitration: a committed snapshot may
+            // win cancellation. Its cancellation handler also removes the slot.
             return try await request.value()
         } onCancel: {
             Task {

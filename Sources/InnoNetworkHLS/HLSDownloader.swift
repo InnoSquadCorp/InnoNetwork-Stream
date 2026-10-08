@@ -39,6 +39,7 @@ public struct HLSDownloader: Sendable {
     ///
     /// - Parameters:
     ///   - session: The URL session used for playlist and media requests.
+    ///   - configuration: Immutable storage, selection and transfer settings.
     ///   - requestContext: InnoNetwork trust, redirect, and metrics policy
     ///     applied to every request. Its event observers receive media retry
     ///     scheduling and terminal-cancellation events.
@@ -111,6 +112,19 @@ public struct HLSDownloader: Sendable {
         sourceURL: URL
     ) async throws -> HLSDownloadPreparation {
         try await operation.prepare(sourceURL: sourceURL)
+    }
+
+    /// Starts a foreground operation whose lifetime belongs to its handle,
+    /// not to a progress subscriber. Macro-generated definitions use this entry.
+    public func start(
+        sourceURL: URL,
+        destinationURL: URL
+    ) -> HLSDownloadTask {
+        HLSDownloadTask(
+            operation: operation,
+            sourceURL: sourceURL,
+            destinationURL: destinationURL
+        )
     }
 
     /// Starts downloading an HLS VOD stream to a requested file.

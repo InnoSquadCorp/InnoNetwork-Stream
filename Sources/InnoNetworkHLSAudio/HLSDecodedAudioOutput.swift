@@ -13,7 +13,7 @@ public final class HLSDecodedAudioOutput {
     package let playerItem: AVPlayerItem
     package let output: AVPlayerItemSampleBufferOutput
 
-    private var readIsInProgress = false
+    private let reads = HLSDecodedAudioReadCoordinator()
 
     /// Whether the system output is attached to the player item.
     public private(set) var isAttached = true
@@ -50,24 +50,17 @@ public final class HLSDecodedAudioOutput {
     /// Cancellation is reported as `CancellationError`. A `nil` result means
     /// AVFoundation ended the sequence. Marker-only buffers are preserved so
     /// clients can observe timeline discontinuities and skip them explicitly.
+    /// Cancelling stops the caller's wait promptly, not necessarily the native
+    /// read. Another read remains prohibited until AVFoundation finishes that
+    /// read; any late sample is discarded. Cancellation never detaches the item.
     public func nextSample() async throws -> HLSDecodedAudioSample? {
         guard isAttached else {
             throw HLSDecodedAudioError.outputDetached
         }
-        guard !readIsInProgress else {
-            throw HLSDecodedAudioError.readAlreadyInProgress
+        let nativeOutput = output
+        return try await reads.next {
+            (await nativeOutput.nextSampleBuffer()).map(HLSDecodedAudioSample.init)
         }
-
-        readIsInProgress = true
-        defer { readIsInProgress = false }
-
-        try Task.checkCancellation()
-        let value = await output.nextSampleBuffer()
-        try Task.checkCancellation()
-        guard isAttached else {
-            throw HLSDecodedAudioError.outputDetached
-        }
-        return value.map(HLSDecodedAudioSample.init)
     }
 
     /// Returns the next sample immediately when one is already available.
@@ -78,9 +71,7 @@ public final class HLSDecodedAudioOutput {
         guard isAttached else {
             throw .outputDetached
         }
-        guard !readIsInProgress else {
-            throw .readAlreadyInProgress
-        }
+        try reads.checkAdmission()
         return output.nextAvailableSampleBuffer().map(HLSDecodedAudioSample.init)
     }
 
@@ -101,11 +92,13 @@ public final class HLSDecodedAudioOutput {
     /// Detaches the system output from the player item.
     ///
     /// Detachment is idempotent and terminal. Create a new output to resume
-    /// decoded-audio delivery.
+    /// decoded-audio delivery. Pending callers receive `outputDetached` without
+    /// waiting for the native read; no new read is admitted on this output.
     public func detach() {
         guard isAttached else { return }
         playerItem.remove(output)
         isAttached = false
+        reads.detach()
     }
 
     package func pacingItemTime() throws(HLSDecodedAudioError) -> CMTime {

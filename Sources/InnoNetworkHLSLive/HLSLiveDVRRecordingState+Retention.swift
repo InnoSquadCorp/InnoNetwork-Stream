@@ -10,6 +10,7 @@ extension HLSLiveDVRRecordingState {
         }
         try prunePrimaryInitializations()
         try pruneExpiredInterstitials()
+        pruneExpiredDateRanges()
         if renditionStates.isEmpty {
             try enforceRollingByteLimit()
         }
@@ -24,6 +25,8 @@ extension HLSLiveDVRRecordingState {
         }
         try synchronizeRenditionsToPrimaryWindow()
         try enforceRollingByteLimit()
+        try pruneExpiredInterstitials()
+        pruneExpiredDateRanges()
     }
 
     private mutating func enforceRollingByteLimit() throws {
@@ -34,6 +37,8 @@ extension HLSLiveDVRRecordingState {
             try evictOldestPrimarySegment()
             try prunePrimaryInitializations()
             try synchronizeRenditionsToPrimaryWindow()
+            try pruneExpiredInterstitials()
+            pruneExpiredDateRanges()
         }
         guard
             mediaByteCount

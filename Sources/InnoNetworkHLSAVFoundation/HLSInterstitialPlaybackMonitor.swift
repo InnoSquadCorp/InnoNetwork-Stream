@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import os
 
 /// Observes server-authored or application-authored interstitial playback.
 ///
@@ -51,6 +52,7 @@ public final class HLSInterstitialPlaybackMonitor {
     ///
     /// The stream first yields the current schedule and current event. When a
     /// consumer falls behind, the newest events replace older buffered values.
+    /// Notification listeners are installed before this method returns.
     public func events()
         -> AsyncStream<HLSInterstitialRuntimeEvent>
     {
@@ -79,51 +81,57 @@ public final class HLSInterstitialPlaybackMonitor {
             )
         )
 
-        let observationTasks = Self.observationTasks(
+        let observations = Self.observations(
             monitor: monitor,
             notificationCenter: notificationCenter,
             continuation: continuation
         )
         continuation.onTermination = { _ in
-            for task in observationTasks {
-                task.cancel()
-            }
+            observations.cancel()
         }
         return stream
     }
 
-    private static func observationTasks(
+    private static func observations(
         monitor: AVPlayerInterstitialEventMonitor,
         notificationCenter: NotificationCenter,
         continuation:
             AsyncStream<
                 HLSInterstitialRuntimeEvent
             >.Continuation
-    ) -> [Task<Void, Never>] {
-        var tasks: [Task<Void, Never>] = []
-        for name in notificationNames {
-            tasks.append(
-                Task { @MainActor in
-                    for await notification in notificationCenter.notifications(
-                        named: name,
-                        object: monitor
-                    ) {
-                        guard !Task.isCancelled else {
-                            return
-                        }
-                        if let event =
-                            HLSInterstitialRuntimeMapper.map(
-                                notification,
-                                monitor: monitor
-                            )
-                        {
-                            continuation.yield(event)
-                        }
-                    }
-                }
-            )
+    ) -> HLSInterstitialNotificationObservations {
+        let receive: @MainActor @Sendable (Notification) -> Void = {
+            notification in
+            if let event = HLSInterstitialRuntimeMapper.map(
+                notification,
+                monitor: monitor
+            ) {
+                continuation.yield(event)
+            }
         }
-        return tasks
+        let tokens = notificationNames.map { name in
+            notificationCenter.addObserver(
+                forName: name,
+                object: monitor,
+                queue: .main
+            ) { notification in
+                // NotificationCenter guarantees delivery on the supplied
+                // main queue. Map AVFoundation objects here instead of
+                // transferring non-Sendable notification payloads to a task.
+                // The synchronous queue contract supplies the isolation that
+                // Foundation's observer callback type cannot express. Keep
+                // this escape local; the notification must never be stored
+                // or captured by an asynchronous operation.
+                nonisolated(unsafe) let deliveredNotification = notification
+                MainActor.assumeIsolated {
+                    receive(deliveredNotification)
+                }
+            }
+        }
+        return HLSInterstitialNotificationObservations(
+            notificationCenter: notificationCenter,
+            tokens: tokens
+        )
     }
 
     private static var notificationNames: [Notification.Name] {
@@ -162,6 +170,39 @@ public final class HLSInterstitialPlaybackMonitor {
                 .notificationNames
         )
         return names
+    }
+}
+
+// Termination may run on any executor. The lock transfers token ownership to
+// exactly one remover, without retaining the monitor in a long-lived task.
+private final class HLSInterstitialNotificationObservations: Sendable {
+    private let notificationCenter: NotificationCenter
+    private let tokens: OSAllocatedUnfairLock<[any NSObjectProtocol]>
+
+    init(
+        notificationCenter: NotificationCenter,
+        tokens: [any NSObjectProtocol]
+    ) {
+        self.notificationCenter = notificationCenter
+        self.tokens = OSAllocatedUnfairLock(uncheckedState: tokens)
+    }
+
+    func cancel() {
+        // Foundation observer tokens are opaque and non-Sendable. They
+        // escape the lock only after removal from its state, to be handed
+        // straight back to the thread-safe NotificationCenter exactly once.
+        let pending = tokens.withLockUnchecked { tokens in
+            let pending = tokens
+            tokens.removeAll()
+            return pending
+        }
+        for token in pending {
+            notificationCenter.removeObserver(token)
+        }
+    }
+
+    deinit {
+        cancel()
     }
 }
 

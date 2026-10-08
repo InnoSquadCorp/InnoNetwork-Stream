@@ -272,9 +272,15 @@ actor HLSLiveDVRPreloadCoordinator {
         maximumRetainedBytes: Int64
     ) async -> Int64? {
         let entry = entries.remove(at: index)
-        let outcome = await entry.task.value
+        // Consumption transfers ownership out of the coordinator's retained
+        // entries. The consuming recorder must now cancel and join this task.
+        let outcome = await withTaskCancellationHandler {
+            await entry.task.value
+        } onCancel: {
+            entry.task.cancel()
+        }
         record(outcome, for: entry.target.kind)
-        guard case .loaded(let resource) = outcome,
+        guard !Task.isCancelled, case .loaded(let resource) = outcome,
             resource.byteCount <= maximumRetainedBytes,
             Self.matches(
                 requestRange: entry.target.requestRange,

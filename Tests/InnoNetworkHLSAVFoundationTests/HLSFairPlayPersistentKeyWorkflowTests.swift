@@ -1,5 +1,6 @@
 #if canImport(AVFoundation) && !os(tvOS)
 import Foundation
+import InnoNetwork
 import Testing
 
 @testable import InnoNetworkHLSAVFoundation
@@ -507,14 +508,14 @@ struct HLSFairPlayPersistentKeyWorkflowTests {
         #expect(writeRequest.snapshot().processedKeys.isEmpty)
     }
 
-    @Test("URL cancellation remains caller cancellation")
-    func preservesTransportCancellation() async throws {
+    @Test("URL and typed core cancellation remain caller cancellation", arguments: [false, true])
+    func preservesTransportCancellation(typed: Bool) async throws {
         let keyID = try HLSFairPlayKeyID("cancelled")
         let request = PersistableKeyRequestDouble()
         let workflow = HLSFairPlayPersistentKeyWorkflow(
             transport: LicenseTransportDouble(
                 response: Data(),
-                cancels: true
+                cancellation: typed ? NetworkError.cancelled : URLError(.cancelled)
             ),
             storage: PersistentKeyStorageDouble()
         )
@@ -756,25 +757,25 @@ private actor LicenseTransportDouble:
 {
     private let response: Data
     private let fails: Bool
-    private let cancels: Bool
+    private let cancellation: (any Error)?
     private var recordedRequests: [HLSFairPlayLicenseRequest] = []
 
     init(
         response: Data,
         fails: Bool = false,
-        cancels: Bool = false
+        cancellation: (any Error)? = nil
     ) {
         self.response = response
         self.fails = fails
-        self.cancels = cancels
+        self.cancellation = cancellation
     }
 
     func contentKeyContext(
         for request: HLSFairPlayLicenseRequest
     ) throws -> Data {
         recordedRequests.append(request)
-        if cancels {
-            throw URLError(.cancelled)
+        if let cancellation {
+            throw cancellation
         }
         if fails {
             throw PersistentKeyTestError.failed

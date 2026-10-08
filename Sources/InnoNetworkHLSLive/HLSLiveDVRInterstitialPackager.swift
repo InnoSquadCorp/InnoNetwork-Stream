@@ -39,12 +39,18 @@ struct HLSLiveDVRInterstitialPackager: Sendable {
             state: &state
         )
         try state.validateDateRanges(dateRanges, isPrimary: true)
-        state.mergeDateRanges(dateRanges)
+        try state.mergeDateRanges(dateRanges)
         guard configuration.interstitials.policy == .package else {
             return
         }
+        let retainedDateRangeIDs = Set(state.dateRanges.map(\.id))
         for dateRange in dateRanges {
-            guard let interstitial = dateRange.interstitial else {
+            // Merging can expire END-ON-NEXT events using their successors.
+            // Their directories remain until checkpoint publication, so do
+            // not repackage a just-pruned source from this same snapshot.
+            guard retainedDateRangeIDs.contains(dateRange.id),
+                let interstitial = dateRange.interstitial
+            else {
                 continue
             }
             guard

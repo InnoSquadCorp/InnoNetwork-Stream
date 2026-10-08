@@ -116,6 +116,8 @@ public struct HLSOfflinePackageDownloader: Sendable {
     ///
     /// The destination must not exist. Work is performed in a hidden sibling
     /// directory and committed with one final rename.
+    /// Cancelling this legacy event stream cancels its producer. Prefer `start`
+    /// when observation and operation ownership must be independent.
     public func download(
         sourceURL: URL,
         destinationDirectoryURL: URL
@@ -137,6 +139,14 @@ public struct HLSOfflinePackageDownloader: Sendable {
             task.cancel()
         }
         return stream
+    }
+
+    /// Starts an owned operation with independent bounded progress and receipt
+    /// observation. Retain the returned handle until the operation completes.
+    public func start(sourceURL: URL, destinationDirectoryURL: URL) -> HLSOfflinePackageTask {
+        HLSOfflinePackageTask(
+            operation: operation, sourceURL: sourceURL,
+            destinationDirectoryURL: destinationDirectoryURL)
     }
 
     /// Creates and atomically commits an offline HLS package.

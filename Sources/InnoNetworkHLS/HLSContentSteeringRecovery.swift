@@ -25,6 +25,10 @@ actor HLSContentSteeringRecovery {
     private var activePlan: ActivePlan?
     private var activation: Activation?
 
+    // Internal bounded lifecycle observation used by deterministic integration
+    // checks; no request URL, credential or activation implementation escapes.
+    var pendingActivationWaiterCount: Int { activation?.waiters.count ?? 0 }
+
     init(
         client: HLSHTTPClient,
         clock: any HLSClock,
@@ -55,6 +59,7 @@ actor HLSContentSteeringRecovery {
         after failure: HLSPathwayFailure,
         excludingPathwayIDs: Set<String>
     ) async throws -> HLSPathwayResource? {
+        try Task.checkCancellation()
         if let activePlan,
             activePlan.pathwayID != failure.pathwayID,
             !Self.isExcluded(
@@ -68,63 +73,79 @@ actor HLSContentSteeringRecovery {
             activePlan = nil
         }
 
-        let currentActivation: Activation
-        if let activation {
-            currentActivation = activation
-        } else {
-            currentActivation = Activation(
-                id: UUID(),
-                task: Task {
-                    try await self.activateNextPlan(
-                        after: failure,
-                        excludingPathwayIDs: excludingPathwayIDs
-                    )
-                }
-            )
-            activation = currentActivation
+        let plan = try await waitForActivation(
+            after: failure,
+            excludingPathwayIDs: excludingPathwayIDs
+        )
+        try Task.checkCancellation()
+        guard !Self.isExcluded(plan?.pathwayID, by: excludingPathwayIDs) else {
+            return nil
         }
-        do {
-            let plan = try await currentActivation.task.value
-            if activation?.id == currentActivation.id {
-                activation = nil
-                activePlan = plan
-                try Task.checkCancellation()
-                guard
-                    !Self.isExcluded(
-                        plan?.pathwayID,
-                        by: excludingPathwayIDs
-                    )
-                else {
-                    return nil
+        return plan?.resource(at: index)
+    }
+
+    private func waitForActivation(
+        after failure: HLSPathwayFailure,
+        excludingPathwayIDs: Set<String>
+    ) async throws -> ActivePlan? {
+        let waiterID = UUID()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                guard !Task.isCancelled else {
+                    continuation.resume(throwing: CancellationError())
+                    return
                 }
-                return plan?.resource(at: index)
-            }
-            if let activePlan {
-                try Task.checkCancellation()
-                guard
-                    !Self.isExcluded(
-                        activePlan.pathwayID,
-                        by: excludingPathwayIDs
-                    )
-                else {
-                    return nil
+                if activation != nil {
+                    activation?.waiters[waiterID] = continuation
+                    return
                 }
-                return activePlan.resource(at: index)
-            }
-            if activation != nil {
-                return try await resource(
-                    at: index,
-                    after: failure,
-                    excludingPathwayIDs: excludingPathwayIDs
+                let activationID = UUID()
+                let task = Task {
+                    let result: Result<ActivePlan?, Error>
+                    do {
+                        result = .success(
+                            try await self.activateNextPlan(
+                                after: failure,
+                                excludingPathwayIDs: excludingPathwayIDs
+                            )
+                        )
+                    } catch {
+                        result = .failure(error)
+                    }
+                    self.completeActivation(id: activationID, result: result)
+                }
+                activation = Activation(
+                    id: activationID,
+                    task: task,
+                    waiters: [waiterID: continuation]
                 )
             }
-            try Task.checkCancellation()
-            return plan?.resource(at: index)
-        } catch {
-            if activation?.id == currentActivation.id {
-                activation = nil
-            }
-            throw error
+        } onCancel: {
+            Task { await self.cancelWaiter(waiterID) }
+        }
+    }
+
+    private func cancelWaiter(_ id: UUID) {
+        guard let continuation = activation?.waiters.removeValue(forKey: id) else {
+            return
+        }
+        if activation?.waiters.isEmpty == true {
+            let task = activation?.task
+            activation = nil
+            task?.cancel()
+        }
+        continuation.resume(throwing: CancellationError())
+    }
+
+    private func completeActivation(
+        id: UUID,
+        result: Result<ActivePlan?, Error>
+    ) {
+        guard let completed = activation, completed.id == id else { return }
+        activation = nil
+        if case .success(let plan) = result { activePlan = plan }
+        for continuation in completed.waiters.values {
+            continuation.resume(with: result)
         }
     }
 
@@ -133,6 +154,7 @@ actor HLSContentSteeringRecovery {
         excludingPathwayIDs: Set<String>
     ) async throws -> ActivePlan? {
         for candidate in candidates {
+            try Task.checkCancellation()
             guard candidate.pathwayID != failure.pathwayID else {
                 continue
             }
@@ -155,6 +177,7 @@ actor HLSContentSteeringRecovery {
             guard admission != .penalized else {
                 continue
             }
+            try Task.checkCancellation()
             do {
                 let document = try await playlistResolver.resolveDocument(
                     from: candidate.variant.url,
@@ -162,6 +185,7 @@ actor HLSContentSteeringRecovery {
                         candidate.multivariantVariables,
                     purpose: .mediaPlaylist
                 )
+                try Task.checkCancellation()
                 guard
                     let media = document.playlist.media,
                     let container = document.playlist.mediaContainer
@@ -193,6 +217,7 @@ actor HLSContentSteeringRecovery {
                 let keySet = try await keyResolver.resolve(
                     resources: transfers
                 )
+                try Task.checkCancellation()
                 let plan = ActivePlan(
                     pathwayID: candidate.pathwayID,
                     transfers: transfers,
@@ -317,6 +342,7 @@ actor HLSContentSteeringRecovery {
 
     private struct Activation: Sendable {
         let id: UUID
-        let task: Task<ActivePlan?, Error>
+        let task: Task<Void, Never>
+        var waiters: [UUID: CheckedContinuation<ActivePlan?, Error>]
     }
 }

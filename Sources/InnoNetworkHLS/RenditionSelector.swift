@@ -22,6 +22,17 @@ public struct RenditionSelector: Sendable {
     /// Creates a rendition selector.
     public init() {}
 
+    /// Selects a rendition from a parser-produced multivariant document.
+    public func select(
+        in document: HLSMultivariantDocument, groupID: String,
+        kind: HLSRenditionKind, policy: HLSRenditionSelectionPolicy,
+        subtitleProvenance: HLSSubtitleProvenancePolicy = HLSSubtitleProvenancePolicy()
+    ) -> HLSRendition? {
+        select(
+            in: document.playlist, groupID: groupID, kind: kind,
+            policy: policy, subtitleProvenance: subtitleProvenance)
+    }
+
     /// Selects one rendition from a referenced group.
     public func select(
         in playlist: HLSPlaylist,

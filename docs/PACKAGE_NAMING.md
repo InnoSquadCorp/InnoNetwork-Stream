@@ -9,8 +9,8 @@ https://github.com/InnoSquadCorp/InnoNetwork-Stream.git
 
 Its SwiftPM package display name and all-in-one library product are
 `InnoNetwork-Stream`. The canonical package identity is `innonetwork-stream`.
-The package is independently versioned; its first release remains `1.0.0`
-and consumes the published InnoNetwork `6.0.0` dependency.
+The package is independently versioned; its first release remains `6.1.1`
+and pins the published InnoNetwork `6.1.1` dependency exactly.
 
 ## Consumer contract
 
@@ -50,12 +50,13 @@ Post-rename build/API/test and naming evidence is retained under
 `.build/package-rename-evidence/`. Earlier five-platform and HLS-tool evidence
 is distinguished in [the dependency compatibility record](INNONETWORK_6_COMPATIBILITY.md).
 
-Fresh post-rename checks on Xcode 27 / Swift 6.4, 2026-09-30:
+Original post-rename checks on Xcode 27 / Swift 6.4, 2026-09-30 (before macro-first redesign):
 
 - Both consumer modes built and ran; the resolved local package identity was
   `innonetwork-stream` with display name `InnoNetwork-Stream`.
-- Full Swift tests passed: 587 registered, 581 ordinary passes, six runtime
-  skips subsequently exercised successfully with loopback HLS fixtures.
+- Full Swift tests passed: 587 registered, 579 ordinary passes, six runtime
+  skips and two Audio fixture cancellations, all eight subsequently exercised
+  successfully with loopback HLS fixtures.
 - Four module symbol contracts remained unchanged at 1,867 declarations.
 - Runtime smoke and three Apple HLS playlist conformance reports passed.
 - Package/dependency/release-script fixtures, formatting, workflow lint, and
@@ -83,6 +84,6 @@ user's separate authorization, `InnoSquadCorp/InnoNetwork-Stream` was created
 as a public repository and connected as `origin`. The existing MIT license
 and `Copyright (c) 2026 InnoSquad` notice were preserved.
 
-Repository creation and source publication do not create a stable `1.0.0`
+Repository creation and source publication do not create a stable `6.1.1`
 tag or Release. That release remains Draft, pending the documented remote
 CI/platform gates. No old `InnoStream` repository redirect is assumed.

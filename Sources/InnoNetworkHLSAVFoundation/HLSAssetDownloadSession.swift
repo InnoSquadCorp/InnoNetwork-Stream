@@ -27,9 +27,44 @@ public final class HLSAssetDownloadSession: Sendable {
         initialState: LifecycleState()
     )
 
-    /// Creates or reconnects to a background AVFoundation HLS session.
-    public init(
+    /// Creates a background AVFoundation HLS session.
+    ///
+    /// For application-delegate restoration, use the initializer that accepts
+    /// the background-session completion handler before native delivery starts.
+    public convenience init(
         configuration: HLSAssetDownloadSessionPack
+    ) throws {
+        try self.init(
+            configuration: configuration,
+            registeredBackgroundCompletion: nil
+        )
+    }
+
+    /// Reconnects to a background session with its application completion.
+    ///
+    /// Call from the host application's main-actor background-session callback.
+    /// The ordinary UIKit completion closure stays owned by the main actor;
+    /// only an actor-isolated delivery operation crosses the delegate queue.
+    /// Registration precedes restored native events, and delivery happens once
+    /// on the main queue after those events finish or the session invalidates.
+    @MainActor
+    public convenience init(
+        configuration: HLSAssetDownloadSessionPack,
+        backgroundSessionCompletion: @escaping () -> Void
+    ) throws {
+        let owner = HLSAssetDownloadApplicationCompletion(
+            backgroundSessionCompletion
+        )
+        try self.init(
+            configuration: configuration,
+            registeredBackgroundCompletion: { owner.complete() }
+        )
+    }
+
+    private init(
+        configuration: HLSAssetDownloadSessionPack,
+        registeredBackgroundCompletion:
+            HLSAssetDownloadBackgroundCompletionStore.Completion?
     ) throws {
         let identifier = configuration.identifier.trimmingCharacters(
             in: .whitespacesAndNewlines
@@ -63,7 +98,9 @@ public final class HLSAssetDownloadSession: Sendable {
 
         let eventHub = HLSAssetDownloadEventHub()
         let backgroundCompletions =
-            HLSAssetDownloadBackgroundCompletionStore()
+            HLSAssetDownloadBackgroundCompletionStore(
+                completion: registeredBackgroundCompletion
+            )
         let invalidationGate = HLSAssetDownloadInvalidationGate()
         let delegate = HLSAssetDownloadDelegate(
             eventHub: eventHub,
@@ -336,19 +373,32 @@ public final class HLSAssetDownloadSession: Sendable {
     }
 
     /// Wires the host application's background-session completion handler.
-    public nonisolated func handleBackgroundSessionCompletion(
+    ///
+    /// The handler is delivered once on the main queue when the next native
+    /// event batch finishes or the session invalidates. Already-finished
+    /// batches are not replayed to subsequently registered handlers.
+    /// Use this only for an existing session, registering synchronously from
+    /// the host application's background-session callback before returning.
+    /// When creating a reconnected session, pass the handler to the initializer
+    /// instead, so registration precedes delivery of restored native events.
+    @MainActor
+    public func handleBackgroundSessionCompletion(
         _ identifier: String,
-        completion: @escaping @Sendable () -> Void
+        completion: @escaping () -> Void
     ) {
+        let owner = HLSAssetDownloadApplicationCompletion(completion)
+        let delivery: HLSAssetDownloadBackgroundCompletionStore.Completion = {
+            owner.complete()
+        }
         guard identifier == configuration.identifier else {
-            completion()
+            HLSAssetDownloadBackgroundCompletionStore.deliver([delivery])
             return
         }
         guard !lifecycle.withLock({ $0.isInvalidating }) else {
-            completion()
+            HLSAssetDownloadBackgroundCompletionStore.deliver([delivery])
             return
         }
-        backgroundCompletions.set(completion)
+        backgroundCompletions.set(delivery)
     }
 
     /// Invalidates the session after finishing or cancelling active tasks.

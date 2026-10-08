@@ -83,12 +83,13 @@ struct HLSDownloadPlanner: Sendable {
             session: contentSteeringSession
         )
         guard
+            case .media(let mediaDocument) = selection.document,
             let media = selection.playlist.media,
             let mediaContainer = selection.playlist.mediaContainer
         else {
             throw HLSDownloadError.invalidPlaylist
         }
-        try HLSMediaPlaylistValidator.validate(media)
+        try mediaDocument.validateSingleFileDownload()
         let resourcePlan = HLSResourcePlan(
             resources: media.resources,
             maximumTransferBytes: maximumTransferBytes

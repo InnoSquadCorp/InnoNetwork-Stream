@@ -28,21 +28,23 @@ jobs:
         language: [swift]
     steps:
       - name: Checkout InnoNetwork-Stream
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Select Xcode 26.0.1
         run: sudo xcode-select -s /Applications/Xcode_26.0.1.app
+      - name: Verify coupled CodeQL action pins
+        run: ruby Scripts/check_codeql_contract.rb
       - name: Verify published InnoNetwork dependency
         run: bash Scripts/check_innonetwork_dependency.sh
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@9e0d7b8d25671d64c341c19c0152d693099fb5ba # v4.35.5
+        uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           languages: ${{ matrix.language }}
           queries: security-extended,security-and-quality
       - name: Build
-        run: xcrun swift build --force-resolved-versions
+        run: bash Scripts/swiftpm.sh build --force-resolved-versions
       - name: Perform CodeQL analysis
-        uses: github/codeql-action/analyze@9e0d7b8d25671d64c341c19c0152d693099fb5ba # v4.35.5
+        uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           category: /language:${{ matrix.language }}

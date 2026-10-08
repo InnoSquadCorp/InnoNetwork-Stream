@@ -1,13 +1,13 @@
 {
-  "originHash" : "665f9c8340c62a73f306e35a689ff4927e8c3c87836aebd7316c1dce7adbbe24",
+  "originHash" : "f060827f8c224626557b76ed1840592dc2f89d2db9dff5a9e647efa02a92a851",
   "pins" : [
     {
       "identity" : "innonetwork",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/InnoSquadCorp/InnoNetwork.git",
       "state" : {
-        "revision" : "9d8053d5f921ebf5c38cc2f816efe90c7db4a450",
-        "version" : "6.0.0"
+        "revision" : "44e4ca28c50c03f817231a077c0f3bdfdbc859c8",
+        "version" : "6.1.1"
       }
     },
     {
@@ -24,8 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-crypto",
       "state" : {
-        "revision" : "da9d28d69ebe3894b18376c8f2395c2f37b8448f",
-        "version" : "4.5.2"
+        "revision" : "a9d1d5ab8951ada40cafff8c8e2b551dfde4f390",
+        "version" : "5.0.0"
       }
     },
     {
@@ -51,8 +51,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/swiftlang/swift-syntax.git",
       "state" : {
-        "revision" : "79e4b74a295b6eb74a8b585e3a39d29e70c1dbd1",
-        "version" : "603.0.2"
+        "revision" : "050f1a346fbbac0ca2cfb15a95274f7bd1cf0ccf",
+        "version" : "604.0.0"
       }
     }
   ],

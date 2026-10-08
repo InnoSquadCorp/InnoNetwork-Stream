@@ -1,7 +1,6 @@
 #if canImport(AVFoundation) && !os(tvOS)
 import Foundation
 import Testing
-import os
 
 @testable import InnoNetworkHLSAVFoundation
 
@@ -57,6 +56,22 @@ struct HLSAssetDownloadEventHubTests {
         }
         #expect(progress == 1)
         #expect(events.count == 3)
+    }
+
+    @Test("cancelling a native observer leaves other observers and terminal replay alive")
+    func independentCancellation() async {
+        let hub = HLSAssetDownloadEventHub()
+        let first = hub.stream(taskIdentifier: 42)
+        let second = hub.stream(taskIdentifier: 42)
+        let waiter = Task { for await _ in first {} }
+        waiter.cancel()
+        await waiter.value
+        hub.sendProgress(0.5, taskIdentifier: 42)
+        hub.sendCompletion(taskIdentifier: 42)
+        let events = await second.reduce(into: []) { $0.append($1) }
+        #expect(events.count == 2)
+        let replay = await hub.stream(taskIdentifier: 42).reduce(into: []) { $0.append($1) }
+        #expect(!replay.isEmpty)
     }
 
     @Test("download summaries are delivered and replayed before completion")
@@ -183,25 +198,6 @@ struct HLSAssetDownloadEventHubTests {
         }
 
         #expect(hub.retainedTerminalEventCount == 256)
-    }
-
-    @Test("all pending background completions are drained together")
-    func backgroundCompletionDrain() {
-        let store = HLSAssetDownloadBackgroundCompletionStore()
-        let completionCount = OSAllocatedUnfairLock(initialState: 0)
-
-        store.set {
-            completionCount.withLock { $0 += 1 }
-        }
-        store.set {
-            completionCount.withLock { $0 += 1 }
-        }
-
-        let pending = store.takeAll()
-        pending.forEach { $0() }
-
-        #expect(completionCount.withLock { $0 } == 2)
-        #expect(store.takeAll().isEmpty)
     }
 }
 #endif

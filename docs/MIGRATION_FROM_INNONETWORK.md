@@ -1,6 +1,6 @@
 # Migrating HLS products from InnoNetwork
 
-InnoNetwork 6 removes its four HLS products. InnoNetwork-Stream 1.0 preserves their
+InnoNetwork 6 removes its four HLS products. InnoNetwork-Stream 6.1.1 preserves their
 product and module names, so Swift imports remain unchanged while package
 ownership changes.
 
@@ -32,11 +32,11 @@ After:
 dependencies: [
     .package(
         url: "https://github.com/InnoSquadCorp/InnoNetwork.git",
-        .upToNextMajor(from: "6.0.0")
+        exact: "6.1.1"
     ),
     .package(
         url: "https://github.com/InnoSquadCorp/InnoNetwork-Stream.git",
-        .upToNextMajor(from: "1.0.0")
+        .upToNextMajor(from: "6.1.1")
     ),
 ],
 targets: [

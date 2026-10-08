@@ -7,10 +7,38 @@ Content Steering support.
 
 `InnoNetworkHLSLive` is an optional companion product layered on
 `InnoNetworkHLS`. It reuses the same parser, URL admission,
-``InnoNetworkHLS/HLSRequestPolicy``, redirect handling, and bounded playlist
+``/InnoNetworkHLS/HLSRequestPolicy``, redirect handling, and bounded playlist
 body limit. The live client accepts either a media-playlist URL or a
 multivariant entry URL and resolves the latter with the configured selection
 policy.
+
+## Macro-first foreground workflows (Draft)
+
+```swift
+import Foundation
+import InnoNetworkHLSLive
+
+@HLSLiveDefinition
+enum ChannelWatch {}
+@HLSDVRDefinition(maximumDurationSeconds: 1800, maximumSegmentCount: 900)
+enum ChannelArchive {}
+
+func watchChannel(source: URL, session: URLSession) throws -> HLSLiveWatching {
+    try ChannelWatch.watch(from: source, session: session)
+}
+func recordChannel(source: URL, destination: URL, client: HLSLivePlaylistClient) throws -> HLSLiveDVRRecording {
+    try ChannelArchive.startRecording(from: source, to: destination, client: client)
+}
+```
+
+Retain the returned handle. ``HLSLiveWatching/observations()`` and
+``HLSLiveDVRRecording/observations()`` are independent bounded subscriptions;
+cancelled observers do not stop work. A watch ends at ENDLIST or explicit
+cancellation. DVR's first ``HLSLiveDVRRecording/stopAndCommit()`` or
+``HLSLiveDVRRecording/cancelAndDiscard()`` intent wins. ``HLSLiveDVRRecording/receipt()``
+is observation, not a lifecycle command. Throwing `validated()` settings and
+the `*Defining` protocols are dynamic/manual equivalents. Use the advanced packs
+below for additional policy, preload and recovery tuning.
 
 ```swift
 import InnoNetworkHLSLive
@@ -79,7 +107,7 @@ query-clean full reload.
 Snapshots expose resolved media URLs and normal parsed playlist metadata; they
 are application data, not an observability surface. Purpose-aware request
 events remain value-redacted and classify subsequent requests as
-``InnoNetworkHLS/HLSRequestPurpose/livePlaylistReload``.
+``/InnoNetworkHLS/HLSRequestPurpose/livePlaylistReload``.
 
 Every snapshot also exposes the ``HLSLivePlaylistSnapshot/reloadMode`` that
 produced it. A session-owned ``HLSLiveHealthAnalyzer`` can reduce those
@@ -294,7 +322,7 @@ sequence, initialization map, and encryption state. Open-ended hinted ranges
 must resolve to an exact advertised range with the same start and transferred
 length. Delta updates, encrypted presentations, mismatches, cancellations,
 and transfer failures discard temporary bytes and leave the ordinary DVR
-request path available. ``InnoNetworkHLS/HLSRequestPurpose/mediaPreloadHint``
+request path available. ``/InnoNetworkHLS/HLSRequestPurpose/mediaPreloadHint``
 lets request adapters distinguish this speculative traffic.
 
 ``HLSLiveDVRProgress/preloadStatistics`` and
@@ -398,7 +426,7 @@ same; every selected rendition must cover the retained primary timeline or the
 whole recording fails atomically.
 
 Generated and translated subtitle selection uses the same
-``InnoNetworkHLS/HLSSubtitleProvenancePolicy`` contract as offline packages.
+``/InnoNetworkHLS/HLSSubtitleProvenancePolicy`` contract as offline packages.
 Exclusion is applied before language or name matching, and preference only
 breaks otherwise-equal matches while retaining source order. Audio and video
 selection are unchanged. ``HLSLiveDVRTrack/characteristics``,
@@ -428,8 +456,9 @@ visible through one atomic directory move. Recovery is disabled by default,
 which preserves legacy cleanup. The resumable policy atomically replaces a
 bounded URL-free checkpoint at coherent complete-segment boundaries and keeps
 the owned hidden directory after ordinary interruption. Rolling multi-track
-recordings publish only after the current snapshot's retained tracks are
-aligned; the new checkpoint becomes durable before obsolete files are removed.
+recordings align retained tracks and publish after each complete primary
+segment, including within a large initial snapshot. The new checkpoint becomes
+durable before obsolete files are removed.
 Resume verifies
 the query-free source identity, selected variant and renditions, initialization
 map identity, exact file sizes, SHA-256 content digests, path confinement, and

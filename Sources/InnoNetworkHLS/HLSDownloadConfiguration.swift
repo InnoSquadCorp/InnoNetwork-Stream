@@ -123,16 +123,22 @@ struct HLSResolvedTransferSettings: Sendable {
 /// Configures bounded HLS VOD transfer and assembly behavior.
 ///
 /// Start with ``safeDefaults()``. Use
-/// ``advanced(storage:variantSelectionPolicy:transfer:)`` only when the
+/// ``advanced(storage:variantSelectionPolicy:contentSteering:transfer:)`` only when the
 /// application owns the storage, quality, concurrency, or retry trade-offs.
 public struct HLSDownloadConfiguration: Sendable {
-    let maximumMediaResourceBytes: Int
-    let maximumTotalDownloadBytes: Int64
-    let diskCapacityPolicy: HLSDiskCapacityPolicy
-    let maximumConcurrentResourceTransfers: Int
+    /// Effective maximum bytes accepted for one media resource.
+    public let maximumMediaResourceBytes: Int
+    /// Effective maximum retained bytes in the assembled output.
+    public let maximumTotalDownloadBytes: Int64
+    /// Effective destination-volume admission policy.
+    public let diskCapacityPolicy: HLSDiskCapacityPolicy
+    /// Effective maximum concurrent resource transfers (`1...8`).
+    public let maximumConcurrentResourceTransfers: Int
     let retryPolicy: (any RetryPolicy)?
-    let variantSelectionPolicy: HLSVariantSelectionPolicy
-    let resumePolicy: HLSResumePolicy
+    /// Effective variant selection policy.
+    public let variantSelectionPolicy: HLSVariantSelectionPolicy
+    /// Effective interrupted-output retention policy.
+    public let resumePolicy: HLSResumePolicy
     let contentSteering: HLSContentSteeringSettings
     let sessionKeyPreloadPolicy: HLSSessionKeyPreloadPolicy
 
@@ -171,9 +177,62 @@ public struct HLSDownloadConfiguration: Sendable {
     /// three resources, leaves session-key preloading disabled, and selects
     /// the highest-quality supported variant.
     /// Transient GET failures receive up to three exponential-backoff retries
-    /// through InnoNetwork's core ``RetryPolicy``.
+    /// through InnoNetwork's core `RetryPolicy`.
     public static func safeDefaults() -> HLSDownloadConfiguration {
         advanced()
+    }
+
+    /// Constructs explicit custom settings without silently normalizing them.
+    ///
+    /// Workflow macros use this same runtime boundary. Dynamic configuration
+    /// does not bypass validation merely because a macro generated the caller.
+    /// The legacy ``advanced(storage:variantSelectionPolicy:contentSteering:transfer:)``
+    /// constructor retains its documented normalization behavior.
+    public static func validated(
+        maximumMediaResourceBytes: Int = 128 * 1_024 * 1_024,
+        maximumTotalDownloadBytes: Int64 = 8 * 1_024 * 1_024 * 1_024,
+        maximumConcurrentResourceTransfers: Int = 3,
+        diskCapacityPolicy: HLSDiskCapacityPolicy = .required(
+            minimumAvailableCapacity: 512 * 1_024 * 1_024
+        ),
+        resumePolicy: HLSResumePolicy = .automatic,
+        variantSelectionPolicy: HLSVariantSelectionPolicy = .highestQuality,
+        contentSteering: HLSContentSteeringPack = HLSContentSteeringPack(),
+        retryPolicy: (any RetryPolicy)? = ExponentialBackoffRetryPolicy()
+    ) throws -> HLSDownloadConfiguration {
+        guard maximumTotalDownloadBytes > 0 else {
+            throw HLSConfigurationError.invalidOutputByteLimit
+        }
+        guard maximumMediaResourceBytes > 0,
+            Int64(exactly: maximumMediaResourceBytes).map({
+                $0 <= maximumTotalDownloadBytes
+            }) == true
+        else {
+            throw HLSConfigurationError.invalidResourceByteLimit
+        }
+        guard (1...8).contains(maximumConcurrentResourceTransfers) else {
+            throw HLSConfigurationError.invalidTransferConcurrency
+        }
+        switch diskCapacityPolicy {
+        case .required(let minimum), .bestEffort(let minimum):
+            guard minimum >= 0 else { throw HLSConfigurationError.invalidDiskCapacity }
+        case .disabled:
+            break
+        }
+        return advanced(
+            storage: HLSStoragePack(
+                maximumMediaResourceBytes: maximumMediaResourceBytes,
+                maximumTotalDownloadBytes: maximumTotalDownloadBytes,
+                diskCapacityPolicy: diskCapacityPolicy,
+                resumePolicy: resumePolicy
+            ),
+            variantSelectionPolicy: variantSelectionPolicy,
+            contentSteering: contentSteering,
+            transfer: HLSTransferPack(
+                maximumConcurrentResourceTransfers: maximumConcurrentResourceTransfers,
+                retryPolicy: retryPolicy
+            )
+        )
     }
 
     /// Returns an explicitly tuned HLS download configuration.

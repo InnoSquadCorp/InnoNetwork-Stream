@@ -44,13 +44,19 @@ public struct HLSOfflinePackageStoragePack: Sendable {
 
 /// Configures bounded multi-rendition HLS offline packages.
 public struct HLSOfflinePackageConfiguration: Sendable {
-    let maximumMediaResourceBytes: Int
-    let maximumTotalDownloadBytes: Int64
-    let diskCapacityPolicy: HLSDiskCapacityPolicy
-    let resumePolicy: HLSResumePolicy
-    let maximumConcurrentResourceTransfers: Int
+    /// Effective maximum bytes accepted for one media resource.
+    public let maximumMediaResourceBytes: Int
+    /// Effective retained-byte limit across the package's resources.
+    public let maximumTotalDownloadBytes: Int64
+    /// Effective destination-volume admission policy.
+    public let diskCapacityPolicy: HLSDiskCapacityPolicy
+    /// Effective interrupted-package retention policy.
+    public let resumePolicy: HLSResumePolicy
+    /// Effective maximum concurrent resource transfers (`1...8`).
+    public let maximumConcurrentResourceTransfers: Int
     let retryPolicy: (any RetryPolicy)?
-    let variantSelectionPolicy: HLSVariantSelectionPolicy
+    /// Effective primary variant selection policy.
+    public let variantSelectionPolicy: HLSVariantSelectionPolicy
     let renditionPack: HLSOfflineRenditionPack
     let contentSteering: HLSContentSteeringSettings
     let sessionKeyPreloadPolicy: HLSSessionKeyPreloadPolicy
@@ -100,6 +106,42 @@ public struct HLSOfflinePackageConfiguration: Sendable {
         -> HLSOfflinePackageConfiguration
     {
         advanced()
+    }
+
+    /// Builds immutable settings without normalizing invalid limits.
+    ///
+    /// The offline macro and manual workflows share the single-file workflow's
+    /// byte, concurrency and disk validation. Renditions retain separate HLS
+    /// timelines and are committed together as one atomic package.
+    public static func validated(
+        maximumMediaResourceBytes: Int = 134_217_728,
+        maximumTotalDownloadBytes: Int64 = 8_589_934_592,
+        maximumConcurrentResourceTransfers: Int = 3,
+        diskCapacityPolicy: HLSDiskCapacityPolicy = .required(minimumAvailableCapacity: 536_870_912),
+        resumePolicy: HLSResumePolicy = .automatic,
+        variantSelectionPolicy: HLSVariantSelectionPolicy = .highestQuality,
+        renditions: HLSOfflineRenditionPack = HLSOfflineRenditionPack(),
+        contentSteering: HLSContentSteeringPack = HLSContentSteeringPack(),
+        retryPolicy: (any RetryPolicy)? = ExponentialBackoffRetryPolicy()
+    ) throws -> HLSOfflinePackageConfiguration {
+        let common = try HLSDownloadConfiguration.validated(
+            maximumMediaResourceBytes: maximumMediaResourceBytes,
+            maximumTotalDownloadBytes: maximumTotalDownloadBytes,
+            maximumConcurrentResourceTransfers: maximumConcurrentResourceTransfers,
+            diskCapacityPolicy: diskCapacityPolicy, resumePolicy: resumePolicy,
+            variantSelectionPolicy: variantSelectionPolicy, contentSteering: contentSteering,
+            retryPolicy: retryPolicy)
+        var builder = Builder()
+        builder.maximumMediaResourceBytes = common.maximumMediaResourceBytes
+        builder.maximumTotalDownloadBytes = common.maximumTotalDownloadBytes
+        builder.maximumConcurrentResourceTransfers = common.maximumConcurrentResourceTransfers
+        builder.diskCapacityPolicy = common.diskCapacityPolicy
+        builder.resumePolicy = common.resumePolicy
+        builder.variantSelectionPolicy = common.variantSelectionPolicy
+        builder.contentSteering = common.contentSteering
+        builder.retryPolicy = common.retryPolicy
+        builder.renditionPack = renditions
+        return HLSOfflinePackageConfiguration(builder: builder)
     }
 
     /// Returns an explicitly tuned offline-package configuration.

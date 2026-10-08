@@ -1,6 +1,7 @@
 #if canImport(AVFoundation) && !os(tvOS)
 import AVFoundation
 import Foundation
+import InnoNetworkHLS
 
 /// Fulfills initial and renewing FairPlay streaming-key requests.
 ///
@@ -97,6 +98,7 @@ public struct HLSFairPlayStreamingKeyWorkflow: Sendable {
         acquisition: HLSFairPlayStreamingKeyAcquisition,
         purpose: HLSFairPlayLicenseRequestPurpose
     ) async throws -> HLSFairPlayContentKeyEvent {
+        try Task.checkCancellation()
         try validate(acquisition)
         let spcResult: HLSFairPlayStreamingSPCResult
         do {
@@ -115,6 +117,7 @@ public struct HLSFairPlayStreamingKeyWorkflow: Sendable {
             }
             throw HLSFairPlayStreamingKeyError.spcGenerationFailed
         }
+        try Task.checkCancellation()
         guard case .generated(let spc) = spcResult else {
             return .fulfilledByAdvisoryKey(purpose)
         }
@@ -141,6 +144,7 @@ public struct HLSFairPlayStreamingKeyWorkflow: Sendable {
             }
             throw HLSFairPlayStreamingKeyError.licenseExchangeFailed
         }
+        try Task.checkCancellation()
         guard
             !licenseResponse.isEmpty,
             licenseResponse.count
@@ -214,12 +218,7 @@ public struct HLSFairPlayStreamingKeyWorkflow: Sendable {
     }
 
     private static func isCancellation(_ error: Error) -> Bool {
-        if error is CancellationError || Task.isCancelled {
-            return true
-        }
-        let cocoaError = error as NSError
-        return cocoaError.domain == NSURLErrorDomain
-            && cocoaError.code == NSURLErrorCancelled
+        HLSHTTPClient.isCancellation(error)
     }
 
     private static func errorCode(

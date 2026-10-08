@@ -399,11 +399,19 @@ enum HLSTimelineParser {
                 $0.endsOnNext ? $0.className : nil
             }
         )
-        for className in classesWithEndsOnNext {
-            let classRanges =
-                ranges
-                .filter { $0.className == className }
-                .sorted { $0.startDate < $1.startDate }
+        guard !classesWithEndsOnNext.isEmpty else {
+            return
+        }
+        var rangesByClass: [String: [HLSDateRange]] = [:]
+        for range in ranges {
+            if let className = range.className,
+                classesWithEndsOnNext.contains(className)
+            {
+                rangesByClass[className, default: []].append(range)
+            }
+        }
+        for ranges in rangesByClass.values {
+            let classRanges = ranges.sorted { $0.startDate < $1.startDate }
             for index in classRanges.indices.dropLast() {
                 let range = classRanges[index]
                 let next = classRanges[classRanges.index(after: index)]

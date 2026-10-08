@@ -1,7 +1,199 @@
+import AVFoundation
+import Foundation
+import InnoNetwork
 import InnoNetworkHLS
 import InnoNetworkHLSAVFoundation
 import InnoNetworkHLSAudio
 import InnoNetworkHLSLive
+
+@HLSDownloadDefinition(
+    maximumMediaResourceBytes: 4_096,
+    maximumTotalDownloadBytes: 16_384,
+    maximumConcurrentResourceTransfers: 2
+)
+enum ConsumerDownload {}
+
+@HLSOfflinePackageDefinition(maximumMediaResourceBytes: 4096, maximumTotalDownloadBytes: 8192)
+enum ConsumerOfflinePackage {}
+
+@MainActor
+@HLSOfflinePackageDefinition
+enum IsolatedOfflinePackage {}
+
+struct ManualOfflinePackage: HLSOfflinePackageDefining {
+    static func configuration() throws -> HLSOfflinePackageConfiguration { try .validated() }
+}
+
+@HLSOfflinePackageDefinition(
+    maximumMediaResourceBytes: 8_388_608,
+    maximumTotalDownloadBytes: 268_435_456,
+    maximumConcurrentResourceTransfers: 3
+)
+enum OfflineMovie {}
+
+func saveOfflineMovie(source: URL, destination: URL) async throws -> HLSOfflinePackageReceipt {
+    try await OfflineMovie.downloadPackage(sourceURL: source, destinationDirectoryURL: destination)
+}
+
+@HLSDownloadDefinition
+enum ConditionalDownload {
+    #if DEBUG
+    static let debugLabel = "debug"
+    #else
+    static let debugLabel = "release"
+    #endif
+}
+
+@HLSLiveDefinition(minimumPollingMilliseconds: 50, maximumPollingMilliseconds: 100)
+enum ConsumerLive {}
+@HLSDVRDefinition(maximumDurationSeconds: 60, maximumSegmentCount: 10)
+enum ConsumerDVR {}
+@HLSPlaybackDefinition(maximumPeakBitRate: 1000, maximumWidth: 320, maximumHeight: 240)
+enum ConsumerPlayback {}
+@HLSCatalogDefinition(maximumEntries: 3, maximumSnapshotBytes: 2048)
+enum ConsumerCatalog {}
+
+// Exact README backend examples: compile effects, invoke settings only below.
+@HLSLiveDefinition
+enum ChannelWatch {}
+@HLSDVRDefinition(maximumDurationSeconds: 1800, maximumSegmentCount: 900)
+enum ChannelArchive {}
+@HLSPlaybackDefinition(maximumPeakBitRate: 10_000_000, maximumWidth: 1920, maximumHeight: 1080)
+enum PlaybackProfile {}
+@HLSCatalogDefinition(maximumEntries: 128, maximumSnapshotBytes: 65_536)
+enum MediaLibrary {}
+
+func watchChannel(source: URL, session: URLSession) throws -> HLSLiveWatching {
+    try ChannelWatch.watch(from: source, session: session)
+}
+func recordChannel(source: URL, destination: URL, client: HLSLivePlaylistClient) throws -> HLSLiveDVRRecording {
+    try ChannelArchive.startRecording(from: source, to: destination, client: client)
+}
+@MainActor
+func configurePlayback(item: AVPlayerItem) async throws -> HLSPlaybackConfigurationResult {
+    try await PlaybackProfile.apply(to: item)
+}
+func makeMediaLibrary(store: any HLSMediaCatalogPersisting) throws -> HLSMediaCatalog {
+    try MediaLibrary.makeCatalog(persistence: store)
+}
+@InnoNetworkHLSLive.HLSLiveDefinition
+enum QualifiedLive {}
+
+// Compile-time isolation control: configuration generation is pure.
+@MainActor
+@HLSDownloadDefinition
+enum IsolatedDownload {}
+@MainActor
+@HLSLiveDefinition
+enum IsolatedLive {}
+@MainActor
+@HLSDVRDefinition
+enum IsolatedDVR {}
+@MainActor
+@HLSPlaybackDefinition
+enum IsolatedPlayback {}
+@MainActor
+@HLSCatalogDefinition
+enum IsolatedCatalog {}
+
+struct ManualLive: HLSLiveDefining { static func configuration() throws -> HLSLiveConfiguration { try .validated() } }
+struct ManualDVR: HLSDVRDefining { static func configuration() throws -> HLSLiveDVRConfiguration { try .validated() } }
+struct ManualPlayback: HLSPlaybackDefining {
+    static func configuration() throws -> HLSPlaybackConfiguration { try .validated() }
+}
+struct ManualCatalog: HLSCatalogDefining {
+    static func configuration() throws -> HLSMediaCatalogConfiguration { try .validated() }
+}
+
+// Compile backend-specific entry points without initiating external effects.
+func observeLive(source: URL, session: URLSession) throws -> HLSLiveWatching {
+    try ConsumerLive.watch(from: source, session: session)
+}
+func recordLive(source: URL, destination: URL, client: HLSLivePlaylistClient) throws -> HLSLiveDVRRecording {
+    try ConsumerDVR.startRecording(from: source, to: destination, client: client)
+}
+
+struct ManualDownload: HLSDownloadDefining {
+    static func configuration() throws -> HLSDownloadConfiguration {
+        try .validated(maximumMediaResourceBytes: 4_096, maximumTotalDownloadBytes: 16_384)
+    }
+}
+
+@APIDefinition(method: .get, path: "/fixture", auth: .anonymous)
+struct ConsumerEndpoint {
+    typealias APIResponse = String
+}
+
+// Exact README workflow and cancellation convenience, compiled externally.
+@HLSDownloadDefinition(
+    maximumMediaResourceBytes: 8_388_608,
+    maximumTotalDownloadBytes: 268_435_456,
+    maximumConcurrentResourceTransfers: 3
+)
+enum MovieDownload {}
+
+func saveMovie(source: URL, destination: URL) async throws -> HLSDownloadReceipt {
+    let operation = try MovieDownload.start(
+        sourceURL: source,
+        destinationURL: destination
+    )
+    return try await withTaskCancellationHandler {
+        try await operation.receipt()
+    } onCancel: {
+        operation.cancel()
+    }
+}
+
+let macroConfiguration = try ConsumerDownload.configuration()
+_ = try ConditionalDownload.configuration()
+precondition(macroConfiguration.maximumMediaResourceBytes == 4_096)
+precondition(macroConfiguration.maximumTotalDownloadBytes == 16_384)
+precondition(macroConfiguration.maximumConcurrentResourceTransfers == 2)
+_ = try ConsumerDownload.makeDownloader()
+_ = try ManualDownload.makeDownloader()
+let liveConfiguration = try ConsumerLive.configuration()
+let dvrConfiguration = try ConsumerDVR.configuration()
+let playbackConfiguration = try ConsumerPlayback.configuration()
+precondition(liveConfiguration.minimumPollingInterval == 0.05)
+precondition(dvrConfiguration.effectiveLimits.maximumSegmentCount == 10)
+precondition(playbackConfiguration.variant.maximumWidth == 320)
+let catalog = try ConsumerCatalog.makeCatalog()
+let catalogRecord = try HLSMediaRecord(id: HLSMediaID(), ownership: .applicationFile, reference: "consumer-asset")
+try await catalog.upsert(catalogRecord)
+let catalogSnapshot = await catalog.snapshot()
+precondition(catalogSnapshot.count == 1)
+_ = try ManualLive.makeClient()
+_ = try ManualDVR.configuration()
+_ = try ManualPlayback.configuration()
+_ = try ManualCatalog.makeCatalog()
+_ = try QualifiedLive.configuration()
+// All six pure generated configuration factories work across actor boundaries.
+_ = try await Task.detached {
+    _ = try IsolatedDownload.makeDownloader()
+    _ = try IsolatedOfflinePackage.makeDownloader()
+    _ = try IsolatedLive.makeClient()
+    _ = try IsolatedDVR.configuration()
+    _ = try IsolatedPlayback.configuration()
+    _ = try IsolatedCatalog.makeCatalog()
+}.value
+_ = try ManualOfflinePackage.makeDownloader()
+let offlineSettings = try ConsumerOfflinePackage.configuration()
+precondition(offlineSettings.maximumMediaResourceBytes == 4096)
+precondition(ConsumerEndpoint().path == "/fixture")
+
+let parsedDocument = try HLSPlaylistParser().parse(
+    "#EXTM3U\n#EXTINF:1,\nsegment.ts\n#EXT-X-ENDLIST\n",
+    relativeTo: URL(string: "https://media.example/media.m3u8")!
+)
+guard case .media(let media) = parsedDocument else { fatalError("incorrect playlist kind") }
+precondition(media.segmentCount == 1)
+try media.validateSingleFileDownload()
+
+// Compile the macro-first advisory phase as well; never contact the network
+// from this package-identity fixture.
+func previewMovie(source: URL, session: URLSession) async throws -> HLSDownloadPreparation {
+    try await MovieDownload.prepare(sourceURL: source, session: session)
+}
 
 _ = HLSDownloadConfiguration.safeDefaults()
 _ = HLSLiveConfiguration.safeDefaults()
@@ -13,4 +205,121 @@ if #available(macOS 27, *) {
 }
 #endif
 
-print("package-identity-consumer: OK (four unchanged Swift imports)")
+struct CancellationEntryInterceptor: RequestInterceptor {
+    let entered: AsyncStream<Void>.Continuation
+    func adapt(_ request: URLRequest) async throws -> URLRequest {
+        entered.yield(())
+        try await Task.sleep(for: .seconds(60))
+        return request
+    }
+}
+actor CancellationRecorder: HLSRequestEventObserving {
+    private var last: HLSRequestEvent?
+    func hlsRequestDidEmit(_ event: HLSRequestEvent) async { last = event }
+    func endedWithCancellation() -> Bool {
+        if case .requestFailed(_, failure: .cancellation) = last { return true }
+        return false
+    }
+}
+// An actual Core cancellation crosses both macro-first entry points. The
+// interceptor holds before transport; this control contacts no origin server.
+let (coreEntered, coreEntry) = AsyncStream<Void>.makeStream()
+let cancellationSession = URLSession(configuration: .ephemeral)
+defer {
+    cancellationSession.invalidateAndCancel()
+    coreEntry.finish()
+}
+let cancellationClient = DefaultNetworkClient(
+    configuration: .advanced(
+        baseURL: URL(string: "https://media.example")!,
+        auth: .init(additionalRequestInterceptors: [CancellationEntryInterceptor(entered: coreEntry)])),
+    session: cancellationSession)
+let cancellationRecorder = CancellationRecorder()
+let cancellationTag: CancellationTag = "package-identity-cancellation"
+let cancellationPolicy = HLSRequestPolicy(eventObservers: [cancellationRecorder]) { request, _ in
+    _ = try await cancellationClient.request(ConsumerEndpoint(), tag: cancellationTag)
+    return request
+}
+let cancelledPreparation = Task {
+    try await ConsumerDownload.prepare(
+        sourceURL: URL(string: "https://media.example/cancelled.m3u8")!,
+        session: cancellationSession, requestPolicy: cancellationPolicy)
+}
+enum ConsumerCancellationError: Error { case entryTimeout }
+let reachedCoreEntry = try await withThrowingTaskGroup(of: Bool.self) { group in
+    group.addTask {
+        var iterator = coreEntered.makeAsyncIterator()
+        return await iterator.next() != nil
+    }
+    group.addTask {
+        try await Task.sleep(for: .seconds(5))
+        throw ConsumerCancellationError.entryTimeout
+    }
+    defer { group.cancelAll() }
+    return try await group.next()!
+}
+precondition(reachedCoreEntry)
+await cancellationClient.cancelAll(matching: cancellationTag)
+do {
+    _ = try await cancelledPreparation.value
+    fatalError("Core cancellation unexpectedly completed Stream preparation")
+} catch { precondition(error is CancellationError) }
+let observedCancellation = await cancellationRecorder.endedWithCancellation()
+precondition(observedCancellation)
+
+// Exercise the offline macro's actual Core transport, planner and atomic writer
+// without any external service. This protocol is scoped to this session only.
+final class OfflineFixtureProtocol: URLProtocol, @unchecked Sendable {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        let playlist = "#EXTM3U\n#EXT-X-TARGETDURATION:1\n#EXTINF:1,\nsegment.ts\n#EXT-X-ENDLIST\n"
+        let body = Data((request.url!.path.hasSuffix("m3u8") ? playlist : "MEDIA").utf8)
+        let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: [:])!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: body)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
+let offlineConfiguration = URLSessionConfiguration.ephemeral
+offlineConfiguration.protocolClasses = [OfflineFixtureProtocol.self]
+let offlineSession = URLSession(configuration: offlineConfiguration)
+let offlineDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+defer {
+    offlineSession.invalidateAndCancel()
+    try? FileManager.default.removeItem(at: offlineDirectory)
+}
+let offlineURL = URL(string: "https://media.example/offline.m3u8")!
+let offlinePreview = try await ConsumerOfflinePackage.prepare(sourceURL: offlineURL, session: offlineSession)
+precondition(offlinePreview.resourceTransferCount == 1)
+precondition(!FileManager.default.fileExists(atPath: offlineDirectory.path))
+let offlineReceipt = try await ConsumerOfflinePackage.downloadPackage(
+    sourceURL: offlineURL, destinationDirectoryURL: offlineDirectory.appendingPathComponent("movie.hlspkg"),
+    session: offlineSession)
+let reopenedOfflineReceipt = try HLSOfflinePackageStore().open(at: offlineReceipt.directoryURL)
+precondition(offlineReceipt.byteCount > 5)  // Includes local playlists and manifest.
+precondition(reopenedOfflineReceipt.byteCount == offlineReceipt.byteCount)
+precondition(FileManager.default.fileExists(atPath: offlineReceipt.entryPlaylistURL.path))
+
+let ownedOffline = try ConsumerOfflinePackage.start(
+    sourceURL: offlineURL, destinationDirectoryURL: offlineDirectory.appendingPathComponent("owned.hlspkg"),
+    session: offlineSession)
+let ownedEvents = try ownedOffline.events()
+let ownedReceipt = try await ownedOffline.receipt()
+var completedOfflineEvents = 0
+for try await observation in ownedEvents {
+    precondition(observation.operationID == ownedOffline.id)
+    if case .completed(let receipt) = observation.event {
+        precondition(receipt.directoryURL == ownedReceipt.directoryURL)
+        completedOfflineEvents += 1
+    }
+}
+precondition(completedOfflineEvents == 1 && ownedOffline.state == .completed)
+ownedOffline.cancel()  // Late cancellation must preserve the atomic commit.
+let lateOwnedReceipt = try await ownedOffline.receipt()
+precondition(lateOwnedReceipt.directoryURL == ownedReceipt.directoryURL)
+
+print(
+    "package-identity-consumer: OK (four imports, six Stream macros, Core macro/cancellation, README, atomic offline transfer)"
+)

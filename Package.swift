@@ -1,6 +1,7 @@
 // swift-tools-version: 6.2
 
 import Foundation
+import CompilerPluginSupport
 import PackageDescription
 
 let strictSettings: [SwiftSetting] = [
@@ -24,7 +25,7 @@ if let localInnoNetworkPath = ProcessInfo.processInfo.environment[
 } else {
     innoNetworkDependency = .package(
         url: "https://github.com/InnoSquadCorp/InnoNetwork.git",
-        .upToNextMajor(from: "6.0.0")
+        exact: "6.1.1"
     )
 }
 
@@ -59,12 +60,30 @@ let package = Package(
             targets: ["InnoNetworkHLSAudio"]
         ),
     ],
-    dependencies: [innoNetworkDependency],
+    dependencies: [
+        innoNetworkDependency,
+        .package(
+            url: "https://github.com/swiftlang/swift-syntax.git",
+            .upToNextMinor(from: "604.0.0")
+        ),
+    ],
     targets: [
+        .macro(
+            name: "InnoNetworkStreamMacros",
+            dependencies: [
+                .product(name: "SwiftCompilerPlugin", package: "swift-syntax"),
+                .product(name: "SwiftSyntax", package: "swift-syntax"),
+                .product(name: "SwiftSyntaxBuilder", package: "swift-syntax"),
+                .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
+                .product(name: "SwiftDiagnostics", package: "swift-syntax"),
+            ],
+            swiftSettings: strictSettings
+        ),
         .target(
             name: "InnoNetworkHLS",
             dependencies: [
-                .product(name: "InnoNetwork", package: "InnoNetwork")
+                .product(name: "InnoNetwork", package: "InnoNetwork"),
+                "InnoNetworkStreamMacros",
             ],
             resources: [.process("Resources")],
             swiftSettings: strictSettings
@@ -74,6 +93,7 @@ let package = Package(
             dependencies: [
                 .product(name: "InnoNetwork", package: "InnoNetwork"),
                 "InnoNetworkHLS",
+                "InnoNetworkStreamMacros",
             ],
             swiftSettings: strictSettings
         ),
@@ -82,12 +102,27 @@ let package = Package(
             dependencies: [
                 .product(name: "InnoNetwork", package: "InnoNetwork"),
                 "InnoNetworkHLS",
+                "InnoNetworkStreamMacros",
             ],
             resources: [.process("Resources")],
             swiftSettings: strictSettings
         ),
         .target(
             name: "InnoNetworkHLSAudio",
+            swiftSettings: strictSettings
+        ),
+        .target(
+            name: "HLSUIKitBackgroundSessionCompileFixture",
+            dependencies: ["InnoNetworkHLSAVFoundation"],
+            path: "Tests/CompileFixtures/HLSUIKitBackgroundSession",
+            swiftSettings: strictSettings
+        ),
+        .testTarget(
+            name: "InnoNetworkStreamMacroTests",
+            dependencies: [
+                "InnoNetworkStreamMacros",
+                .product(name: "SwiftSyntaxMacrosTestSupport", package: "swift-syntax"),
+            ],
             swiftSettings: strictSettings
         ),
         .testTarget(

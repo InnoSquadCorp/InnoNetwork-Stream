@@ -70,7 +70,7 @@ enum HLSAppleAuthoringAnalyzer {
                 if let value,
                     let duration = Double(value),
                     duration.isFinite,
-                    Int(duration.rounded()) > targetDuration
+                    duration.rounded() > Double(targetDuration)
                 {
                     diagnostics.append(
                         warning(

@@ -19,7 +19,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -56,7 +56,17 @@ jobs:
           RELEASE_FETCH_MAIN: '1'
         run: bash Scripts/validate_release_candidate.sh
       - name: Run full release preflight
+        env:
+          APPLE_HLS_APPROVED_EVIDENCE_SHA256: ${{ vars.APPLE_HLS_APPROVED_EVIDENCE_SHA256 }}
+          APPLE_HLS_APPROVED_BY: ${{ vars.APPLE_HLS_APPROVED_BY }}
         run: bash Scripts/run_local_release_preflight.sh --full
+      - name: Preserve HLS startup and runtime failures
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-hls-runtime-diagnostics
+          path: .build/hls-runtime-diagnostics/
+          if-no-files-found: ignore
       - name: Revalidate the tested release identity
         if: github.event_name == 'push'
         env:
@@ -88,7 +98,7 @@ jobs:
           path: |
             .build/release-artifacts/InnoNetwork-Stream-${{ github.ref_name }}.tar.gz
             .build/release-artifacts/SHA256SUMS
-            .build/local-release-preflight/apple-hls/
+            ReleaseEvidence/apple-hls/
           if-no-files-found: error
       - name: Revalidate release identity immediately before publication
         if: github.event_name == 'push'

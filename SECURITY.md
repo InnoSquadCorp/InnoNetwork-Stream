@@ -18,7 +18,7 @@ request before the maintainers have acknowledged the report.
 
 Whichever channel you use, please include:
 
-- affected module and version (for example `InnoNetworkHLS @ 1.0.0`, or `main`
+- affected module and version (for example `InnoNetworkHLS @ 6.1.1`, or `main`
   plus the tested commit revision for an unreleased fix)
 - reproduction steps (minimal failing case if possible)
 - expected impact and threat model (confidentiality / integrity /
@@ -31,7 +31,7 @@ Whichever channel you use, please include:
 
 - No stable InnoNetwork-Stream tag exists yet. Reports against `main` are assessed as
   prerelease findings.
-- After `1.0.0`, the latest `1.x` minor is the actively supported line.
+- After publication, the latest `6.x` minor is the actively supported line.
 - HLS code previously published by InnoNetwork follows InnoNetwork's support
   policy until applications migrate to InnoNetwork-Stream.
 
@@ -47,7 +47,7 @@ tag and a `SHA256SUMS` file. Verify both the tag and checksum before consuming
 an archive outside SwiftPM:
 
 ```bash
-version="1.0.0"
+version="6.1.1"
 shasum -a 256 -c SHA256SUMS
 git verify-tag "$version"
 ```

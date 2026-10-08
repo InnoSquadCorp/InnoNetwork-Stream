@@ -197,7 +197,8 @@ struct HLSAssetDownloadSessionTests {
         await session.shutdown(cancelRunningTasks: true)
     }
 
-    @Test("a foreign background completion is released immediately")
+    @MainActor
+    @Test("a foreign background completion is released once on the main thread")
     func foreignBackgroundCompletion() async throws {
         let session = try HLSAssetDownloadSession(
             configuration: HLSAssetDownloadSessionPack(
@@ -205,16 +206,63 @@ struct HLSAssetDownloadSessionTests {
                     "com.innonetwork.tests.\(UUID().uuidString)"
             )
         )
-        let didComplete = OSAllocatedUnfairLock(initialState: false)
+        let calls = OSAllocatedUnfairLock(initialState: [Bool]())
 
         session.handleBackgroundSessionCompletion(
             "com.example.other"
         ) {
-            didComplete.withLock { $0 = true }
+            calls.withLock { $0.append(Thread.isMainThread) }
         }
-
-        #expect(didComplete.withLock { $0 })
         await session.shutdown(cancelRunningTasks: true)
+        await flushMainQueue()
+
+        #expect(calls.withLock { $0 } == [true])
+    }
+
+    @MainActor
+    @Test("an invalidated background session releases later handlers on the main thread")
+    func invalidatedBackgroundCompletion() async throws {
+        let identifier = "com.innonetwork.tests.\(UUID().uuidString)"
+        let session = try HLSAssetDownloadSession(
+            configuration: HLSAssetDownloadSessionPack(identifier: identifier)
+        )
+        await session.shutdown(cancelRunningTasks: true)
+        let calls = OSAllocatedUnfairLock(initialState: [Bool]())
+
+        session.handleBackgroundSessionCompletion(identifier) {
+            calls.withLock { $0.append(Thread.isMainThread) }
+        }
+        await flushMainQueue()
+
+        #expect(calls.withLock { $0 } == [true])
+    }
+
+    @MainActor
+    @Test("reconnection registers its handler before starting native delivery")
+    func initializerRegistersBackgroundCompletion() async throws {
+        let calls = OSAllocatedUnfairLock(initialState: [Bool]())
+        let session = try HLSAssetDownloadSession(
+            configuration: HLSAssetDownloadSessionPack(
+                identifier: "com.innonetwork.tests.\(UUID().uuidString)"
+            ),
+            backgroundSessionCompletion: {
+                calls.withLock { $0.append(Thread.isMainThread) }
+            }
+        )
+        await session.shutdown(cancelRunningTasks: true)
+        await session.shutdown(cancelRunningTasks: true)
+        await flushMainQueue()
+
+        #expect(calls.withLock { $0 } == [true])
+    }
+
+    @MainActor
+    private func flushMainQueue() async {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async {
+                continuation.resume()
+            }
+        }
     }
 
     @Test("system and application cancellation are classified")

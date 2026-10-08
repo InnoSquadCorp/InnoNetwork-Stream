@@ -200,19 +200,19 @@ extension HLSLiveDVRRecordingState {
         dateRanges.removeAll { $0.id == id }
     }
 
-    mutating func pruneExpiredInterstitials() throws {
+    mutating func pruneExpiredInterstitials(
+        expiredIDs: Set<String>? = nil
+    ) throws {
         guard configuration.limits.retentionPolicy == .rollingWindow,
             let retainedStart = segments.first?.programDateTime
         else {
             return
         }
-        let expired = interstitials.filter { interstitial in
-            guard let end = Self.endDate(of: interstitial.dateRange) else {
-                return false
-            }
-            return end <= retainedStart
-        }
-        let expiredIDs = Set(expired.map(\.id))
+        // Resolve END-ON-NEXT against the full source timeline, before any
+        // successor metadata disappears. Merge passes its updated timeline's
+        // result so packaged and source records expire at the same boundary.
+        let expiredIDs = expiredIDs ?? expiredDateRangeIDs(in: dateRanges)
+        let expired = interstitials.filter { expiredIDs.contains($0.id) }
         for interstitial in expired {
             guard mediaByteCount >= interstitial.byteCount else {
                 throw HLSLiveDVRError.storageFailed
@@ -228,6 +228,7 @@ extension HLSLiveDVRRecordingState {
         if !expiredIDs.isEmpty {
             interstitials.removeAll { expiredIDs.contains($0.id) }
             dateRanges.removeAll { expiredIDs.contains($0.id) }
+            omittedInterstitials.removeAll { expiredIDs.contains($0.id) }
         }
         resolvedDateRangeSchedules.removeAll { schedule in
             guard

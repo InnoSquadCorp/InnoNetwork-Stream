@@ -292,7 +292,7 @@ extension HLSLiveDVRRecordingState {
         }
     }
 
-    private var retainedMediaRelativePaths: [String] {
+    var retainedMediaRelativePaths: [String] {
         var paths = Set(initializationState.records.map(\.fileName))
         paths.formUnion(
             segments.compactMap { segment in
@@ -416,56 +416,118 @@ extension HLSLiveDVRRecordingState {
         )
     }
 
-    private func validateRenditionCoverage() throws {
+    func validateRenditionCoverage() throws {
         guard !renditionStates.isEmpty else {
             return
         }
-        guard let primaryStart = segments.first,
-            let primaryEnd = segments.last
-        else {
+        guard !segments.isEmpty else {
             throw HLSLiveDVRError.noSegmentsRecorded
         }
+        let primaryIntervals = try Self.coverageIntervals(
+            segments,
+            adjacencyTolerance: 0
+        )
         for renditionState in renditionStates {
-            guard
-                let renditionStart = renditionState.segments.first,
-                let renditionEnd = renditionState.segments.last
+            guard !renditionState.segments.isEmpty else {
+                throw HLSLiveDVRError.unsupportedFeature(
+                    .incompleteExternalRendition
+                )
+            }
+            if let primaryIntervals,
+                let renditionIntervals = try Self.coverageIntervals(
+                    renditionState.segments,
+                    adjacencyTolerance: 0.5
+                )
+            {
+                // Both unions are sorted and disjoint. Sweep once rather
+                // than scan every rendition segment for every primary one.
+                // Shared discontinuity holes need no invented coverage;
+                // overlapping segments contribute their complete union.
+                var index = 0
+                for primary in primaryIntervals {
+                    while index < renditionIntervals.count,
+                        renditionIntervals[index].end
+                            < primary.end.addingTimeInterval(-0.5)
+                    {
+                        index += 1
+                    }
+                    guard index < renditionIntervals.count,
+                        renditionIntervals[index].start
+                            <= primary.start.addingTimeInterval(0.5),
+                        renditionIntervals[index].end
+                            >= primary.end.addingTimeInterval(-0.5)
+                    else {
+                        throw HLSLiveDVRError.unsupportedFeature(
+                            .incompleteExternalRendition
+                        )
+                    }
+                }
+            } else {
+                // A discontinuity may reset date inference. Preserve the
+                // existing boundary/duration checks when an interior date
+                // is unknown rather than inventing a continuous timeline.
+                if let primaryStart = segments.first?.programDateTime,
+                    let primaryEnd = segments.last,
+                    let primaryEndDate = primaryEnd.programDateTime,
+                    let renditionStart = renditionState.segments.first?.programDateTime,
+                    let renditionEnd = renditionState.segments.last,
+                    let renditionEndDate = renditionEnd.programDateTime
+                {
+                    guard renditionStart <= primaryStart.addingTimeInterval(0.5),
+                        renditionEndDate.addingTimeInterval(renditionEnd.duration)
+                            >= primaryEndDate.addingTimeInterval(primaryEnd.duration - 0.5)
+                    else {
+                        throw HLSLiveDVRError.unsupportedFeature(
+                            .incompleteExternalRendition
+                        )
+                    }
+                } else {
+                    guard renditionState.recordedDuration + 0.5 >= recordedDuration else {
+                        throw HLSLiveDVRError.unsupportedFeature(
+                            .incompleteExternalRendition
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private static func coverageIntervals(
+        _ segments: [HLSLiveDVRStoredSegment],
+        adjacencyTolerance: TimeInterval
+    ) throws -> [(start: Date, end: Date)]? {
+        var intervals: [(start: Date, end: Date)] = []
+        intervals.reserveCapacity(segments.count)
+        for segment in segments {
+            guard let start = segment.programDateTime else {
+                return nil
+            }
+            let end = start.addingTimeInterval(segment.duration)
+            guard start.timeIntervalSinceReferenceDate.isFinite,
+                end.timeIntervalSinceReferenceDate.isFinite,
+                segment.duration.isFinite, segment.duration > 0
             else {
                 throw HLSLiveDVRError.unsupportedFeature(
                     .incompleteExternalRendition
                 )
             }
-            if let primaryStartDate = primaryStart.programDateTime,
-                let primaryEndDate = primaryEnd.programDateTime,
-                let renditionStartDate = renditionStart.programDateTime,
-                let renditionEndDate = renditionEnd.programDateTime
+            // An explicitly declared GAP remains a represented timeline
+            // interval. Its admission policy is handled before retention.
+            intervals.append((start, end))
+        }
+        intervals.sort { $0.start < $1.start }
+        var merged: [(start: Date, end: Date)] = []
+        for interval in intervals {
+            if let previous = merged.last,
+                interval.start
+                    <= previous.end.addingTimeInterval(adjacencyTolerance)
             {
-                let primaryEndBoundary =
-                    primaryEndDate
-                    .addingTimeInterval(primaryEnd.duration)
-                let renditionEndBoundary =
-                    renditionEndDate
-                    .addingTimeInterval(renditionEnd.duration)
-                guard
-                    renditionStartDate
-                        <= primaryStartDate.addingTimeInterval(0.5),
-                    renditionEndBoundary
-                        >= primaryEndBoundary.addingTimeInterval(-0.5)
-                else {
-                    throw HLSLiveDVRError.unsupportedFeature(
-                        .incompleteExternalRendition
-                    )
-                }
+                merged[merged.count - 1].end = max(previous.end, interval.end)
             } else {
-                guard
-                    renditionState.recordedDuration + 0.5
-                        >= recordedDuration
-                else {
-                    throw HLSLiveDVRError.unsupportedFeature(
-                        .incompleteExternalRendition
-                    )
-                }
+                merged.append(interval)
             }
         }
+        return merged
     }
 
     private func packageDateRanges() throws -> [HLSDateRange] {

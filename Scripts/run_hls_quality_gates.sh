@@ -8,6 +8,7 @@ skip_build=false
 require_apple_tools=false
 require_runtime_smoke=false
 apple_report_root=""
+apple_evidence=""
 
 usage() {
   cat <<'USAGE'
@@ -19,11 +20,17 @@ Usage: bash Scripts/run_hls_quality_gates.sh [options]
                          Require the macOS 27 AVPlayer decoded-audio smoke.
   --apple-report-root <path>
                          Retain Apple-tool reports below this path.
+  --apple-evidence <path> Verify independently approved local SDK-output evidence.
 USAGE
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --apple-evidence)
+      shift
+      [[ $# -gt 0 && -n "$1" ]] || { echo 'Missing evidence path' >&2; exit 64; }
+      apple_evidence="$1"
+      ;;
     --skip-build)
       skip_build=true
       ;;
@@ -54,12 +61,17 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
+if [[ -n "$apple_evidence" && "$require_apple_tools" == true ]]; then
+  echo 'Choose local SDK-output evidence or direct fixed-fixture tools, not both.' >&2
+  exit 64
+fi
+
 if [[ "$skip_build" == true ]]; then
-  xcrun swift test \
+  bash Scripts/swiftpm.sh test \
     --skip-build \
     --filter 'HLS(MediaFixtureIntegrity|ParserMutation|ParserScaling|LiveRace|AssetDownloadEventHubRace)Tests'
 else
-  xcrun swift test \
+  bash Scripts/swiftpm.sh test \
     --filter 'HLS(MediaFixtureIntegrity|ParserMutation|ParserScaling|LiveRace|AssetDownloadEventHubRace)Tests'
 fi
 
@@ -80,7 +92,9 @@ else
 fi
 printf '%s\n' "$runtime_output"
 
-if [[ "$require_apple_tools" == true && -n "$apple_report_root" ]]; then
+if [[ -n "$apple_evidence" ]]; then
+  apple_tool_output="$(python3 Scripts/apple_hls_evidence.py verify --bundle "$apple_evidence")"
+elif [[ "$require_apple_tools" == true && -n "$apple_report_root" ]]; then
   apple_tool_output="$(
     bash Scripts/validate_hls_with_apple_tools.sh \
     --require-tools \

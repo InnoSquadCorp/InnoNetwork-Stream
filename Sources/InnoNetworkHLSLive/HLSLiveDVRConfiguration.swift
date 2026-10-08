@@ -57,8 +57,8 @@ public enum HLSLiveDVRRecoveryPolicy: Equatable, Sendable {
     case disabled
 
     /// Persists an owned checkpoint at each coherent complete-segment
-    /// boundary. Rolling multi-track recordings publish after the current
-    /// snapshot's retained tracks have been aligned.
+    /// boundary. Rolling multi-track recordings align retained tracks and
+    /// publish the checkpoint before reclaiming each boundary's obsolete files.
     case resumable
 }
 

@@ -1,7 +1,8 @@
 import Foundation
 
 struct HLSResolvedMediaSelection: Sendable {
-    let playlist: HLSPlaylist
+    let document: HLSPlaylistDocument
+    var playlist: HLSPlaylist { document.legacyPlaylist }
     let mediaPlaylistIdentity: HLSContentIdentity
     let responseFreshness: HLSHTTPResponseFreshness
     let selectedVariant: HLSVariant?
@@ -80,9 +81,9 @@ struct HLSMediaPlaylistResolver: Sendable {
         disablesCaching: Bool = false
     ) async throws -> HLSResolvedMediaSelection {
         let playlist = document.playlist
-        guard playlist.kind == .multivariant else {
+        guard case .multivariant = document.document else {
             return HLSResolvedMediaSelection(
-                playlist: playlist,
+                document: document.document,
                 mediaPlaylistIdentity: document.identity,
                 responseFreshness: document.responseFreshness,
                 selectedVariant: nil,
@@ -125,7 +126,7 @@ struct HLSMediaPlaylistResolver: Sendable {
                         requestTimeout: requestTimeout,
                         disablesCaching: disablesCaching
                     )
-                guard mediaDocument.playlist.kind == .media else {
+                guard case .media = mediaDocument.document else {
                     throw HLSDownloadError.invalidPlaylist
                 }
                 let selectionReason: HLSContentSteeringSelectionReason
@@ -153,7 +154,7 @@ struct HLSMediaPlaylistResolver: Sendable {
                     )
                 )
                 return HLSResolvedMediaSelection(
-                    playlist: mediaDocument.playlist,
+                    document: mediaDocument.document,
                     mediaPlaylistIdentity: mediaDocument.identity,
                     responseFreshness:
                         mediaDocument.responseFreshness,

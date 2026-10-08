@@ -364,18 +364,86 @@ extension HLSLiveDVRRecordingState {
         "X-URI",
     ]
 
+    // Match recovery's metadata budget. When dates cannot establish expiry,
+    // fail closed at this bound rather than silently losing open ranges.
+    static let maximumRetainedDateRangeCount = 10_000
+
     mutating func mergeDateRanges(
-        _ updates: [HLSDateRange]
-    ) {
-        for update in updates {
-            if let index = dateRanges.firstIndex(where: {
-                $0.id == update.id
-            }) {
-                dateRanges[index] = update
-            } else {
-                dateRanges.append(update)
+        _ updates: [HLSDateRange],
+        maximumCount: Int = HLSLiveDVRRecordingState.maximumRetainedDateRangeCount
+    ) throws {
+        var merged = dateRanges
+        var indices: [String: Int] = [:]
+        for (index, range) in merged.enumerated() {
+            guard indices.updateValue(index, forKey: range.id) == nil else {
+                throw HLSLiveDVRError.recoveryCorrupted
             }
         }
+        for update in updates {
+            if let index = indices[update.id] {
+                merged[index] = update
+            } else {
+                indices[update.id] = merged.count
+                merged.append(update)
+            }
+        }
+        // Replacements can close an open range. Apply the whole bounded
+        // snapshot before pruning and enforcing the retained-history budget.
+        let expiredIDs = expiredDateRangeIDs(in: merged)
+        merged.removeAll { expiredIDs.contains($0.id) }
+        guard merged.count <= maximumCount else {
+            throw HLSLiveDVRError.unsupportedFeature(
+                .unrepresentableTimelineMetadata
+            )
+        }
+        // Remove packaged state and account for its queued directory eviction
+        // before publishing metadata without those IDs. Physical deletion is
+        // deferred until the recorder saves the next coherent checkpoint.
+        try pruneExpiredInterstitials(expiredIDs: expiredIDs)
+        dateRanges = merged
+        omittedInterstitials.removeAll { expiredIDs.contains($0.id) }
+    }
+
+    mutating func pruneExpiredDateRanges() {
+        guard configuration.limits.retentionPolicy == .rollingWindow else {
+            return
+        }
+        let expiredIDs = expiredDateRangeIDs(in: dateRanges)
+        dateRanges.removeAll { expiredIDs.contains($0.id) }
+        omittedInterstitials.removeAll { expiredIDs.contains($0.id) }
+    }
+
+    func expiredDateRangeIDs(in ranges: [HLSDateRange]) -> Set<String> {
+        guard configuration.limits.retentionPolicy == .rollingWindow,
+            let retainedStart = segments.first?.programDateTime,
+            retainedStart.timeIntervalSinceReferenceDate.isFinite
+        else {
+            return []
+        }
+        // END-ON-NEXT is closed by the next start of the same class. Resolve
+        // against the complete merged timeline before removing any successor.
+        var nextStartByClass: [String: Date] = [:]
+        var implicitEndsByID: [String: Date] = [:]
+        for range in ranges.sorted(by: { $0.startDate > $1.startDate }) {
+            guard let className = range.className else { continue }
+            if range.endsOnNext, let nextStart = nextStartByClass[className] {
+                implicitEndsByID[range.id] = nextStart
+            }
+            nextStartByClass[className] = range.startDate
+        }
+        return Set(
+            ranges.compactMap { range in
+                let end =
+                    range.endDate ?? range.duration.map {
+                        range.startDate.addingTimeInterval($0)
+                    } ?? implicitEndsByID[range.id]
+                guard let end, end.timeIntervalSinceReferenceDate.isFinite,
+                    end <= retainedStart
+                else {
+                    return nil
+                }
+                return range.id
+            })
     }
 
 }

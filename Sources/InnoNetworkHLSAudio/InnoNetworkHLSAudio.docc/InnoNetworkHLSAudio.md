@@ -61,6 +61,13 @@ item's current time. A paused item therefore stops new reads once the lead is
 filled. A backward time jump clears the previous boundary so a seek can deliver
 the sequence-restart marker. The bounded polling interval is cancellation-safe.
 
+Cancellation also ends a pending `nextSample()` client wait promptly, without
+detaching the caller's player item. AVFoundation may keep its native read pending;
+the output rejects further reads until that read finishes and discards its late
+sample. Detachment is terminal and completes pending client waits with
+`HLSDecodedAudioError.outputDetached`. Creating a fresh output is an explicit
+caller choice, not an automatic cancellation side effect.
+
 The paced sequence retains but does not detach its output. Only one iterator or
 direct read should consume at a time;
 ``HLSDecodedAudioError/readAlreadyInProgress`` rejects overlapping reads.

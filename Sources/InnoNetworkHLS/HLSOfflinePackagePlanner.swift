@@ -91,7 +91,7 @@ struct HLSOfflinePackagePlanner: Sendable {
         defer {
             sessionKeyPreload.cancel()
         }
-        guard sourceDocument.playlist.kind == .multivariant else {
+        guard case .multivariant = sourceDocument.document else {
             return HLSOfflinePackagePlan(
                 selectedVariant: nil,
                 selectedIFrameVariant: nil,
@@ -535,7 +535,7 @@ struct HLSOfflinePackagePlanner: Sendable {
         document: HLSResolvedPlaylistDocument,
         descriptor: HLSOfflinePackageTrack
     ) throws -> HLSOfflinePackageTrackPlan {
-        guard document.playlist.kind == .media,
+        guard case .media = document.document,
             let media = document.playlist.media
         else {
             throw HLSDownloadError.invalidPlaylist

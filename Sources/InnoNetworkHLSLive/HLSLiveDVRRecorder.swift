@@ -11,6 +11,7 @@ public struct HLSLiveDVRRecorder: Sendable {
     private let liveClient: HLSLivePlaylistClient
     private let resourceWriter: HLSLiveDVRResourceWriter
     private let configuration: HLSLiveDVRConfiguration
+    private let checkpointPersistence: HLSLiveDVRCheckpointStore.Persistence
 
     /// Creates a recorder backed by the default live client.
     public init(
@@ -28,6 +29,21 @@ public struct HLSLiveDVRRecorder: Sendable {
         client: HLSLivePlaylistClient,
         configuration: HLSLiveDVRConfiguration = .safeDefaults()
     ) {
+        self.init(
+            client: client,
+            configuration: configuration,
+            checkpointPersistence: HLSLiveDVRCheckpointStore.Persistence()
+        )
+    }
+
+    // Tests inject I/O failures at the real recorder's commit boundary. Public
+    // construction always uses the store's unchanged production operations.
+    init(
+        client: HLSLivePlaylistClient,
+        configuration: HLSLiveDVRConfiguration,
+        checkpointPersistence: HLSLiveDVRCheckpointStore.Persistence
+    ) {
+        self.checkpointPersistence = checkpointPersistence
         self.liveClient = client
         self.resourceWriter = HLSLiveDVRResourceWriter(
             client: client.resourceClient,
@@ -143,6 +159,7 @@ public struct HLSLiveDVRRecorder: Sendable {
                 bufferingPolicy: .bufferingNewest(64)
             )
         let control = HLSLiveDVRRecordingControl()
+        let channel = HLSOperationChannel<HLSLiveDVREvent, HLSLiveDVRReceipt>()
         let recorder = self
         let task = Task<HLSLiveDVRReceipt, Error> {
             do {
@@ -154,23 +171,29 @@ public struct HLSLiveDVRRecorder: Sendable {
                     mode: mode
                 ) {
                     continuation.yield(.progress($0))
+                    channel.emit(.progress($0))
                 }
                 await control.finishPlaybackSnapshotRequests()
                 continuation.yield(.completed(receipt))
                 continuation.finish()
+                channel.emit(.completed(receipt))
+                channel.finish(.success(receipt))
                 return receipt
             } catch is CancellationError {
                 await control.finishPlaybackSnapshotRequests()
                 continuation.finish()
+                channel.finish(.failure(CancellationError()))
                 throw CancellationError()
             } catch {
                 await control.finishPlaybackSnapshotRequests()
                 continuation.finish(throwing: error)
+                channel.finish(.failure(error))
                 throw error
             }
         }
         return HLSLiveDVRRecording(
             events: stream,
+            channel: channel,
             control: control,
             task: task
         )
@@ -290,14 +313,16 @@ public struct HLSLiveDVRRecorder: Sendable {
             throw HLSLiveDVRError.recoveryDisabled
         case (.resumable, .fresh):
             let store = HLSLiveDVRCheckpointStore(
-                destinationURL: destinationDirectoryURL
+                destinationURL: destinationDirectoryURL,
+                persistence: checkpointPersistence
             )
             checkpointStore = store
             pendingCheckpoint = nil
             workspace = try store.prepareFresh()
         case (.resumable, .resume):
             let store = HLSLiveDVRCheckpointStore(
-                destinationURL: destinationDirectoryURL
+                destinationURL: destinationDirectoryURL,
+                persistence: checkpointPersistence
             )
             let recovery = try store.resume(sourceURL: sourceURL)
             checkpointStore = store
@@ -329,6 +354,7 @@ public struct HLSLiveDVRRecorder: Sendable {
         )
         let usesRollingRetention =
             configuration.limits.retentionPolicy == .rollingWindow
+        var skippedInitialPrimaryPrefix = false
         let resourceContext = resourceWriter.makeContext(
             workspace: workspace
         )
@@ -436,62 +462,110 @@ public struct HLSLiveDVRRecorder: Sendable {
                         (request, renditionSnapshot)
                     )
                 }
+                var pendingRenditions: [(index: Int, candidates: [HLSLiveSegment], offset: Int)] = []
                 for (request, renditionSnapshot) in renditionSnapshots {
-                    let availableRenditionCandidates =
-                        try state
-                        .renditionCandidates(
-                            in: renditionSnapshot,
-                            at: request.index
-                        )
-                    let renditionCandidates =
-                        rollingRenditionCandidates(
-                            availableRenditionCandidates,
-                            primaryCandidates: candidates,
-                            usesRollingRetention: usesRollingRetention
-                        )
-                    for segment in renditionCandidates {
-                        guard
-                            state.canRetainRendition(
-                                segment,
+                    pendingRenditions.append(
+                        (
+                            request.index,
+                            try state.renditionCandidates(
+                                in: renditionSnapshot,
                                 at: request.index
-                            )
-                        else {
-                            throw HLSLiveDVRError.unsupportedFeature(
-                                .incompleteExternalRendition
-                            )
-                        }
-                        try state.validateRenditionSegment(
-                            segment,
-                            at: request.index
-                        )
-                        guard
-                            try await resourceWriter
-                                .retainRenditionInitializationIfNeeded(
-                                    for: segment,
-                                    at: request.index,
-                                    state: &state,
-                                    context: resourceContext
-                                ),
-                            try await resourceWriter.retainRendition(
-                                segment,
-                                at: request.index,
-                                state: &state,
-                                context: resourceContext
-                            )
-                        else {
-                            throw HLSLiveDVRError.unsupportedFeature(
-                                .incompleteExternalRendition
-                            )
-                        }
-                    }
+                            ),
+                            0
+                        ))
                 }
-                var didRetainPrimarySegment = false
                 for segment in candidates {
+                    let previousBoundary = state
                     guard state.canRetain(segment) else {
                         if usesRollingRetention {
                             throw HLSLiveDVRError.storageFailed
                         }
                         break recordingLoop
+                    }
+                    if usesRollingRetention, state.segments.isEmpty,
+                        let primaryStart = segment.programDateTime
+                    {
+                        // A fresh rolling recording may start at the common
+                        // dated window of its tracks. Once a coherent boundary
+                        // exists, missing mandatory coverage still fails.
+                        for index in pendingRenditions.indices {
+                            while pendingRenditions[index].offset
+                                < pendingRenditions[index].candidates.count
+                            {
+                                let candidate = pendingRenditions[index].candidates[
+                                    pendingRenditions[index].offset
+                                ]
+                                guard let start = candidate.programDateTime,
+                                    start.addingTimeInterval(candidate.duration) <= primaryStart
+                                else { break }
+                                pendingRenditions[index].offset += 1
+                            }
+                        }
+                        if pendingRenditions.contains(where: { pending in
+                            guard pending.offset < pending.candidates.count,
+                                let firstStart = pending.candidates[pending.offset].programDateTime
+                            else { return false }
+                            return firstStart > primaryStart.addingTimeInterval(0.5)
+                        }) {
+                            state.lastObservedSequence = segment.sequenceNumber
+                            skippedInitialPrimaryPrefix = true
+                            continue
+                        }
+                    }
+                    // Extend each external track only to this primary boundary.
+                    // A whole playlist of future audio must not consume the
+                    // stop-at-limit budget or the rolling disk window first.
+                    for pendingIndex in pendingRenditions.indices {
+                        let pending = pendingRenditions[pendingIndex]
+                        let segmentsToRetain = renditionCandidates(
+                            pending.candidates.dropFirst(pending.offset),
+                            through: segment,
+                            retained: state.renditionStates[pending.index],
+                            primaryDuration: state.recordedDuration
+                        )
+                        for renditionSegment in segmentsToRetain {
+                            guard
+                                state.canRetainRendition(
+                                    renditionSegment,
+                                    at: pending.index
+                                )
+                            else {
+                                if usesRollingRetention {
+                                    throw HLSLiveDVRError.unsupportedFeature(
+                                        .incompleteExternalRendition
+                                    )
+                                }
+                                try rollbackRetainedBoundary(previousBoundary, state: &state)
+                                break recordingLoop
+                            }
+                            try state.validateRenditionSegment(
+                                renditionSegment,
+                                at: pending.index
+                            )
+                            guard
+                                try await resourceWriter.retainRenditionInitializationIfNeeded(
+                                    for: renditionSegment,
+                                    at: pending.index,
+                                    state: &state,
+                                    context: resourceContext
+                                ),
+                                try await resourceWriter.retainRendition(
+                                    renditionSegment,
+                                    at: pending.index,
+                                    state: &state,
+                                    context: resourceContext
+                                )
+                            else {
+                                if usesRollingRetention {
+                                    throw HLSLiveDVRError.unsupportedFeature(
+                                        .incompleteExternalRendition
+                                    )
+                                }
+                                try rollbackRetainedBoundary(previousBoundary, state: &state)
+                                break recordingLoop
+                            }
+                            pendingRenditions[pendingIndex].offset += 1
+                        }
                     }
                     try state.validate(segment)
                     guard
@@ -507,6 +581,7 @@ public struct HLSLiveDVRRecorder: Sendable {
                         if usesRollingRetention {
                             throw HLSLiveDVRError.storageFailed
                         }
+                        try rollbackRetainedBoundary(previousBoundary, state: &state)
                         break recordingLoop
                     }
                     let didRetain = try await resourceWriter.retain(
@@ -515,50 +590,24 @@ public struct HLSLiveDVRRecorder: Sendable {
                         context: resourceContext
                     )
                     guard didRetain else {
-                        try resourceWriter
-                            .discardUnreferencedInitialization(
-                                for: segment,
-                                state: &state
-                            )
                         if usesRollingRetention {
                             throw HLSLiveDVRError.storageFailed
                         }
+                        try rollbackRetainedBoundary(previousBoundary, state: &state)
                         break recordingLoop
                     }
-                    didRetainPrimarySegment = true
                     if let statistics = await preloadCoordinator?
                         .statisticsSnapshot()
                     {
                         state.preloadStatistics = statistics
                     }
-                    if !usesRollingRetention {
-                        try persistRetainedBoundary(
-                            sourceURL: sourceURL,
-                            checkpointStore: checkpointStore,
-                            checkpointedFilePaths:
-                                &checkpointedFilePaths,
-                            preservesRecovery: &preservesRecovery,
-                            state: &state
-                        )
-                        await fulfillPlaybackSnapshotRequests(
-                            control: control,
-                            state: state
-                        )
+                    if usesRollingRetention {
+                        try state.finalizeRollingPresentation()
                     }
-                    if !usesRollingRetention {
-                        onProgress(state.progress)
-                        if let control,
-                            await control.shouldStopAndCommit
-                        {
-                            break recordingLoop
-                        }
-                        if state.reachedLimit {
-                            break recordingLoop
-                        }
-                    }
-                }
-                if usesRollingRetention, didRetainPrimarySegment {
-                    try state.finalizeRollingPresentation()
+                    try state.validateRenditionCoverage()
+                    // Publish the complete A/V boundary before deleting files
+                    // referenced by the previous durable checkpoint. Do this
+                    // for every segment, including a large initial snapshot.
                     try persistRetainedBoundary(
                         sourceURL: sourceURL,
                         checkpointStore: checkpointStore,
@@ -574,6 +623,9 @@ public struct HLSLiveDVRRecorder: Sendable {
                     if let control,
                         await control.shouldStopAndCommit
                     {
+                        break recordingLoop
+                    }
+                    if state.reachedLimit {
                         break recordingLoop
                     }
                 }
@@ -627,11 +679,23 @@ public struct HLSLiveDVRRecorder: Sendable {
             throw CancellationError()
         }
         try Task.checkCancellation()
+        if skippedInitialPrimaryPrefix, state.segments.isEmpty {
+            throw HLSLiveDVRError.unsupportedFeature(.incompleteExternalRendition)
+        }
         try resourceWriter.discardAllStagedParts(state: &state)
-        try resourceWriter.discard(
-            state.takePendingEvictionFilePaths(),
-            workspace: state.workspace
-        )
+        if !state.segments.isEmpty {
+            try state.validateRenditionCoverage()
+            // A metadata-only final snapshot can expire an interstitial
+            // without appending media. Persist that new boundary before
+            // deleting anything the previous checkpoint still references.
+            try persistRetainedBoundary(
+                sourceURL: sourceURL,
+                checkpointStore: checkpointStore,
+                checkpointedFilePaths: &checkpointedFilePaths,
+                preservesRecovery: &preservesRecovery,
+                state: &state
+            )
+        }
         let receipt = try state.commit(
             to: destinationDirectoryURL
         )
@@ -742,6 +806,25 @@ public struct HLSLiveDVRRecorder: Sendable {
         }
     }
 
+    private func rollbackRetainedBoundary(
+        _ previous: HLSLiveDVRRecordingState,
+        state: inout HLSLiveDVRRecordingState
+    ) throws {
+        let newPaths = Set(state.retainedMediaRelativePaths)
+            .subtracting(previous.retainedMediaRelativePaths)
+        try resourceWriter.discard(newPaths.sorted(), workspace: state.workspace)
+        // Part fallback may already have discarded files, and preloads may
+        // have been consumed. Restore track accounting without resurrecting
+        // that transient state or reusing emitted resource request indices.
+        let currentParts = state.partState
+        let currentPreloads = state.preloadStatistics
+        let nextResourceIndex = state.nextResourceIndex
+        state = previous
+        state.partState = currentParts
+        state.preloadStatistics = currentPreloads
+        state.nextResourceIndex = nextResourceIndex
+    }
+
     private func persistRetainedBoundary(
         sourceURL: URL,
         checkpointStore: HLSLiveDVRCheckpointStore?,
@@ -770,45 +853,43 @@ public struct HLSLiveDVRRecorder: Sendable {
         )
     }
 
-    private func rollingRenditionCandidates(
-        _ candidates: [HLSLiveSegment],
-        primaryCandidates: [HLSLiveSegment],
-        usesRollingRetention: Bool
+    private func renditionCandidates(
+        _ candidates: ArraySlice<HLSLiveSegment>,
+        through primary: HLSLiveSegment,
+        retained: HLSLiveDVRRenditionRecordingState,
+        primaryDuration: TimeInterval
     ) -> [HLSLiveSegment] {
-        guard usesRollingRetention else {
-            return candidates
+        let primaryEnd = primary.programDateTime.map {
+            $0.addingTimeInterval(primary.duration)
         }
-        guard let lastPrimary = primaryCandidates.last else {
-            return []
+        var retainedEnd = retained.segments.last.flatMap { segment in
+            segment.programDateTime.map {
+                $0.addingTimeInterval(segment.duration)
+            }
         }
-        if let primaryStart = lastPrimary.programDateTime {
-            let primaryEnd = primaryStart.addingTimeInterval(
-                lastPrimary.duration
-            )
-            let datedPrefix = candidates.prefix { candidate in
-                guard let candidateStart = candidate.programDateTime else {
-                    return false
+        var remainingDuration =
+            primaryDuration + primary.duration - retained.recordedDuration
+        var result: [HLSLiveSegment] = []
+        for candidate in candidates {
+            if let primaryEnd, let candidateStart = candidate.programDateTime {
+                if let retainedEnd,
+                    retainedEnd >= primaryEnd.addingTimeInterval(-0.5)
+                {
+                    break
                 }
-                return candidateStart
-                    < primaryEnd.addingTimeInterval(0.5)
+                guard candidateStart < primaryEnd else {
+                    break
+                }
+                retainedEnd = candidateStart.addingTimeInterval(candidate.duration)
+            } else if remainingDuration <= 0.5,
+                !retained.segments.isEmpty || !result.isEmpty
+            {
+                break
             }
-            if candidates.contains(where: {
-                $0.programDateTime != nil
-            }) {
-                return Array(datedPrefix)
-            }
+            result.append(candidate)
+            remainingDuration -= candidate.duration
         }
-        let primarySequences = Set(
-            primaryCandidates.map(\.sequenceNumber)
-        )
-        if candidates.contains(where: {
-            primarySequences.contains($0.sequenceNumber)
-        }) {
-            return candidates.filter {
-                $0.sequenceNumber <= lastPrimary.sequenceNumber
-            }
-        }
-        return candidates
+        return result
     }
 
     private func stageParts(

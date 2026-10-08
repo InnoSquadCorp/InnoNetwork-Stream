@@ -327,6 +327,8 @@ def write_ready_file(path: Path, base_url: str) -> None:
 
 
 def main() -> None:
+    started = time.monotonic()
+    print(f"hls-runtime-server: starting pid={os.getpid()} python={sys.version.split()[0]}", flush=True)
     parser = argparse.ArgumentParser()
     parser.add_argument("fixture_root", type=Path)
     parser.add_argument("ready_file", type=Path)
@@ -354,7 +356,7 @@ def main() -> None:
     server.daemon_threads = True
     port = server.server_address[1]
     write_ready_file(arguments.ready_file, f"http://127.0.0.1:{port}")
-    print(f"hls-runtime-server: ready on port {port}", file=sys.stderr, flush=True)
+    print(f"hls-runtime-server: ready elapsed_ms={(time.monotonic() - started) * 1000:.2f} port={port}", flush=True)
     try:
         server.serve_forever(poll_interval=0.1)
     except KeyboardInterrupt:

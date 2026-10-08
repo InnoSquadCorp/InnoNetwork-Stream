@@ -214,14 +214,14 @@ enum HLSOfflinePackageIntegrity {
     }
 }
 
-private enum HLSOfflinePackageValidator {
-    private static let maximumManifestBytes = 8 * 1_024 * 1_024
+enum HLSOfflinePackageValidator {
     private static let maximumPlaylistBytes = 8 * 1_024 * 1_024
     private static let maximumTrackCount = 128
     private static let manifestPath = "manifest.json"
 
     static func open(
-        at directoryURL: URL
+        at directoryURL: URL,
+        maximumManifestBytes: Int = HLSOfflinePackageManifest.maximumEncodedBytes
     ) throws -> HLSOfflinePackageReceipt {
         guard directoryURL.isFileURL else {
             throw HLSDownloadError.invalidDestination
@@ -235,7 +235,10 @@ private enum HLSOfflinePackageValidator {
         )
         let manifestData = try boundedRegularFileData(
             at: manifestURL,
-            maximumBytes: maximumManifestBytes
+            maximumBytes: min(
+                maximumManifestBytes,
+                HLSOfflinePackageManifest.maximumEncodedBytes
+            )
         )
         let manifest: HLSOfflinePackageManifest
         do {

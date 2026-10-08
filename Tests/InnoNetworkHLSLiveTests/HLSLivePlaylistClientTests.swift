@@ -468,8 +468,11 @@ struct HLSLivePlaylistClientTests {
         #expect(settings.requestTimeout == 300)
     }
 
-    @Test("missing delta history falls back to one clean full reload")
-    func recoversFromMissingDeltaBase() async throws {
+    @Test(
+        "missing or oversized delta history falls back without allocating it",
+        arguments: [2, Int.max]
+    )
+    func recoversFromMissingDeltaBase(skippedSegments: Int) async throws {
         let sourceURL = try #require(
             URL(string: "https://media.example/recovery.m3u8")
         )
@@ -504,9 +507,9 @@ struct HLSLivePlaylistClientTests {
                 #EXTM3U
                 #EXT-X-VERSION:9
                 #EXT-X-TARGETDURATION:4
-                #EXT-X-MEDIA-SEQUENCE:10
+                #EXT-X-MEDIA-SEQUENCE:\(skippedSegments == Int.max ? 0 : 10)
                 #EXT-X-SERVER-CONTROL:CAN-BLOCK-RELOAD=YES,CAN-SKIP-UNTIL=24
-                #EXT-X-SKIP:SKIPPED-SEGMENTS=2
+                #EXT-X-SKIP:SKIPPED-SEGMENTS=\(skippedSegments)
                 #EXTINF:4,
                 12.ts
                 """

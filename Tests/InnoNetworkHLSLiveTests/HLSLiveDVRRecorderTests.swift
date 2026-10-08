@@ -6,6 +6,616 @@ import Testing
 @testable import InnoNetworkHLSLive
 
 extension HLSLivePlaylistClientTests {
+    @Test("Rolling metadata drops closed history while preserving overlaps and open ranges")
+    func boundsRollingDateRangeHistory() throws {
+        let fixture = try makeFixture()
+        defer { fixture.cleanup() }
+        let start = Date(timeIntervalSinceReferenceDate: 0)
+        var state = HLSLiveDVRRecordingState(
+            configuration: .advanced(
+                limits: HLSLiveDVRLimitPack(
+                    maximumSegmentCount: 1,
+                    retentionPolicy: .rollingWindow
+                ),
+                startPosition: .currentWindow
+            ),
+            workspace: HLSLiveDVRWorkspace(directoryURL: fixture.rootURL)
+        )
+        try state.mergeDateRanges([
+            HLSDateRange(id: "open", startDate: start),
+            HLSDateRange(id: "overlap", startDate: start, duration: 2_000),
+        ])
+        for index in 0..<256 {
+            let date = start.addingTimeInterval(Double(index * 4))
+            state.segments = [
+                HLSLiveDVRStoredSegment(
+                    sequenceNumber: Int64(index), duration: 4,
+                    beginsDiscontinuity: false, programDateTime: date,
+                    fileName: "segment.ts", byteCount: 1, contentSHA256: "unused"
+                )
+            ]
+            try state.mergeDateRanges([
+                HLSDateRange(id: "closed-\(index)", startDate: date, duration: 4)
+            ])
+            #expect(state.dateRanges.count == 3)
+            #expect(state.dateRanges.prefix(2).map(\.id) == ["open", "overlap"])
+        }
+        // A formerly open range can close in an update already behind us.
+        try state.mergeDateRanges([
+            HLSDateRange(id: "open", startDate: start, duration: 4)
+        ])
+        #expect(!state.dateRanges.contains { $0.id == "open" })
+    }
+
+    @Test("Closing a range frees its metadata slot within the same snapshot")
+    func closingDateRangeFreesBudget() throws {
+        let fixture = try makeFixture()
+        defer { fixture.cleanup() }
+        let start = Date(timeIntervalSinceReferenceDate: 0)
+        var state = HLSLiveDVRRecordingState(
+            configuration: .advanced(
+                limits: HLSLiveDVRLimitPack(retentionPolicy: .rollingWindow),
+                startPosition: .currentWindow
+            ),
+            workspace: HLSLiveDVRWorkspace(directoryURL: fixture.rootURL)
+        )
+        try state.mergeDateRanges([HLSDateRange(id: "old", startDate: start)], maximumCount: 1)
+        state.segments = [
+            HLSLiveDVRStoredSegment(
+                sequenceNumber: 1, duration: 4, beginsDiscontinuity: false,
+                programDateTime: start.addingTimeInterval(4),
+                fileName: "segment.ts", byteCount: 1, contentSHA256: "unused"
+            )
+        ]
+        try state.mergeDateRanges(
+            [
+                HLSDateRange(id: "old", startDate: start, duration: 4),
+                HLSDateRange(id: "new", startDate: start.addingTimeInterval(4), duration: 4),
+            ], maximumCount: 1)
+        #expect(state.dateRanges.map(\.id) == ["new"])
+    }
+
+    @Test("Rolling END-ON-NEXT chapters expire using the complete same-class timeline")
+    func prunesClosedEndOnNextDateRanges() throws {
+        let fixture = try makeFixture()
+        defer { fixture.cleanup() }
+        let start = Date(timeIntervalSinceReferenceDate: 0)
+        var state = HLSLiveDVRRecordingState(
+            configuration: .advanced(
+                limits: HLSLiveDVRLimitPack(retentionPolicy: .rollingWindow),
+                startPosition: .currentWindow
+            ),
+            workspace: HLSLiveDVRWorkspace(directoryURL: fixture.rootURL)
+        )
+        func chapter(_ index: Int) -> HLSDateRange {
+            HLSDateRange(
+                id: "chapter-\(index)", className: "chapter",
+                startDate: start.addingTimeInterval(Double(index * 4)), endsOnNext: true)
+        }
+        state.segments = [
+            HLSLiveDVRStoredSegment(
+                sequenceNumber: 2, duration: 4, beginsDiscontinuity: false,
+                programDateTime: start.addingTimeInterval(8),
+                fileName: "segment.ts", byteCount: 1, contentSHA256: "unused"
+            )
+        ]
+        try state.mergeDateRanges([chapter(2), chapter(0), chapter(1)], maximumCount: 1)
+        #expect(state.dateRanges.map(\.id) == ["chapter-2"])
+        // The newest chapter remains open even after the window moves until
+        // another chapter of the same class supplies its actual end.
+        state.segments = [
+            HLSLiveDVRStoredSegment(
+                sequenceNumber: 3, duration: 4, beginsDiscontinuity: false,
+                programDateTime: start.addingTimeInterval(12),
+                fileName: "segment.ts", byteCount: 1, contentSHA256: "unused"
+            )
+        ]
+        try state.mergeDateRanges([], maximumCount: 1)
+        #expect(state.dateRanges.map(\.id) == ["chapter-2"])
+        try state.mergeDateRanges([chapter(3)], maximumCount: 1)
+        #expect(state.dateRanges.map(\.id) == ["chapter-3"])
+    }
+
+    @Test("Undated rolling metadata fails at its budget without discarding open ranges")
+    func boundsUndatedRollingMetadata() throws {
+        let fixture = try makeFixture()
+        defer { fixture.cleanup() }
+        var state = HLSLiveDVRRecordingState(
+            configuration: .advanced(
+                limits: HLSLiveDVRLimitPack(retentionPolicy: .rollingWindow),
+                startPosition: .currentWindow
+            ),
+            workspace: HLSLiveDVRWorkspace(directoryURL: fixture.rootURL)
+        )
+        let ranges = (0..<4).map {
+            HLSDateRange(id: "open-\($0)", startDate: Date(timeIntervalSinceReferenceDate: 0))
+        }
+        try state.mergeDateRanges(ranges, maximumCount: 4)
+        #expect(throws: HLSLiveDVRError.unsupportedFeature(.unrepresentableTimelineMetadata)) {
+            try state.mergeDateRanges(
+                [
+                    HLSDateRange(id: "overflow", startDate: Date(timeIntervalSinceReferenceDate: 0))
+                ], maximumCount: 4)
+        }
+        #expect(state.dateRanges == ranges)
+    }
+
+    @Test("Corrupt duplicate metadata IDs throw instead of trapping during merge")
+    func rejectsDuplicateStoredDateRangeIDs() throws {
+        let fixture = try makeFixture()
+        defer { fixture.cleanup() }
+        var state = HLSLiveDVRRecordingState(
+            configuration: .advanced(startPosition: .currentWindow),
+            workspace: HLSLiveDVRWorkspace(directoryURL: fixture.rootURL)
+        )
+        let range = HLSDateRange(id: "duplicate", startDate: Date(timeIntervalSinceReferenceDate: 0))
+        state.dateRanges = [range, range]
+        #expect(throws: HLSLiveDVRError.recoveryCorrupted) {
+            try state.mergeDateRanges([])
+        }
+    }
+
+    @Test("Stop-at-limit metadata retains history behind the live window")
+    func preservesStopAtLimitDateRangeHistory() throws {
+        let fixture = try makeFixture()
+        defer { fixture.cleanup() }
+        var state = HLSLiveDVRRecordingState(
+            configuration: .advanced(startPosition: .currentWindow),
+            workspace: HLSLiveDVRWorkspace(directoryURL: fixture.rootURL)
+        )
+        state.segments = [
+            HLSLiveDVRStoredSegment(
+                sequenceNumber: 100, duration: 4, beginsDiscontinuity: false,
+                programDateTime: Date(timeIntervalSinceReferenceDate: 400),
+                fileName: "segment.ts", byteCount: 1, contentSHA256: "unused"
+            )
+        ]
+        let history = HLSDateRange(
+            id: "history", startDate: Date(timeIntervalSinceReferenceDate: 0), duration: 4
+        )
+        try state.mergeDateRanges([history])
+        state.pruneExpiredDateRanges()
+        #expect(state.dateRanges == [history])
+    }
+
+    @Test("A large initial rolling window reclaims files before its last transfer", arguments: [false, true])
+    func boundsPeakRollingFiles(externalAudio: Bool) async throws {
+        let fixture = try makeFixture()
+        defer {
+            fixture.cleanup()
+            HLSLiveURLProtocol.reset()
+        }
+        let masterURL = try url("https://media.example/peak-master.m3u8")
+        let videoURL = try url("https://media.example/peak-video.m3u8")
+        let audioURL = try url("https://media.example/peak-audio.m3u8")
+        let finalURL = try url("https://media.example/peak-video-12.ts")
+        let sourceURL = externalAudio ? masterURL : videoURL
+        if externalAudio {
+            HLSLiveURLProtocol.register(
+                playlistResponse(
+                    """
+                    #EXTM3U
+                    #EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",NAME="Stereo",DEFAULT=YES,URI="peak-audio.m3u8"
+                    #EXT-X-STREAM-INF:BANDWIDTH=1000,AUDIO="audio"
+                    peak-video.m3u8
+                    """), for: masterURL)
+        }
+        for prefix in externalAudio ? ["video", "audio"] : ["video"] {
+            let media = (1...12).map {
+                "#EXTINF:4,\npeak-\(prefix)-\($0).ts"
+            }.joined(separator: "\n")
+            HLSLiveURLProtocol.register(
+                playlistResponse(
+                    """
+                    #EXTM3U
+                    #EXT-X-TARGETDURATION:4
+                    #EXT-X-MEDIA-SEQUENCE:1
+                    \(media)
+                    #EXT-X-ENDLIST
+                    """), for: prefix == "video" ? videoURL : audioURL)
+            for index in 1...12 {
+                HLSLiveURLProtocol.register(
+                    mediaResponse(Data(repeating: 0x47, count: 188)),
+                    for: try url("https://media.example/peak-\(prefix)-\(index).ts"))
+            }
+        }
+        let store = HLSLiveDVRCheckpointStore(destinationURL: fixture.destinationURL)
+        let inspected = DVRPeakInspectionProbe()
+        let client = HLSLivePlaylistClient(
+            session: fixture.session,
+            requestPolicy: HLSRequestPolicy { request, _ in
+                if request.url == finalURL {
+                    // The adapter gates the final transfer until the physical
+                    // workspace and the preceding durable checkpoint are read.
+                    let checkpoint = try JSONDecoder().decode(
+                        HLSLiveDVRCheckpoint.self,
+                        from: Data(contentsOf: store.rootURL.appendingPathComponent("checkpoint.json")))
+                    #expect(checkpoint.primary.segments.last?.sequenceNumber == 11)
+                    let enumerator = try #require(
+                        FileManager.default.enumerator(
+                            at: store.workspace.directoryURL, includingPropertiesForKeys: nil))
+                    let mediaFiles = enumerator.compactMap { $0 as? URL }.filter { $0.pathExtension == "ts" }
+                    #expect(mediaFiles.count == (externalAudio ? 3 : 1))
+                    for file in checkpoint.files {
+                        #expect(
+                            FileManager.default.fileExists(
+                                atPath:
+                                    store.workspace.directoryURL.appendingPathComponent(file.relativePath).path))
+                    }
+                    await inspected.markInspected()
+                }
+                return request
+            }
+        )
+        let receipt = try await HLSLiveDVRRecorder(
+            client: client,
+            configuration: .advanced(
+                limits: HLSLiveDVRLimitPack(
+                    maximumSegmentCount: 1, maximumMediaResourceBytes: 1_024,
+                    maximumTotalMediaBytes: 4_096, retentionPolicy: .rollingWindow),
+                startPosition: .currentWindow,
+                recovery: HLSLiveDVRRecoveryPack(policy: .resumable)
+            )
+        ).record(from: sourceURL, to: fixture.destinationURL)
+        #expect(await inspected.didInspect)
+        #expect(receipt.firstMediaSequence == 12)
+        #expect(receipt.segmentCount == 1)
+    }
+
+    @Test("Fresh rolling recording starts at its tracks' common dated window", arguments: [false, true])
+    func rollingStartupFindsCommonDatedWindow(audioAhead: Bool) async throws {
+        let fixture = try makeFixture()
+        defer {
+            fixture.cleanup()
+            HLSLiveURLProtocol.reset()
+        }
+        let sourceURL = try url("https://media.example/common-master.m3u8")
+        HLSLiveURLProtocol.register(
+            playlistResponse(
+                """
+                #EXTM3U
+                #EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",NAME="Stereo",DEFAULT=YES,URI="common-audio.m3u8"
+                #EXT-X-STREAM-INF:BANDWIDTH=1000,AUDIO="audio"
+                common-video.m3u8
+                """), for: sourceURL)
+        for prefix in ["video", "audio"] {
+            let first = (prefix == "audio") == audioAhead ? 1 : 0
+            let media = (first...2).map { index in
+                "#EXT-X-PROGRAM-DATE-TIME:2026-01-01T00:00:0\(index * 4)Z\n#EXTINF:4,\ncommon-\(prefix)-\(index).ts"
+            }.joined(separator: "\n")
+            HLSLiveURLProtocol.register(
+                playlistResponse(
+                    """
+                    #EXTM3U
+                    #EXT-X-TARGETDURATION:4
+                    #EXT-X-MEDIA-SEQUENCE:\(first)
+                    \(media)
+                    #EXT-X-ENDLIST
+                    """), for: try url("https://media.example/common-\(prefix).m3u8"))
+            for index in first...2 {
+                HLSLiveURLProtocol.register(
+                    mediaResponse(Data("\(prefix)-\(index)".utf8)),
+                    for: try url("https://media.example/common-\(prefix)-\(index).ts"))
+            }
+        }
+        let receipt = try await rollingRecorder(
+            session: fixture.session, maximumSegmentCount: 1,
+            recovery: HLSLiveDVRRecoveryPack(policy: .resumable)
+        )
+        .record(from: sourceURL, to: fixture.destinationURL)
+        #expect(receipt.firstMediaSequence == 2)
+        #expect(receipt.lastMediaSequence == 2)
+        #expect(receipt.segmentCount == 1)
+        let requests = HLSLiveURLProtocol.capturedRequests().compactMap(\.url)
+        for prefix in ["video", "audio"] {
+            #expect(!requests.contains(try url("https://media.example/common-\(prefix)-0.ts")))
+        }
+        let resourceFiles = try packageFileURLs(receipt.directoryURL).filter { $0.pathExtension == "ts" }
+        #expect(resourceFiles.count == 2)
+        for track in receipt.tracks {
+            let contents = try String(
+                contentsOf: receipt.directoryURL.appendingPathComponent(track.relativePlaylistPath),
+                encoding: .utf8)
+            #expect(contents.contains("#EXT-X-MEDIA-SEQUENCE:2"))
+        }
+    }
+
+    @Test("Rolling recording never skips a dated coverage gap after its first coherent boundary")
+    func rejectsDatedCoverageGapAfterBoundary() async throws {
+        let fixture = try makeFixture()
+        defer {
+            fixture.cleanup()
+            HLSLiveURLProtocol.reset()
+        }
+        let sourceURL = try url("https://media.example/coverage-master.m3u8")
+        HLSLiveURLProtocol.register(
+            playlistResponse(
+                """
+                #EXTM3U
+                #EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",NAME="Stereo",DEFAULT=YES,URI="coverage-audio.m3u8"
+                #EXT-X-STREAM-INF:BANDWIDTH=1000,AUDIO="audio"
+                coverage-video.m3u8
+                """), for: sourceURL)
+        for prefix in ["video", "audio"] {
+            let secondStart = prefix == "audio" ? 8 : 4
+            HLSLiveURLProtocol.register(
+                playlistResponse(
+                    """
+                    #EXTM3U
+                    #EXT-X-TARGETDURATION:4
+                    #EXT-X-MEDIA-SEQUENCE:0
+                    #EXT-X-PROGRAM-DATE-TIME:2026-01-01T00:00:00Z
+                    #EXTINF:4,
+                    coverage-\(prefix)-0.ts
+                    #EXT-X-DISCONTINUITY
+                    #EXT-X-PROGRAM-DATE-TIME:2026-01-01T00:00:0\(secondStart)Z
+                    #EXTINF:4,
+                    coverage-\(prefix)-1.ts
+                    #EXT-X-ENDLIST
+                    """), for: try url("https://media.example/coverage-\(prefix).m3u8"))
+            for index in 0...1 {
+                HLSLiveURLProtocol.register(
+                    mediaResponse(Data("\(prefix)-\(index)".utf8)),
+                    for: try url("https://media.example/coverage-\(prefix)-\(index).ts"))
+            }
+        }
+        await #expect(throws: HLSLiveDVRError.unsupportedFeature(.incompleteExternalRendition)) {
+            try await rollingRecorder(
+                session: fixture.session, maximumSegmentCount: 1,
+                recovery: HLSLiveDVRRecoveryPack(policy: .resumable)
+            )
+            .record(from: sourceURL, to: fixture.destinationURL)
+        }
+        let store = HLSLiveDVRCheckpointStore(destinationURL: fixture.destinationURL)
+        let checkpoint = try JSONDecoder().decode(
+            HLSLiveDVRCheckpoint.self,
+            from: Data(contentsOf: store.rootURL.appendingPathComponent("checkpoint.json")))
+        #expect(checkpoint.primary.segments.map(\.sequenceNumber) == [0])
+        #expect(checkpoint.renditions.first?.track.segments.map(\.sequenceNumber) == [0])
+        for file in checkpoint.files {
+            let fileURL = store.workspace.directoryURL.appendingPathComponent(file.relativePath)
+            #expect(try Data(contentsOf: fileURL).count == Int(file.byteCount))
+        }
+        #expect(!FileManager.default.fileExists(atPath: fixture.destinationURL.path))
+        #expect(
+            !HLSLiveURLProtocol.capturedRequests().compactMap(\.url)
+                .contains(try url("https://media.example/coverage-audio-1.ts")))
+    }
+
+    @Test(
+        "Stop-at-limit rolls back every provisional track and map after a limit refusal",
+        arguments: DVRLimitRefusalCase.allCases, [false, true])
+    func rollsBackLimitedAVBoundary(scenario: DVRLimitRefusalCase, resumable: Bool) async throws {
+        let fixture = try makeFixture()
+        defer {
+            fixture.cleanup()
+            HLSLiveURLProtocol.reset()
+        }
+        let sourceURL = try url("https://media.example/rollback-master.m3u8")
+        let videoURL = try url("https://media.example/rollback-video.m3u8")
+        let twoTracks = [DVRLimitRefusalCase.laterRendition, .laterRenditionMap, .renditionCount, .renditionDuration]
+            .contains(scenario)
+        let audioCount = twoTracks ? 2 : 1
+        let primaryMaps = [DVRLimitRefusalCase.primaryInitialization, .primaryMediaAfterMap].contains(scenario)
+        let audioMaps = scenario == .laterRenditionMap
+        let resourceBytes = scenario == .secondAudio ? 6 : 2
+        let totalLimit: Int64
+        switch scenario {
+        case .secondAudio: totalLimit = 15
+        case .laterRendition: totalLimit = 9
+        case .laterRenditionMap: totalLimit = 11
+        case .primaryInitialization: totalLimit = 8
+        case .primaryMedia: totalLimit = 7
+        case .primaryMediaAfterMap: totalLimit = 9
+        case .renditionCount, .renditionDuration: totalLimit = 100
+        }
+        let expectedAudioSegments = (0..<audioCount).map { index in
+            index == 1 && [DVRLimitRefusalCase.renditionCount, .renditionDuration].contains(scenario) ? 2 : 1
+        }
+        let expectedFileCount =
+            1 + expectedAudioSegments.reduce(0, +)
+            + (primaryMaps ? 1 : 0) + (audioMaps ? audioCount : 0)
+        let expectedMediaBytes = Int64(
+            (1 + expectedAudioSegments.reduce(0, +)) * resourceBytes
+                + (primaryMaps ? 1 : 0) + (audioMaps ? audioCount : 0)
+        )
+        let audioTags = (0..<audioCount).map { index in
+            "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"audio\",NAME=\"Audio\(index)\",DEFAULT=\(index == 0 ? "YES" : "NO"),URI=\"rollback-audio\(index).m3u8\""
+        }.joined(separator: "\n")
+        HLSLiveURLProtocol.register(
+            playlistResponse(
+                """
+                #EXTM3U
+                \(audioTags)
+                #EXT-X-STREAM-INF:BANDWIDTH=1000,AUDIO="audio"
+                rollback-video.m3u8
+                """), for: sourceURL)
+        for track in 0...audioCount {
+            let primary = track == 0
+            let name = primary ? "video" : "audio\(track - 1)"
+            let mapped = primary ? primaryMaps : audioMaps
+            let durations: [Int]
+            if track == 2, scenario == .renditionCount {
+                durations = [2, 2, 2, 2]
+            } else if track == 2, scenario == .renditionDuration {
+                durations = [3, 3, 3]
+            } else {
+                durations = [4, 4]
+            }
+            var lines = ["#EXTM3U", "#EXT-X-VERSION:7", "#EXT-X-TARGETDURATION:4", "#EXT-X-MEDIA-SEQUENCE:1"]
+            for (index, duration) in durations.enumerated() {
+                if mapped {
+                    if index > 0 { lines.append("#EXT-X-DISCONTINUITY") }
+                    let mapName = "rollback-\(name)-map\(index + 1).mp4"
+                    lines.append("#EXT-X-MAP:URI=\"\(mapName)\"")
+                    let mapBytes = primary && index == 1 && scenario == .primaryInitialization ? 2 : 1
+                    HLSLiveURLProtocol.register(
+                        mediaResponse(Data(repeating: 0x69, count: mapBytes)),
+                        for: try url("https://media.example/\(mapName)"))
+                }
+                let fileName = "rollback-\(name)-\(index + 1).\(mapped ? "m4s" : "ts")"
+                lines.append("#EXTINF:\(duration),")
+                lines.append(fileName)
+                HLSLiveURLProtocol.register(
+                    mediaResponse(Data(repeating: 0x47, count: resourceBytes)),
+                    for: try url("https://media.example/\(fileName)"))
+            }
+            lines.append("#EXT-X-ENDLIST")
+            HLSLiveURLProtocol.register(
+                playlistResponse(lines.joined(separator: "\n")),
+                for: primary ? videoURL : try url("https://media.example/rollback-\(name).m3u8"))
+        }
+        let store = HLSLiveDVRCheckpointStore(destinationURL: fixture.destinationURL)
+        let inspected = DVRPeakInspectionProbe()
+        let client = HLSLivePlaylistClient(
+            session: fixture.session,
+            requestPolicy: HLSRequestPolicy { request, _ in
+                if resumable, let path = request.url?.lastPathComponent,
+                    path == "rollback-audio0-2.\(audioMaps ? "m4s" : "ts")"
+                        || path == "rollback-audio0-map2.mp4"
+                {
+                    let checkpoint = try JSONDecoder().decode(
+                        HLSLiveDVRCheckpoint.self,
+                        from: Data(contentsOf: store.rootURL.appendingPathComponent("checkpoint.json")))
+                    #expect(checkpoint.primary.segments.count == 1)
+                    #expect(checkpoint.files.reduce(Int64(0)) { $0 + $1.byteCount } == expectedMediaBytes)
+                    for file in checkpoint.files {
+                        let fileURL = store.workspace.directoryURL.appendingPathComponent(file.relativePath)
+                        #expect(try Data(contentsOf: fileURL).count == Int(file.byteCount))
+                    }
+                    await inspected.markInspected()
+                }
+                return request
+            })
+        let receipt = try await HLSLiveDVRRecorder(
+            client: client,
+            configuration: .advanced(
+                limits: HLSLiveDVRLimitPack(
+                    maximumDuration: scenario == .renditionDuration ? 8 : 60,
+                    maximumSegmentCount: scenario == .renditionCount ? 2 : 20,
+                    maximumMediaResourceBytes: 1_024, maximumTotalMediaBytes: totalLimit),
+                startPosition: .currentWindow,
+                renditions: HLSLiveDVRRenditionPack(audio: .all),
+                recovery: HLSLiveDVRRecoveryPack(policy: resumable ? .resumable : .disabled)
+            )
+        ).record(from: sourceURL, to: fixture.destinationURL)
+        #expect(receipt.segmentCount == 1)
+        #expect(receipt.recordedDuration == 4)
+        #expect(receipt.mediaByteCount == expectedMediaBytes)
+        let resourceFiles = try packageFileURLs(receipt.directoryURL).filter { $0.pathExtension != "m3u8" }
+        #expect(resourceFiles.count == expectedFileCount)
+        #expect(try resourceFiles.reduce(Int64(0)) { $0 + Int64(try Data(contentsOf: $1).count) } == expectedMediaBytes)
+        for (index, track) in receipt.tracks.enumerated() {
+            let contents = try String(
+                contentsOf: receipt.directoryURL.appendingPathComponent(track.relativePlaylistPath),
+                encoding: .utf8)
+            #expect(
+                contents.components(separatedBy: "#EXTINF:").count - 1
+                    == (index == 0 ? 1 : expectedAudioSegments[index - 1]))
+            #expect(!contents.contains("initialization-00001"))
+        }
+        if resumable { #expect(await inspected.didInspect) }
+        #expect(!FileManager.default.fileExists(atPath: store.rootURL.path))
+    }
+
+    @Test("Stop-at-limit retains one aligned A/V prefix without future transfers", arguments: [false, true])
+    func stopsAtAlignedAVPrefix(durationLimit: Bool) async throws {
+        try await assertAlignedAVLimit(durationLimit: durationLimit, reload: false)
+    }
+
+    @Test("A reload with multiple segments stops at the remaining aligned A/V budget", arguments: [false, true])
+    func stopsAtAlignedAVPrefixAfterReload(durationLimit: Bool) async throws {
+        try await assertAlignedAVLimit(durationLimit: durationLimit, reload: true)
+    }
+
+    private func assertAlignedAVLimit(durationLimit: Bool, reload: Bool) async throws {
+        let fixture = try makeFixture()
+        defer {
+            fixture.cleanup()
+            HLSLiveURLProtocol.reset()
+        }
+        let masterURL = try url("https://media.example/limit-master.m3u8")
+        let videoURL = try url("https://media.example/limit-video.m3u8")
+        let audioURL = try url("https://media.example/limit-audio.m3u8")
+        HLSLiveURLProtocol.register(
+            playlistResponse(
+                """
+                #EXTM3U
+                #EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",NAME="Stereo",DEFAULT=YES,URI="limit-audio.m3u8"
+                #EXT-X-STREAM-INF:BANDWIDTH=1000,AUDIO="audio"
+                limit-video.m3u8
+                """), for: masterURL)
+        func playlist(_ prefix: String, indices: ClosedRange<Int>, ended: Bool) -> String {
+            let media = indices.map { "#EXTINF:4,\nlimit-\(prefix)-\($0).ts" }.joined(separator: "\n")
+            return """
+                #EXTM3U
+                #EXT-X-TARGETDURATION:4
+                #EXT-X-MEDIA-SEQUENCE:\(indices.lowerBound)
+                #EXT-X-SERVER-CONTROL:CAN-BLOCK-RELOAD=YES
+                \(media)
+                \(ended ? "#EXT-X-ENDLIST" : "")
+                """
+        }
+        for prefix in ["video", "audio"] {
+            let playlistURL = prefix == "video" ? videoURL : audioURL
+            HLSLiveURLProtocol.register(
+                playlistResponse(
+                    playlist(
+                        prefix,
+                        indices: reload ? 1...1 : 1...2, ended: !reload)), for: playlistURL)
+            if reload {
+                let nextURL =
+                    prefix == "video"
+                    ? try url("https://media.example/limit-video.m3u8?_HLS_msn=2") : audioURL
+                HLSLiveURLProtocol.register(
+                    playlistResponse(playlist(prefix, indices: 2...3, ended: true)),
+                    for: nextURL
+                )
+            }
+            for index in 1...(reload ? 3 : 2) {
+                HLSLiveURLProtocol.register(
+                    mediaResponse(Data("\(prefix)-\(index)".utf8)),
+                    for: try url("https://media.example/limit-\(prefix)-\(index).ts"))
+            }
+        }
+        let count = reload ? 2 : 1
+        let gate = DVRReloadBoundaryGate()
+        let client = HLSLivePlaylistClient(
+            session: fixture.session,
+            requestPolicy: HLSRequestPolicy { request, _ in
+                if reload, request.url == audioURL {
+                    await gate.open()
+                }
+                if reload, request.url?.query == "_HLS_msn=2" {
+                    try await gate.wait()
+                }
+                return request
+            }
+        )
+        let receipt = try await HLSLiveDVRRecorder(
+            client: client,
+            configuration: .advanced(
+                limits: HLSLiveDVRLimitPack(
+                    maximumDuration: durationLimit ? Double(count * 4) : 60,
+                    maximumSegmentCount: durationLimit ? 20 : count,
+                    maximumMediaResourceBytes: 1_024, maximumTotalMediaBytes: 4_096
+                ), startPosition: .currentWindow
+            )
+        ).record(from: masterURL, to: fixture.destinationURL)
+        #expect(receipt.segmentCount == count)
+        #expect(receipt.recordedDuration == Double(count * 4))
+        let audio = try #require(receipt.tracks.first { $0.kind == .audio })
+        let contents = try String(
+            contentsOf: receipt.directoryURL.appendingPathComponent(audio.relativePlaylistPath),
+            encoding: .utf8
+        )
+        #expect(contents.components(separatedBy: "#EXTINF:").count - 1 == count)
+        let requests = HLSLiveURLProtocol.capturedRequests().compactMap(\.url)
+        for prefix in ["video", "audio"] {
+            #expect(!requests.contains(try url("https://media.example/limit-\(prefix)-\(count + 1).ts")))
+        }
+    }
+
     @Test("limit packs normalize unsafe values")
     func limitNormalization() {
         let limits = HLSLiveDVRLimitPack(
@@ -259,6 +869,14 @@ extension HLSLivePlaylistClientTests {
             return
         }
         #expect(progress.segmentCount == 1)
+        let cancelledWaiter = Task { try await recording.receipt() }
+        cancelledWaiter.cancel()
+        do {
+            _ = try await cancelledWaiter.value
+            Issue.record("Expected observer cancellation")
+        } catch { #expect(error is CancellationError) }
+        #expect(recording.state == .running)
+        let independent = try recording.observations()
         #expect(
             progress.preloadStatistics
                 == HLSLiveDVRPreloadStatistics()
@@ -267,6 +885,10 @@ extension HLSLivePlaylistClientTests {
         let receipt = try await recording.stopAndCommit()
         let repeatedReceipt = try await recording.stopAndCommit()
         #expect(receipt == repeatedReceipt)
+        #expect(try await recording.receipt() == receipt)
+        #expect(recording.state == .completed)
+        let observations = try await independent.reduce(into: []) { $0.append($1.event) }
+        #expect(observations.last == .completed(receipt))
         #expect(receipt.segmentCount == 1)
         #expect(receipt.firstMediaSequence == 10)
         #expect(receipt.lastMediaSequence == 10)
@@ -8689,4 +9311,37 @@ private func aes128Encrypt(
     }
     ciphertext.count = outputLength
     return ciphertext
+}
+
+private actor DVRPeakInspectionProbe {
+    private(set) var didInspect = false
+
+    func markInspected() {
+        didInspect = true
+    }
+}
+
+private actor DVRReloadBoundaryGate {
+    private var isOpen = false
+
+    func open() {
+        isOpen = true
+    }
+
+    func wait() async throws {
+        while !isOpen {
+            try await Task.sleep(for: .milliseconds(1))
+        }
+    }
+}
+
+enum DVRLimitRefusalCase: CaseIterable, Equatable, Sendable {
+    case secondAudio
+    case laterRendition
+    case laterRenditionMap
+    case primaryInitialization
+    case primaryMedia
+    case primaryMediaAfterMap
+    case renditionCount
+    case renditionDuration
 }

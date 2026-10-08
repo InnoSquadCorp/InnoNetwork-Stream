@@ -6,6 +6,14 @@ events.
 
 ## Overview
 
+Prefer ``HLSPlaybackDefinition(maximumPeakBitRate:maximumWidth:maximumHeight:)``
+for a declarative playback profile. It applies
+to a caller-owned item on MainActor without creating, retaining or playing a
+player. `HLSPlaybackConfiguration.validated(...)` is its dynamic equivalent.
+This foreground configuration contract does not replace system-managed
+background task IDs or session restoration. Background download event
+observation remains independent from explicit native task cancellation.
+
 ``HLSAssetDownloadSession`` is the system-backed companion to the raw
 single-file assembler in `InnoNetworkHLS`. It owns one
 `AVAssetDownloadURLSession`, reconnects by background-session identifier, and
@@ -164,9 +172,40 @@ or extension host; command-line processes receive a typed
 an Objective-C exception. Do not remove an asset while it is being downloaded
 or played.
 
-Call
+When the application-delegate background-session callback must recreate the
+session, pass its ordinary `@escaping () -> Void` handler directly to
+``HLSAssetDownloadSession/init(configuration:backgroundSessionCompletion:)``.
+This initializer is main-actor isolated, matching the UIKit callback:
+
+```swift
+let restoredSession = try HLSAssetDownloadSession(
+    configuration: restoredConfiguration,
+    backgroundSessionCompletion: completionHandler
+)
+// Retain restoredSession for the lifetime of this background identifier.
+```
+
+The configuration must match the identifier and options used for the original
+background session. Registration happens before the native session starts
+delivering restored events. Migrate reconnection code that previously created
+a session and then called `handleBackgroundSessionCompletion` to this
+initializer, since native events can finish between those two operations.
+Ordinary session creation continues to use
+``HLSAssetDownloadSession/init(configuration:)`` without actor isolation.
+
+For an already-owned session, call
 ``HLSAssetDownloadSession/handleBackgroundSessionCompletion(_:completion:)``
-from the matching application-delegate callback, and retain the session until
+synchronously inside the matching main-actor application-delegate callback,
+before returning. It also accepts UIKit's ordinary completion closure, without
+requiring an application to assert `Sendable` conformance or cast the handler.
+The closure remains main-actor owned while native delegate events arrive on
+another queue. Registration targets the next native event-batch finish; earlier finish
+callbacks are not replayed into a new batch. Each registered handler is called
+once, asynchronously on the main queue, when that batch finishes or the session
+invalidates. A foreign identifier or a session already shutting down also
+releases the supplied handler on the main queue.
+
+Retain the session until
 ``HLSAssetDownloadSession/shutdown(cancelRunningTasks:)`` completes.
 Set ``HLSAssetDownloadSessionPack/sharedContainerIdentifier`` when an app
 extension owns the background session.
@@ -396,8 +435,10 @@ for await event in events {
 ```
 
 Create the monitor and each event stream on the main actor, while the returned
-stream can be consumed from another task. Each stream first yields the current
-schedule and current event. Its buffer is clamped to `2...1,024`; when a
+stream can be consumed from another task. Notification listeners are installed
+before `events()` returns, including for notifications posted in that same
+main-actor turn. Each stream first yields the current schedule and current
+event. Its buffer is clamped to `2...1,024`; when a
 consumer falls behind, newer lifecycle updates replace older buffered values.
 Create one stream per consumer and cancel its consuming task when observation
 ends.

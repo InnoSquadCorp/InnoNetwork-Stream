@@ -1,10 +1,48 @@
 import Foundation
 
 enum HLSPathwayCatalogBuilder {
+    struct Limits {
+        var maximumClones = 64
+        var maximumPathways = 64
+        var maximumRecords = 16_384
+        var maximumURLBytes = 64 * 1_024
+        var maximumExpandedTextBytes = 8 * 1_024 * 1_024
+    }
+
+    private struct Budget {
+        var remainingRecords: Int
+        var remainingTextBytes: Int
+
+        mutating func reserveRecords(_ count: Int) -> Bool {
+            guard count >= 0, count <= remainingRecords else { return false }
+            remainingRecords -= count
+            return true
+        }
+
+        mutating func reserveText(_ count: Int) -> Bool {
+            guard count >= 0, count <= remainingTextBytes else { return false }
+            remainingTextBytes -= count
+            return true
+        }
+    }
+
     static func make(
         playlist: HLSPlaylist,
-        manifest: HLSContentSteeringManifest
+        manifest: HLSContentSteeringManifest,
+        limits: Limits = Limits()
     ) -> HLSPathwayCatalog? {
+        guard !Task.isCancelled,
+            manifest.pathwayClones.count <= limits.maximumClones,
+            manifest.pathwayPriority.count <= limits.maximumPathways
+        else { return nil }
+        var budget = Budget(
+            remainingRecords: limits.maximumRecords,
+            remainingTextBytes: limits.maximumExpandedTextBytes
+        )
+        guard budget.reserveRecords(playlist.variants.count),
+            budget.reserveRecords(playlist.iFrameVariants.count),
+            budget.reserveRecords(playlist.renditions.count)
+        else { return nil }
         var variants = playlist.variants
         var iFrameVariants = playlist.iFrameVariants
         var renditions = playlist.renditions
@@ -13,6 +51,7 @@ enum HLSPathwayCatalogBuilder {
         )
 
         for clone in manifest.pathwayClones {
+            guard !Task.isCancelled else { return nil }
             guard knownPathwayIDs.contains(clone.baseID) else {
                 continue
             }
@@ -25,10 +64,14 @@ enum HLSPathwayCatalogBuilder {
             let baseIFrameVariants = iFrameVariants.filter {
                 ($0.pathwayID ?? HLSPathwayID.implicit) == clone.baseID
             }
-            let groupMappings = makeGroupMappings(
-                variants: baseVariants + baseIFrameVariants,
-                cloneID: clone.id
-            )
+            guard budget.reserveRecords(baseVariants.count),
+                budget.reserveRecords(baseIFrameVariants.count),
+                let groupMappings = makeGroupMappings(
+                    variants: baseVariants + baseIFrameVariants,
+                    cloneID: clone.id,
+                    budget: &budget
+                )
+            else { return nil }
             let baseRenditions = renditions.filter { rendition in
                 groupMappings[
                     GroupKey(
@@ -37,25 +80,32 @@ enum HLSPathwayCatalogBuilder {
                     )
                 ] != nil
             }
+            guard budget.reserveRecords(baseRenditions.count) else { return nil }
             let clonedRenditions = baseRenditions.compactMap {
                 clonedRendition(
                     $0,
                     groupMappings: groupMappings,
-                    clone: clone
+                    clone: clone,
+                    maximumURLBytes: limits.maximumURLBytes,
+                    budget: &budget
                 )
             }
             let clonedVariants = baseVariants.compactMap {
                 clonedVariant(
                     $0,
                     groupMappings: groupMappings,
-                    clone: clone
+                    clone: clone,
+                    maximumURLBytes: limits.maximumURLBytes,
+                    budget: &budget
                 )
             }
             let clonedIFrameVariants = baseIFrameVariants.compactMap {
                 clonedVariant(
                     $0,
                     groupMappings: groupMappings,
-                    clone: clone
+                    clone: clone,
+                    maximumURLBytes: limits.maximumURLBytes,
+                    budget: &budget
                 )
             }
             guard clonedVariants.count == baseVariants.count,
@@ -71,8 +121,10 @@ enum HLSPathwayCatalogBuilder {
         }
 
         var pathways: [HLSPathway] = []
+        var outputBudget = Budget(remainingRecords: limits.maximumRecords, remainingTextBytes: 0)
         for pathwayID in manifest.pathwayPriority
         where knownPathwayIDs.contains(pathwayID) {
+            guard !Task.isCancelled else { return nil }
             let pathwayVariants = variants.filter {
                 ($0.pathwayID ?? HLSPathwayID.implicit) == pathwayID
             }
@@ -82,16 +134,20 @@ enum HLSPathwayCatalogBuilder {
             guard !pathwayVariants.isEmpty else {
                 continue
             }
+            let pathwayRenditions = referencedRenditions(
+                variants: pathwayVariants + pathwayIFrameVariants,
+                renditions: renditions
+            )
+            guard outputBudget.reserveRecords(pathwayVariants.count),
+                outputBudget.reserveRecords(pathwayIFrameVariants.count),
+                outputBudget.reserveRecords(pathwayRenditions.count)
+            else { return nil }
             pathways.append(
                 HLSPathway(
                     id: pathwayID,
                     variants: pathwayVariants,
                     iFrameVariants: pathwayIFrameVariants,
-                    renditions: referencedRenditions(
-                        variants:
-                            pathwayVariants + pathwayIFrameVariants,
-                        renditions: renditions
-                    )
+                    renditions: pathwayRenditions
                 )
             )
         }
@@ -101,7 +157,9 @@ enum HLSPathwayCatalogBuilder {
     private static func clonedRendition(
         _ rendition: HLSRendition,
         groupMappings: [GroupKey: String],
-        clone: HLSContentSteeringManifest.PathwayClone
+        clone: HLSContentSteeringManifest.PathwayClone,
+        maximumURLBytes: Int,
+        budget: inout Budget
     ) -> HLSRendition? {
         let key = GroupKey(
             kind: rendition.kind,
@@ -115,7 +173,9 @@ enum HLSPathwayCatalogBuilder {
                 $0,
                 stableID: rendition.stableID,
                 overrideURLs: clone.perRenditionURLs,
-                clone: clone
+                clone: clone,
+                maximumURLBytes: maximumURLBytes,
+                budget: &budget
             )
         }
         guard rendition.url == nil || clonedURL != nil else {
@@ -143,14 +203,18 @@ enum HLSPathwayCatalogBuilder {
     private static func clonedVariant(
         _ variant: HLSVariant,
         groupMappings: [GroupKey: String],
-        clone: HLSContentSteeringManifest.PathwayClone
+        clone: HLSContentSteeringManifest.PathwayClone,
+        maximumURLBytes: Int,
+        budget: inout Budget
     ) -> HLSVariant? {
         guard
             let url = transformedURL(
                 variant.url,
                 stableID: variant.stableID,
                 overrideURLs: clone.perVariantURLs,
-                clone: clone
+                clone: clone,
+                maximumURLBytes: maximumURLBytes,
+                budget: &budget
             )
         else {
             return nil
@@ -196,51 +260,30 @@ enum HLSPathwayCatalogBuilder {
 
     private static func makeGroupMappings(
         variants: [HLSVariant],
-        cloneID: String
-    ) -> [GroupKey: String] {
+        cloneID: String,
+        budget: inout Budget
+    ) -> [GroupKey: String]? {
         var mappings: [GroupKey: String] = [:]
         for variant in variants {
-            insertMapping(
-                groupID: variant.audioGroupID,
-                kind: .audio,
-                cloneID: cloneID,
-                into: &mappings
-            )
-            insertMapping(
-                groupID: variant.subtitleGroupID,
-                kind: .subtitles,
-                cloneID: cloneID,
-                into: &mappings
-            )
-            insertMapping(
-                groupID: variant.videoGroupID,
-                kind: .video,
-                cloneID: cloneID,
-                into: &mappings
-            )
-            if case .group(let groupID) = variant.closedCaptions {
-                insertMapping(
-                    groupID: groupID,
-                    kind: .closedCaptions,
-                    cloneID: cloneID,
-                    into: &mappings
-                )
+            let captionGroup: String?
+            if case .group(let groupID) = variant.closedCaptions { captionGroup = groupID } else { captionGroup = nil }
+            let groups: [(HLSRenditionKind, String?)] = [
+                (.audio, variant.audioGroupID), (.subtitles, variant.subtitleGroupID),
+                (.video, variant.videoGroupID), (.closedCaptions, captionGroup),
+            ]
+            for (kind, groupID) in groups {
+                guard let groupID else { continue }
+                let key = GroupKey(kind: kind, groupID: groupID)
+                guard mappings[key] == nil else { continue }
+                // Reserve before concatenation: a long clone ID multiplied
+                // across groups must not allocate outside the text budget.
+                guard budget.reserveText(groupID.utf8.count),
+                    budget.reserveText(1), budget.reserveText(cloneID.utf8.count)
+                else { return nil }
+                mappings[key] = "\(groupID)@\(cloneID)"
             }
         }
         return mappings
-    }
-
-    private static func insertMapping(
-        groupID: String?,
-        kind: HLSRenditionKind,
-        cloneID: String,
-        into mappings: inout [GroupKey: String]
-    ) {
-        guard let groupID else {
-            return
-        }
-        let key = GroupKey(kind: kind, groupID: groupID)
-        mappings[key] = "\(groupID)@\(cloneID)"
     }
 
     private static func mappedGroupID(
@@ -301,10 +344,32 @@ enum HLSPathwayCatalogBuilder {
         _ sourceURL: URL,
         stableID: String?,
         overrideURLs: [String: URL],
-        clone: HLSContentSteeringManifest.PathwayClone
+        clone: HLSContentSteeringManifest.PathwayClone,
+        maximumURLBytes: Int,
+        budget: inout Budget
     ) -> URL? {
+        guard !Task.isCancelled else { return nil }
         if let stableID, let override = overrideURLs[stableID] {
+            let bytes = override.absoluteString.utf8.count
+            guard bytes <= maximumURLBytes, budget.reserveText(bytes) else { return nil }
             return override
+        }
+        // A conservative pre-allocation envelope includes percent encoding.
+        // Replaced old query fields remain counted, so oversized rewrites fail
+        // back to the original pathway instead of building an enormous URL.
+        var available = maximumURLBytes
+        func reserve(_ bytes: Int, multiplier: Int = 1) -> Bool {
+            guard available >= 0, bytes <= available / multiplier else { return false }
+            available -= bytes * multiplier
+            return true
+        }
+        guard reserve(sourceURL.absoluteString.utf8.count),
+            reserve(clone.host?.utf8.count ?? 0, multiplier: 3)
+        else { return nil }
+        for (key, value) in clone.parameters {
+            guard reserve(key.utf8.count, multiplier: 3),
+                reserve(value.utf8.count, multiplier: 3), reserve(2)
+            else { return nil }
         }
         guard
             var components = URLComponents(
@@ -335,7 +400,11 @@ enum HLSPathwayCatalogBuilder {
             )
             components.queryItems = queryItems
         }
-        return components.url
+        guard let url = components.url,
+            url.absoluteString.utf8.count <= maximumURLBytes,
+            budget.reserveText(url.absoluteString.utf8.count)
+        else { return nil }
+        return url
     }
 
     private struct GroupKey: Hashable {

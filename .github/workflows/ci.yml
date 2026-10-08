@@ -27,7 +27,7 @@ jobs:
     outputs:
       plan: ${{ steps.plan.outputs.plan }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -41,7 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Verify planning and workflow contracts
@@ -59,7 +59,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Review dependency changes
@@ -76,13 +76,26 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout InnoNetwork-Stream
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Select Xcode 26.0.1
         run: sudo xcode-select -s /Applications/Xcode_26.0.1.app
       - name: Run swift-format lint
         run: bash Scripts/format.sh --lint
+      - name: Prepare formatting diagnostics
+        if: failure()
+        run: |
+          mkdir -p .build/format-diagnostics
+          bash Scripts/format.sh
+          git diff -- Sources Tests > .build/format-diagnostics/swift-format.patch
+      - name: Preserve formatting diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: swift-format-diagnostics
+          path: .build/format-diagnostics/
+          if-no-files-found: ignore
 
   build-and-test:
     needs: ci-plan
@@ -102,7 +115,7 @@ jobs:
             path: /Applications/Xcode.app
     steps:
       - name: Checkout InnoNetwork-Stream
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Select Xcode
@@ -116,7 +129,18 @@ jobs:
       - name: Verify dependency lock did not drift
         run: git diff --exit-code -- Package.resolved
       - name: Run tests
-        run: xcrun swift test --force-resolved-versions --parallel
+        run: bash Scripts/swiftpm.sh test --force-resolved-versions --parallel
+      - name: Compile UIKit background integration
+        run: bash Scripts/check_uikit_background_consumer.sh
+      - name: Generate and reopen SDK HLS outputs
+        run: python3 Scripts/apple_hls_evidence.py smoke --bundle .build/hls-sdk-output-smoke
+      - name: Preserve SDK output diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hls-sdk-output-${{ matrix.xcode.label }}
+          path: .build/hls-sdk-output-smoke/
+          if-no-files-found: ignore
 
   contracts:
     needs: ci-plan
@@ -126,7 +150,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Checkout InnoNetwork-Stream
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Select Xcode 27
@@ -137,17 +161,40 @@ jobs:
         run: |
           bash -n Scripts/*.sh Scripts/tests/*.sh
           python3 -m py_compile Scripts/*.py
+          ruby Scripts/check_codeql_contract.rb
+          ruby Scripts/tests/test_codeql_contract.rb
+          python3 Scripts/tests/test_hls_fixture_readiness.py
+          python3 Scripts/tests/test_swiftpm_scratch.py
           bash Scripts/tests/test_check_innonetwork_dependency.sh
           bash Scripts/tests/test_validate_docs_release_state.sh
           bash Scripts/tests/test_validate_release_candidate.sh
           bash Scripts/tests/test_validate_release_ref.sh
           bash Scripts/tests/test_validate_hls_with_apple_tools.sh
           bash Scripts/tests/test_package_identity.sh
-          bash Scripts/validate_docs_release_state.sh --expect draft
+          bash Scripts/tests/test_run_affected_tests.sh
+          python3 Scripts/tests/test_public_signatures.py
+          python3 -B -m unittest discover -s Scripts/tests -p "test_*hls_evidence*.py" -v
+          bash Scripts/validate_docs_release_state.sh
       - name: Validate public API
-        run: bash Scripts/check_public_api_contract.sh
+        run: |
+          bash Scripts/check_public_api_contract.sh
+          bash Scripts/check_docc.sh --skip-build
       - name: Run HLS contract gates
         run: bash Scripts/run_hls_quality_gates.sh
+      - name: Preserve generated API diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: public-api-diagnostics
+          path: .build/api-contract-diagnostics/
+          if-no-files-found: ignore
+      - name: Preserve HLS startup and runtime failures
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hls-runtime-diagnostics
+          path: .build/hls-runtime-diagnostics/
+          if-no-files-found: ignore
 
   platform-build:
     needs: ci-plan
@@ -184,7 +231,7 @@ jobs:
             triple: arm64-apple-xros1.0
     steps:
       - name: Checkout InnoNetwork-Stream
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Select Xcode 26.0.1
@@ -194,12 +241,13 @@ jobs:
       - name: Build with xcodebuild
         if: matrix.builder == 'xcodebuild'
         run: |
+          dependency_scratch="$(python3 Scripts/swiftpm_scratch_path.py "$PWD")"
           xcodebuild \
+            -skipMacroValidation \
             -scheme InnoNetwork-Stream-Package \
             -destination '${{ matrix.destination }}' \
-            -skipMacroValidation \
             -onlyUsePackageVersionsFromResolvedFile \
-            -clonedSourcePackagesDirPath .build \
+            -clonedSourcePackagesDirPath "$dependency_scratch" \
             -derivedDataPath '.build/platform-${{ matrix.runtime }}' \
             CODE_SIGNING_ALLOWED=NO \
             build
@@ -234,7 +282,7 @@ jobs:
       checks: read
       pull-requests: read
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Require every selected validation

@@ -10,6 +10,33 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
+ACTION_PINS = {
+    'actions/checkout': '3d3c42e5aac5ba805825da76410c181273ba90b1',
+    'github/codeql-action/init': '2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2',
+    'github/codeql-action/analyze': '2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2',
+}
+
+
+def reviewed_action_pins(steps):
+    """Apply reviewed action updates without replacing the legacy gate bodies."""
+    steps = copy.deepcopy(steps)
+    for step in steps:
+        action = step.get('uses', '').partition('@')[0]
+        if action in ACTION_PINS:
+            step['uses'] = action + '@' + ACTION_PINS[action]
+    return steps
+
+
+def failure_artifact(name):
+    return {
+        'name': 'Preserve HLS startup and runtime failures',
+        'if': 'failure()',
+        'uses': 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
+        'with': {'name': name, 'path': '.build/hls-runtime-diagnostics/',
+                 'if-no-files-found': 'ignore'},
+    }
+
+
 def module(name):
     spec = importlib.util.spec_from_file_location(name, ROOT / 'Scripts' / (name + '.py'))
     result = importlib.util.module_from_spec(spec); spec.loader.exec_module(result); return result
@@ -103,6 +130,23 @@ class WorkflowTests(unittest.TestCase):
                 self.assertNotIn('continue-on-error',step)
                 if step.get('uses','').startswith('actions/checkout@'):self.assertIs(step['with']['persist-credentials'],False)
                 if 'uses' in step:self.assertRegex(step['uses'],r'@[0-9a-f]{40}$')
+    def test_reviewed_action_pins_and_read_only_checkout_in_every_workflow(self):
+        seen = set()
+        for path in sorted((ROOT / '.github/workflows').glob('*.yml')):
+            workflow = yaml(path)
+            for job in workflow['jobs'].values():
+                for step in job.get('steps', []):
+                    if 'uses' not in step:
+                        self.assertNotIn('--development', step.get('run', ''))
+                        continue
+                    self.assertRegex(step['uses'], r'@[0-9a-f]{40}$')
+                    action, _, ref = step['uses'].partition('@')
+                    if action in ACTION_PINS:
+                        self.assertEqual(ref, ACTION_PINS[action], (path.name, action))
+                        seen.add(action)
+                    if action == 'actions/checkout':
+                        self.assertIs(step['with']['persist-credentials'], False)
+        self.assertEqual(seen, set(ACTION_PINS))
     def test_existing_commands_matrices_and_resource_budgets_are_retained(self):
         for key,old in self.old['jobs'].items():
             current=self.ci['jobs'][key]
@@ -110,15 +154,71 @@ class WorkflowTests(unittest.TestCase):
                 self.assertEqual(current.get(field),old.get(field),(key,field))
             old_steps=[s for s in old['steps'] if not s.get('uses','').startswith('actions/checkout@')]
             new_steps=[s for s in current['steps'] if not s.get('uses','').startswith('actions/checkout@')]
-            # Retain the original lane; only noninteractive, locked package
-            # flags may differ after the hosted macro-approval failure.
+            # Keep the frozen legacy gates and explicitly enumerate the
+            # reviewed SwiftPM, DocC, and diagnostic additions from PR #4.
+            old_steps = copy.deepcopy(old_steps)
+            if key == 'lint':
+                old_steps.extend([
+                    {'name': 'Prepare formatting diagnostics', 'if': 'failure()',
+                     'run': 'mkdir -p .build/format-diagnostics\nbash Scripts/format.sh\n'
+                            'git diff -- Sources Tests > .build/format-diagnostics/swift-format.patch\n'},
+                    {'name': 'Preserve formatting diagnostics', 'if': 'failure()',
+                     'uses': 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
+                     'with': {'name': 'swift-format-diagnostics', 'path': '.build/format-diagnostics/',
+                              'if-no-files-found': 'ignore'}},
+                ])
+            if key == 'build-and-test':
+                next(s for s in old_steps if s['name'] == 'Run tests')['run'] = (
+                    'bash Scripts/swiftpm.sh test --force-resolved-versions --parallel')
+                old_steps.append({
+                    'name': 'Compile UIKit background integration',
+                    'run': 'bash Scripts/check_uikit_background_consumer.sh',
+                })
+                old_steps.append({
+                    'name': 'Generate and reopen SDK HLS outputs',
+                    'run': 'python3 Scripts/apple_hls_evidence.py smoke --bundle .build/hls-sdk-output-smoke',
+                })
+                old_steps.append({
+                    'name': 'Preserve SDK output diagnostics', 'if': 'failure()',
+                    'uses': 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
+                    'with': {'name': 'hls-sdk-output-${{ matrix.xcode.label }}',
+                             'path': '.build/hls-sdk-output-smoke/', 'if-no-files-found': 'ignore'},
+                })
+            if key == 'contracts':
+                validation = next(s for s in old_steps if s['name'] == 'Validate scripts and documentation')
+                validation['run'] = validation['run'].replace(
+                    'python3 -m py_compile Scripts/*.py\n',
+                    'python3 -m py_compile Scripts/*.py\n'
+                    'ruby Scripts/check_codeql_contract.rb\n'
+                    'ruby Scripts/tests/test_codeql_contract.rb\n'
+                    'python3 Scripts/tests/test_hls_fixture_readiness.py\n'
+                    'python3 Scripts/tests/test_swiftpm_scratch.py\n')
+                validation['run'] = validation['run'].replace(
+                    'bash Scripts/validate_docs_release_state.sh --expect draft\n',
+                    'bash Scripts/tests/test_run_affected_tests.sh\n'
+                    'python3 Scripts/tests/test_public_signatures.py\n'
+                    'python3 -B -m unittest discover -s Scripts/tests -p \"test_*hls_evidence*.py\" -v\n'
+                    'bash Scripts/validate_docs_release_state.sh\n')
+                next(s for s in old_steps if s['name'] == 'Validate public API')['run'] = (
+                    'bash Scripts/check_public_api_contract.sh\n'
+                    'bash Scripts/check_docc.sh --skip-build\n')
+                old_steps.append({
+                    'name': 'Preserve generated API diagnostics', 'if': 'always()',
+                    'uses': 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
+                    'with': {'name': 'public-api-diagnostics', 'path': '.build/api-contract-diagnostics/',
+                             'if-no-files-found': 'ignore'},
+                })
+                old_steps.append(failure_artifact('hls-runtime-diagnostics'))
+            # Noninteractive locked package flags must occur exactly once;
+            # all original xcodebuild arguments and other steps still match.
             if key == 'platform-build':
-                old_steps = copy.deepcopy(old_steps)
                 build = next(s for s in old_steps if s['name'] == 'Build with xcodebuild')
                 flags = ['-skipMacroValidation', '-onlyUsePackageVersionsFromResolvedFile',
-                         '-clonedSourcePackagesDirPath .build']
+                         '-clonedSourcePackagesDirPath "$dependency_scratch"']
                 new_build = next(s for s in new_steps if s['name'] == 'Build with xcodebuild')
                 lines = new_build['run'].splitlines(keepends=True)
+                self.assertEqual(lines.pop(0),
+                                 'dependency_scratch="$(python3 Scripts/swiftpm_scratch_path.py "$PWD")"\n')
                 for flag in flags:
                     matches = [line for line in lines if line.strip().removesuffix('\\').strip() == flag]
                     self.assertEqual(len(matches), 1, flag)
@@ -130,40 +230,113 @@ class WorkflowTests(unittest.TestCase):
                 self.assertLess(names.index('Verify published InnoNetwork dependency'),
                                 names.index('Build with xcodebuild'))
             self.assertEqual(new_steps,old_steps,key)
+    def test_xcodebuild_reuses_the_dependency_gates_scoped_checkouts(self):
+        # Exercise the actual workflow command and wrapper with a controlled
+        # toolchain identity. This is argument forwarding, not an Apple build.
+        command = next(s['run'] for s in self.ci['jobs']['platform-build']['steps']
+                       if s.get('name') == 'Build with xcodebuild')
+        command = command.replace('${{ matrix.destination }}', 'platform=macOS')
+        command = command.replace('${{ matrix.runtime }}', 'macOS')
+        with tempfile.TemporaryDirectory() as directory:
+            scratch = Path(directory)
+            package = scratch / 'package with spaces'
+            (package / 'Scripts').mkdir(parents=True)
+            (package / 'Package.swift').write_text('// command forwarding fixture\n')
+            (package / 'Scripts/swiftpm_scratch_path.py').write_bytes(
+                (ROOT / 'Scripts/swiftpm_scratch_path.py').read_bytes())
+            sdk = scratch / 'test.sdk'
+            sdk.mkdir()
+            xcrun = scratch / 'xcrun'
+            xcrun.write_text(
+                '#!/bin/sh\ncase "$1:$2" in\n'
+                ' --sdk:macosx) printf "%s\\n" "$TEST_SDK" ;;\n'
+                ' --find:swift) printf "%s\\n" "$TEST_SWIFT" ;;\n'
+                ' swift:--version) printf "Apple Swift version 6.4\\n" ;;\n'
+                ' *) printf "%s\\n" "$@" > "$SWIFTPM_ARGUMENTS" ;;\nesac\n')
+            xcrun.chmod(0o755)
+            xcodebuild = scratch / 'xcodebuild'
+            xcodebuild.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$XCODEBUILD_ARGUMENTS"\n')
+            xcodebuild.chmod(0o755)
+            swift_arguments = scratch / 'swift-arguments'
+            xcode_arguments = scratch / 'xcode-arguments'
+            environment = {**os.environ, 'PATH': str(scratch) + os.pathsep + os.environ['PATH'],
+                           'TEST_SDK': str(sdk), 'TEST_SWIFT': str(scratch / 'swift'),
+                           'SWIFTPM_ARGUMENTS': str(swift_arguments),
+                           'XCODEBUILD_ARGUMENTS': str(xcode_arguments)}
+            subprocess.run(['bash', str(ROOT / 'Scripts/swiftpm.sh'), 'package',
+                            '--force-resolved-versions', 'show-dependencies', '--format', 'json'],
+                           cwd=package, env=environment, check=True)
+            subprocess.run(['bash', '-eu', '-o', 'pipefail', '-c', command],
+                           cwd=package, env=environment, check=True)
+            swift = swift_arguments.read_text().splitlines()
+            xcode = xcode_arguments.read_text().splitlines()
+            verified_path = swift[swift.index('--scratch-path') + 1]
+            self.assertEqual(xcode[xcode.index('-clonedSourcePackagesDirPath') + 1], verified_path)
+            self.assertEqual(Path(verified_path).parent, package / '.build/swiftpm')
+            self.assertRegex(Path(verified_path).name, r'^scope-[0-9a-f]{24}$')
+            for flag in ['-clonedSourcePackagesDirPath', '-skipMacroValidation',
+                         '-onlyUsePackageVersionsFromResolvedFile']:
+                self.assertEqual(xcode.count(flag), 1)
     def test_codeql_has_one_change_owner_and_keeps_scheduled_security_scan(self):
-        if 'codeql' not in self.old:return
         code=yaml(ROOT/'.github/workflows/codeql.yml')
         self.assertEqual(set(code['true'] if 'true' in code else code[True]),{'workflow_call','workflow_dispatch','schedule'})
         self.assertEqual(self.ci['jobs']['codeql']['uses'],'./.github/workflows/codeql.yml')
         for k,old in self.old['codeql'].items():
             current=copy.deepcopy(code['jobs'][k]);original=copy.deepcopy(old)
-            for job in [current,original]:
-                for step in job['steps']:
-                    if step.get('uses','').startswith('actions/checkout@'):step.pop('with',None)
+            original['steps'] = reviewed_action_pins(original['steps'])
+            for step in original['steps']:
+                if step.get('uses', '').startswith('actions/checkout@'):
+                    step['with'] = {'persist-credentials': False}
+                if step['name'] == 'Build':
+                    step['run'] = 'bash Scripts/swiftpm.sh build --force-resolved-versions'
+            dependency = next(i for i, step in enumerate(original['steps'])
+                              if step['name'] == 'Verify published InnoNetwork dependency')
+            original['steps'].insert(dependency, {
+                'name': 'Verify coupled CodeQL action pins',
+                'run': 'ruby Scripts/check_codeql_contract.rb',
+            })
             self.assertEqual(current,original)
     def test_release_validation_commands_stay_fresh(self):
-        jobs=yaml(ROOT/'.github/workflows/release.yml')['jobs']
+        release = yaml(ROOT/'.github/workflows/release.yml')
+        jobs = release['jobs']
+        self.assertEqual(release['true'], {'push': {'tags': ['*.*.*']}, 'workflow_dispatch': None})
+        self.assertEqual(release['concurrency'], {'group': 'release-${{ github.ref }}', 'cancel-in-progress': False})
+        self.assertEqual(set(jobs), set(self.old['release']))
         for key,old in self.old['release'].items():
-            if key.startswith('publish'):continue
-            if 'codeql' in self.old:
-                changed = {'Validate tagged release ref', 'Prepare tagged source archive'}
-                current = {s.get('name'): s for s in jobs[key]['steps']}
-                for step in old['steps']:
-                    if step.get('name') not in changed:
-                        self.assertEqual(current[step.get('name')], step)
-                names = [s.get('name') for s in jobs[key]['steps']]
-                self.assertEqual(names[names.index('Publish GitHub release') - 1],
-                                 'Revalidate release identity immediately before publication')
-                self.assertIn('$RELEASE_COMMIT_SHA', current['Prepare tagged source archive']['run'])
-                self.assertEqual(current['Validate tagged release ref']['env']['RELEASE_EXPECTED_SHA'], '${{ github.sha }}')
-            else:
-                self.assertEqual([s for s in jobs[key]['steps'] if 'run' in s], [s for s in old['steps'] if 'run' in s])
-        if 'codeql' not in self.old:
-            release=jobs['publish-release'];self.assertEqual(release['needs'],'validate-release')
-            notes=next(s for s in release['steps'] if s.get('id')=='notes')
-            self.assertNotIn('${{',notes['run']);self.assertIn('RELEASE_VERSION',notes['env'])
-            with tempfile.TemporaryDirectory() as d:
-                for version in ['1.2.3','1.2.3-rc.1','$(touch owned)','../../etc/passwd','1.2.3\ninjected=yes']:
-                    result=subprocess.run(['bash','-c',notes['run']],cwd=d,env={**os.environ,'RELEASE_VERSION':version,'GITHUB_OUTPUT':str(Path(d)/'output')},capture_output=True)
-                    self.assertEqual(result.returncode==0,version in ['1.2.3','1.2.3-rc.1'])
-                self.assertFalse((Path(d)/'owned').exists())
+            expected = copy.deepcopy(old)
+            expected['steps'] = reviewed_action_pins(expected['steps'])
+            steps = expected['steps']
+            tagged = next(s for s in steps if s['name'] == 'Validate tagged release ref')
+            tagged['id'] = 'release-ref'
+            tagged['env'].update(RELEASE_VERIFY_REMOTE='1', RELEASE_EXPECTED_SHA='${{ github.sha }}')
+            archive = next(s for s in steps if s['name'] == 'Prepare tagged source archive')
+            archive['env']['RELEASE_COMMIT_SHA'] = '${{ steps.release-ref.outputs.commit_sha }}'
+            archive['run'] = archive['run'].replace('  "$RELEASE_TAG"\n', '  "$RELEASE_COMMIT_SHA"\n')
+            revalidate = {
+                'name': 'Revalidate the tested release identity',
+                'if': "github.event_name == 'push'",
+                'env': {
+                    'RELEASE_TAG': '${{ github.ref_name }}',
+                    'RELEASE_TAG_REF': '${{ github.ref }}',
+                    'RELEASE_EXPECTED_SHA': '${{ steps.release-ref.outputs.commit_sha }}',
+                    'RELEASE_EXPECTED_TAG_OBJECT': '${{ steps.release-ref.outputs.tag_object }}',
+                    'RELEASE_VERIFY_REMOTE': '1',
+                },
+                'run': 'bash Scripts/validate_release_ref.sh',
+            }
+            preflight = next(i for i, s in enumerate(steps) if s['name'] == 'Run full release preflight')
+            steps[preflight]['env'] = {
+                'APPLE_HLS_APPROVED_EVIDENCE_SHA256': '${{ vars.APPLE_HLS_APPROVED_EVIDENCE_SHA256 }}',
+                'APPLE_HLS_APPROVED_BY': '${{ vars.APPLE_HLS_APPROVED_BY }}',
+            }
+            artifact = next(s for s in steps if s['name'] == 'Upload release validation artifacts')
+            artifact['with']['path'] = artifact['with']['path'].replace(
+                '.build/local-release-preflight/apple-hls/', 'ReleaseEvidence/apple-hls/')
+            steps[preflight + 1:preflight + 1] = [failure_artifact('release-hls-runtime-diagnostics'), revalidate]
+            before_publish = copy.deepcopy(revalidate)
+            before_publish['name'] = 'Revalidate release identity immediately before publication'
+            publish = next(i for i, s in enumerate(steps) if s['name'] == 'Publish GitHub release')
+            steps.insert(publish, before_publish)
+            # Full equality also protects event guards, token scope, archive
+            # identity, exact revalidation order, scripts, and job budgets.
+            self.assertEqual(jobs[key], expected)

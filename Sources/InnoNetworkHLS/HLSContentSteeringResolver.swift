@@ -26,41 +26,58 @@ struct HLSPathwayCatalog: Sendable {
 
 actor HLSContentSteeringResolver {
     private static let failedReloadDelay: Duration = .seconds(300)
+    private static let maximumCachedManifests = 64
 
     private let client: HLSHTTPClient
     private let settings: HLSContentSteeringSettings
-    private let clock = ContinuousClock()
+    private let now: @Sendable () -> ContinuousClock.Instant
     private var entries: [URL: CacheEntry] = [:]
+    private var recentlyUsedURLs: [URL] = []
+    private struct Flight {
+        let id: UUID
+        let task: Task<Void, Never>
+        var waiters: [UUID: CheckedContinuation<HLSContentSteeringManifest?, Error>]
+    }
+    private var flights: [URL: Flight] = [:]
+    // Includes cancelled producers until they actually finish, so rapid
+    // cancel/restart cannot bypass the work bound with draining tasks.
+    private var activeLoads = 0
+
+    var pendingManifestWaiterCount: Int { flights.values.reduce(0) { $0 + $1.waiters.count } }
+    var activeManifestLoadCount: Int { activeLoads }
 
     init(
         client: HLSHTTPClient,
-        settings: HLSContentSteeringSettings
+        settings: HLSContentSteeringSettings,
+        now: @escaping @Sendable () -> ContinuousClock.Instant = { ContinuousClock.now }
     ) {
         self.client = client
         self.settings = settings
+        self.now = now
     }
 
     func catalog(
         for playlist: HLSPlaylist
     ) async throws -> HLSPathwayCatalog {
+        try Task.checkCancellation()
         guard let directive = playlist.contentSteering else {
             return .unsteered(playlist)
         }
         guard settings.isEnabled else {
-            return Self.fallbackCatalog(
+            return try Self.fallbackCatalog(
                 for: playlist,
                 initialPathwayID: directive.initialPathwayID
             )
         }
         let manifest = try await cachedManifest(for: directive)
-        guard let manifest,
-            let catalog = HLSPathwayCatalogBuilder.make(
-                playlist: playlist,
-                manifest: manifest
-            ),
-            !catalog.pathways.isEmpty
+        try Task.checkCancellation()
+        let catalog = manifest.flatMap {
+            HLSPathwayCatalogBuilder.make(playlist: playlist, manifest: $0)
+        }
+        try Task.checkCancellation()
+        guard let catalog, !catalog.pathways.isEmpty
         else {
-            return Self.fallbackCatalog(
+            return try Self.fallbackCatalog(
                 for: playlist,
                 initialPathwayID: directive.initialPathwayID
             )
@@ -71,34 +88,107 @@ actor HLSContentSteeringResolver {
     private func cachedManifest(
         for directive: HLSContentSteering
     ) async throws -> HLSContentSteeringManifest? {
-        let now = clock.now
+        let now = self.now()
         if let entry = entries[directive.serverURL] {
             if entry.isGone || now < entry.expiration {
+                recordAccess(to: directive.serverURL)
                 return entry.manifest
             }
         }
 
-        let previous = entries[directive.serverURL]
-        let requestURL = previous?.reloadURL ?? directive.serverURL
-        let outcome = try await loadManifest(from: requestURL)
+        return try await waitForManifest(at: directive.serverURL)
+    }
+
+    private func waitForManifest(at url: URL) async throws -> HLSContentSteeringManifest? {
+        let waiterID = UUID()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                guard !Task.isCancelled else {
+                    continuation.resume(throwing: CancellationError())
+                    return
+                }
+                if var flight = flights[url] {
+                    guard flight.waiters.count < 64 else {
+                        continuation.resume(returning: entries[url]?.manifest)
+                        return
+                    }
+                    flight.waiters[waiterID] = continuation
+                    flights[url] = flight
+                    return
+                }
+                guard activeLoads < 64 else {
+                    // Steering is optional; bounded overload uses the last
+                    // manifest or the declared initial pathway, without I/O.
+                    continuation.resume(returning: entries[url]?.manifest)
+                    return
+                }
+                let id = UUID()
+                let previous = entries[url]
+                let requestURL = previous?.reloadURL ?? url
+                activeLoads += 1
+                let task = Task {
+                    let result: Result<ManifestLoadOutcome, Error>
+                    do {
+                        let outcome = try await self.loadManifest(from: requestURL)
+                        try Task.checkCancellation()
+                        result = .success(outcome)
+                    } catch { result = .failure(error) }
+                    self.completeFlight(at: url, id: id, result: result, previous: previous, requestURL: requestURL)
+                }
+                flights[url] = Flight(id: id, task: task, waiters: [waiterID: continuation])
+            }
+        } onCancel: {
+            Task { await self.cancelWaiter(waiterID, at: url) }
+        }
+    }
+
+    private func cancelWaiter(_ id: UUID, at url: URL) {
+        guard var flight = flights[url], let waiter = flight.waiters.removeValue(forKey: id) else { return }
+        if flight.waiters.isEmpty {
+            flights.removeValue(forKey: url)
+            flight.task.cancel()
+        } else {
+            flights[url] = flight
+        }
+        waiter.resume(throwing: CancellationError())
+    }
+
+    private func completeFlight(
+        at url: URL, id: UUID, result: Result<ManifestLoadOutcome, Error>,
+        previous: CacheEntry?, requestURL: URL
+    ) {
+        activeLoads -= 1
+        guard let flight = flights[url], flight.id == id else { return }
+        flights.removeValue(forKey: url)
+        let manifest = result.map { store($0, at: url, previous: previous, requestURL: requestURL) }
+        for waiter in flight.waiters.values { waiter.resume(with: manifest) }
+    }
+
+    private func store(
+        _ outcome: ManifestLoadOutcome, at url: URL, previous: CacheEntry?, requestURL: URL
+    ) -> HLSContentSteeringManifest? {
+        // Loading/adaptation time must not consume a server's requested wait.
+        let receivedAt = self.now()
         switch outcome {
         case .success(let manifest):
-            entries[directive.serverURL] = CacheEntry(
-                manifest: manifest,
-                reloadURL: manifest.reloadURL ?? requestURL,
-                expiration: now.advanced(
-                    by: .seconds(manifest.timeToLive)
-                ),
-                isGone: false
-            )
+            cache(
+                CacheEntry(
+                    manifest: manifest,
+                    reloadURL: manifest.reloadURL ?? requestURL,
+                    expiration: receivedAt.advanced(
+                        by: .seconds(manifest.timeToLive)
+                    ),
+                    isGone: false
+                ), for: url)
             return manifest
         case .gone:
-            entries[directive.serverURL] = CacheEntry(
-                manifest: previous?.manifest,
-                reloadURL: requestURL,
-                expiration: now,
-                isGone: true
-            )
+            cache(
+                CacheEntry(
+                    manifest: previous?.manifest,
+                    reloadURL: requestURL,
+                    expiration: receivedAt,
+                    isGone: true
+                ), for: url)
             return previous?.manifest
         case .unavailable(let retryDelay):
             let delay =
@@ -107,14 +197,28 @@ actor HLSContentSteeringResolver {
                     .seconds($0.timeToLive)
                 }
                 ?? Self.failedReloadDelay
-            entries[directive.serverURL] = CacheEntry(
-                manifest: previous?.manifest,
-                reloadURL: requestURL,
-                expiration: now.advanced(by: delay),
-                isGone: false
-            )
+            cache(
+                CacheEntry(
+                    manifest: previous?.manifest,
+                    reloadURL: requestURL,
+                    expiration: receivedAt.advanced(by: delay),
+                    isGone: false
+                ), for: url)
             return previous?.manifest
         }
+    }
+
+    private func cache(_ entry: CacheEntry, for url: URL) {
+        entries[url] = entry
+        recordAccess(to: url)
+        while recentlyUsedURLs.count > Self.maximumCachedManifests {
+            entries.removeValue(forKey: recentlyUsedURLs.removeFirst())
+        }
+    }
+
+    private func recordAccess(to url: URL) {
+        recentlyUsedURLs.removeAll { $0 == url }
+        recentlyUsedURLs.append(url)
     }
 
     private func loadManifest(
@@ -203,71 +307,108 @@ actor HLSContentSteeringResolver {
     private static func fallbackCatalog(
         for playlist: HLSPlaylist,
         initialPathwayID: String?
-    ) -> HLSPathwayCatalog {
+    ) throws -> HLSPathwayCatalog {
+        try Task.checkCancellation()
+        let limits = HLSPathwayCatalogBuilder.Limits()
+        func initialOnly() throws -> HLSPathwayCatalog {
+            let preferred = initialPathwayID.flatMap { id in
+                playlist.variants.contains { ($0.pathwayID ?? HLSPathwayID.implicit) == id } ? id : nil
+            }
+            guard let id = preferred ?? playlist.variants.first.map({ $0.pathwayID ?? HLSPathwayID.implicit }) else {
+                return .unsteered(playlist)
+            }
+            let variants = playlist.variants.filter { ($0.pathwayID ?? HLSPathwayID.implicit) == id }
+            let iFrames = playlist.iFrameVariants.filter { ($0.pathwayID ?? HLSPathwayID.implicit) == id }
+            let renditions = referencedRenditions(variants: variants + iFrames, renditions: playlist.renditions)
+            try Task.checkCancellation()
+            // One original pathway reuses only records admitted by the input
+            // playlist bound; it cannot multiply a shared rendition group.
+            return HLSPathwayCatalog(pathways: [
+                HLSPathway(id: id, variants: variants, iFrameVariants: iFrames, renditions: renditions)
+            ])
+        }
         var pathwayIDs: [String] = []
+        var seen: Set<String> = []
         if let initialPathwayID {
             pathwayIDs.append(initialPathwayID)
+            seen.insert(initialPathwayID)
         }
         for variant in playlist.variants {
-            let pathwayID = variant.pathwayID ?? HLSPathwayID.implicit
-            if !pathwayIDs.contains(pathwayID) {
-                pathwayIDs.append(pathwayID)
+            let id = variant.pathwayID ?? HLSPathwayID.implicit
+            if seen.insert(id).inserted {
+                pathwayIDs.append(id)
+                if pathwayIDs.count > limits.maximumPathways { return try initialOnly() }
             }
         }
-        let pathways: [HLSPathway] = pathwayIDs.compactMap { pathwayID in
-            let variants = playlist.variants.filter {
-                ($0.pathwayID ?? HLSPathwayID.implicit) == pathwayID
+        var remaining = limits.maximumRecords
+        func reserve(_ count: Int) -> Bool {
+            guard count <= remaining else { return false }
+            remaining -= count
+            return true
+        }
+        guard reserve(playlist.variants.count), reserve(playlist.iFrameVariants.count) else {
+            return try initialOnly()
+        }
+        let variantsByID = Dictionary(grouping: playlist.variants) { $0.pathwayID ?? HLSPathwayID.implicit }
+        let iFramesByID = Dictionary(grouping: playlist.iFrameVariants) { $0.pathwayID ?? HLSPathwayID.implicit }
+        let renditionCounts = Dictionary(grouping: playlist.renditions, by: \.groupID).mapValues(\.count)
+        // Reserve every output reference before copying any group into each
+        // pathway. A small source group shared by many paths is not free.
+        for id in pathwayIDs {
+            try Task.checkCancellation()
+            let variants = variantsByID[id] ?? []
+            guard !variants.isEmpty else { continue }
+            let keys = referencedGroupIDs(variants: variants + (iFramesByID[id] ?? []))
+            for key in keys {
+                guard reserve(renditionCounts[key] ?? 0) else { return try initialOnly() }
             }
-            let iFrameVariants = playlist.iFrameVariants.filter {
-                ($0.pathwayID ?? HLSPathwayID.implicit) == pathwayID
-            }
-            guard !variants.isEmpty else {
-                return nil
-            }
+        }
+        let pathways: [HLSPathway] = try pathwayIDs.compactMap { id in
+            try Task.checkCancellation()
+            let variants = variantsByID[id] ?? []
+            let iFrames = iFramesByID[id] ?? []
+            guard !variants.isEmpty else { return nil }
             return HLSPathway(
-                id: pathwayID,
-                variants: variants,
-                iFrameVariants: iFrameVariants,
-                renditions: Self.referencedRenditions(
-                    variants: variants + iFrameVariants,
-                    renditions: playlist.renditions
-                )
+                id: id, variants: variants, iFrameVariants: iFrames,
+                renditions: referencedRenditions(variants: variants + iFrames, renditions: playlist.renditions)
             )
         }
-        guard !pathways.isEmpty else {
-            return .unsteered(playlist)
-        }
+        try Task.checkCancellation()
+        guard !pathways.isEmpty else { return .unsteered(playlist) }
         return HLSPathwayCatalog(pathways: pathways)
+    }
+
+    private static func referencedGroupIDs(variants: [HLSVariant]) -> Set<String> {
+        Set(
+            variants.flatMap { variant in
+                [
+                    variant.audioGroupID, variant.subtitleGroupID, variant.videoGroupID,
+                    variant.closedCaptions?.groupID,
+                ].compactMap { $0 }
+            })
     }
 
     private static func referencedRenditions(
         variants: [HLSVariant],
         renditions: [HLSRendition]
     ) -> [HLSRendition] {
-        let groupIDs = Set(
-            variants.flatMap { variant in
-                [
-                    variant.audioGroupID,
-                    variant.subtitleGroupID,
-                    variant.videoGroupID,
-                    variant.closedCaptions?.groupID,
-                ].compactMap { $0 }
-            }
-        )
+        let groupIDs = referencedGroupIDs(variants: variants)
         return renditions.filter { groupIDs.contains($0.groupID) }
     }
 
-    private static func retryDelay(
-        from response: HTTPURLResponse
+    static func retryDelay(
+        from response: HTTPURLResponse, now: Date = Date()
     ) -> Duration? {
-        guard
-            let value = response.value(forHTTPHeaderField: "Retry-After"),
-            let seconds = Int64(value),
-            seconds > 0
-        else {
-            return nil
+        guard let raw = response.value(forHTTPHeaderField: "Retry-After") else { return nil }
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return nil }
+        // RFC 9110: delay-seconds is unsigned decimal, including zero; the
+        // alternative is HTTP-date. Invalid/overflow input retains fallback.
+        if value.utf8.allSatisfy({ (48...57).contains($0) }) {
+            return Int64(value).map { .seconds($0) }
         }
-        return .seconds(seconds)
+        guard let date = HLSHTTPDateParser.parse(value, requiresGMTZone: true) else { return nil }
+        return .seconds(max(0, date.timeIntervalSince(now)))
     }
 
     private static func decodeDataURL(

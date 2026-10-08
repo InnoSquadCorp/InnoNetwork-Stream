@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+dependency_arguments=()
+if [[ "${1:-}" == "--development" ]]; then
+  dependency_arguments=(--development)
+  shift
+fi
+[[ $# -eq 0 ]] || { echo "Usage: $0 [--development]" >&2; exit 64; }
+
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 symbols_dir="$repo_root/Scripts/symbols"
 budgets_file="$symbols_dir/budgets.tsv"
@@ -12,10 +19,11 @@ fail() {
 }
 
 [[ -f "$budgets_file" ]] || fail "missing Scripts/symbols/budgets.tsv"
-bash Scripts/check_innonetwork_dependency.sh
+bash Scripts/check_innonetwork_dependency.sh ${dependency_arguments[@]+"${dependency_arguments[@]}"}
 
-find .build -path '*/symbolgraph/*.symbols.json' -type f -delete 2>/dev/null || true
-xcrun swift package --force-resolved-versions dump-symbol-graph \
+# Select only this build context; never delete diagnostic or other-context graphs.
+scratch_path="$(python3 Scripts/swiftpm_scratch_path.py "$repo_root")"
+bash Scripts/swiftpm.sh package --force-resolved-versions dump-symbol-graph \
   --minimum-access-level public \
   --skip-synthesized-members >/dev/null
 
@@ -24,7 +32,14 @@ cleanup() {
   rm -f "$actual"
 }
 trap cleanup EXIT
-python3 Scripts/collect_public_symbols.py . > "$actual"
+python3 Scripts/collect_public_symbols.py . --build-root "$scratch_path" > "$actual"
+
+# Preserve generated evidence even when a reviewed API change makes a gate
+# fail. These diagnostics never replace the checked-in approved snapshots.
+mkdir -p .build/api-contract-diagnostics
+cp "$actual" .build/api-contract-diagnostics/public-symbols.tsv
+python3 Scripts/collect_public_signatures.py . --build-root "$scratch_path" \
+  > .build/api-contract-diagnostics/public-signatures.tsv
 
 declare -a contracts=(
   "InnoNetworkHLS:hls.allowlist"
@@ -65,3 +80,6 @@ total_budget="$(awk -F '\t' '$1 == "TOTAL" { print $2 }' "$budgets_file")"
   || fail "all modules export $total declarations (budget: $total_budget)"
 
 echo "public-api-contract: OK ($total/$total_budget)"
+python3 Scripts/collect_public_signatures.py . \
+  --build-root "$scratch_path" \
+  --check Scripts/symbols/public-signatures.tsv

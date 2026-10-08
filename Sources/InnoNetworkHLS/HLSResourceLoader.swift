@@ -367,6 +367,9 @@ struct HLSResourceLoader: Sendable {
             if let byteRange, receivedBytes != byteRange.length {
                 throw HLSDownloadError.invalidByteRangeResponse
             }
+            guard receivedBytes > 0 else {
+                throw HLSDownloadError.emptyOutput
+            }
             do {
                 try fileHandle.synchronize()
                 try fileHandle.close()
@@ -407,7 +410,8 @@ struct HLSResourceLoader: Sendable {
                 let plaintextByteCount =
                     try decryptedResourceURL.resourceValues(
                         forKeys: [.fileSizeKey]
-                    ).fileSize
+                    ).fileSize,
+                plaintextByteCount > 0
             else {
                 throw HLSDownloadError.aes128DecryptionFailed
             }
@@ -446,40 +450,8 @@ struct HLSResourceLoader: Sendable {
         contentRange value: String,
         expected byteRange: HLSByteRange
     ) -> Bool {
-        let normalized = value.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        )
-        guard normalized.lowercased().hasPrefix("bytes ") else {
-            return false
-        }
-        let fields = normalized.dropFirst("bytes ".count).split(
-            separator: "/",
-            maxSplits: 1,
-            omittingEmptySubsequences: false
-        )
-        guard fields.count == 2 else {
-            return false
-        }
-        let interval = fields[0].split(
-            separator: "-",
-            maxSplits: 1,
-            omittingEmptySubsequences: false
-        )
-        guard interval.count == 2,
-            let lowerBound = Int64(interval[0]),
-            let upperBound = Int64(interval[1]),
-            lowerBound == byteRange.offset,
-            upperBound == byteRange.endOffset - 1
-        else {
-            return false
-        }
-        if fields[1] == "*" {
-            return true
-        }
-        guard let totalLength = Int64(fields[1]) else {
-            return false
-        }
-        return totalLength > upperBound
+        guard let range = HLSContentRange(value) else { return false }
+        return range.offset == byteRange.offset && range.length == byteRange.length
     }
 
     private static func canFailOver(
