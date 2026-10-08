@@ -1,22 +1,28 @@
 """Native proof positive controls, stale/failing evidence and race regressions."""
 import copy
+import contextlib
+import io
+import json
 from datetime import datetime, timedelta, timezone
 import importlib.util
 from pathlib import Path
 import unittest
+from unittest.mock import patch
+import subprocess
+import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location('gate', ROOT / 'Scripts/verify-ci-metadata.py')
 gate = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(gate)
-HEAD, BASE, SOURCE = 'a' * 40, 'b' * 40, 'c' * 40
+HEAD, BASE, SOURCE, TREE = 'a' * 40, 'b' * 40, 'c' * 40, 'e' * 40
 REPO = gate.CONFIG['repository']
 
 
 class Transcript:
     def __init__(self):
-        self.pr = dict(number=45, state='open', labels=[], head=dict(sha=HEAD),
-                       base=dict(sha=BASE, repo=dict(full_name=REPO)))
+        self.pr = dict(number=45, state='open', labels=[], head=dict(sha=HEAD), merge_commit_sha=SOURCE,
+                       base=dict(ref='main', sha=BASE, repo=dict(full_name=REPO)))
         self.event = dict(action='edited', pull_request=copy.deepcopy(self.pr), changes={})
         self.env = dict(GITHUB_REPOSITORY=REPO, GITHUB_EVENT_NAME='pull_request', GITHUB_REF='refs/pull/45/merge',
                         GITHUB_RUN_ID='20', GITHUB_RUN_ATTEMPT='1', GITHUB_SHA=SOURCE)
@@ -26,7 +32,11 @@ class Transcript:
                         display_title=f'CI validation v2 pr:45 head:{HEAD} base:{BASE} source:{SOURCE} release:false asan:false concurrency:false')
         self.own = {**self.run, 'id':20, 'run_number':20, 'status':'in_progress', 'conclusion':None,
                     'display_title':gate.METADATA_PREFIX+'current'}
-        self.merge = dict(sha=SOURCE, parents=[dict(sha=BASE),dict(sha=HEAD)])
+        self.merge = dict(sha=SOURCE, tree=dict(sha=TREE), parents=[dict(sha=BASE),dict(sha=HEAD)])
+        self.base_ref = dict(ref='refs/heads/main', object=dict(type='commit',sha=BASE))
+        self.checkout = dict(commit=SOURCE,tree=TREE)
+        self.base_ref_reads = 0
+        self.base_ref_race = None
         self.runs = [self.run,self.own]
         self.jobs,self.checks = [],{}
         for i,name in enumerate(gate.CONFIG['checks']):
@@ -52,6 +62,11 @@ class Transcript:
             if self.reads==1 and getattr(self,'run_read',False) and self.run_race:self.run_race(result)
             self.run_read=True
             return result
+        if '/git/ref/heads/' in path:
+            self.base_ref_reads += 1
+            result=copy.deepcopy(self.base_ref)
+            if self.base_ref_reads==2 and self.base_ref_race:self.base_ref_race(result)
+            return result
         if '/git/commits/' in path:return copy.deepcopy(self.merge)
         if '/check-runs/' in path:return copy.deepcopy(self.checks[int(path.rsplit('/',1)[1])])
         if '/actions/runs/' in path:
@@ -69,15 +84,84 @@ class Transcript:
         raise AssertionError(path)
 
     def prove(self):
-        return gate.prove(self,self.event,self.env)
+        return gate.prove(self,self.event,self.env,checkout=self.checkout)
 
 
 class MetadataGateTests(unittest.TestCase):
     def test_current_success_is_read_only_and_bound(self):
         t=Transcript();proof=t.prove()
-        self.assertEqual(proof,dict(run=10,attempt=1,head=HEAD,base=BASE,source=SOURCE,check='CI Required'))
+        self.assertEqual(proof,dict(run=10,attempt=1,head=HEAD,base=BASE,event_base=BASE,base_ref='main',source=SOURCE,tree=TREE,check='CI Required'))
         for name in gate.CONFIG['checks']:
-            t=Transcript();self.assertEqual(gate.prove(t,t.event,t.env,name)['check'],name)
+            t=Transcript();self.assertEqual(gate.prove(t,t.event,t.env,name,checkout=t.checkout)['check'],name)
+
+    def test_checkout_identity_requires_clean_real_git_tree(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            def git(*args):
+                return subprocess.check_output(['git','-C',directory,*args],text=True,stderr=subprocess.PIPE).strip()
+            git('init','-q');git('config','user.name','Fixture');git('config','user.email','fixture@example.invalid')
+            (root/'source').write_text('original')
+            git('add','.');git('-c','commit.gpgsign=false','commit','-qm','fixture')
+            self.assertEqual(gate.checkout_identity(root),dict(commit=git('rev-parse','HEAD'),tree=git('rev-parse','HEAD^{tree}')))
+            (root/'source').write_text('dirty')
+            with self.assertRaises(ValueError):gate.checkout_identity(root)
+            git('add','source')
+            with self.assertRaises(ValueError):gate.checkout_identity(root)
+            git('reset','--hard','HEAD')
+            (root/'extra').write_text('untracked')
+            with self.assertRaises(ValueError):gate.checkout_identity(root)
+
+    def test_main_rejects_checkout_change_after_successful_native_proof(self):
+        t=Transcript()
+        with tempfile.TemporaryDirectory() as directory:
+            event=Path(directory)/'event.json';event.write_text(json.dumps(t.event))
+            env={**t.env,'GH_TOKEN':'synthetic-fixture-token','GITHUB_EVENT_PATH':str(event)}
+            output,error=io.StringIO(),io.StringIO()
+            changed=dict(commit=SOURCE,tree='f'*40)
+            with patch.object(gate.sys,'argv',['verify-ci-metadata.py']), \
+                    patch.dict(gate.os.environ,env,clear=True), \
+                    patch.object(gate,'API',return_value=t), \
+                    patch.object(gate,'checkout_identity',side_effect=[t.checkout,changed]), \
+                    contextlib.redirect_stdout(output),contextlib.redirect_stderr(error):
+                self.assertEqual(gate.main(),1)
+            self.assertIn('checkout changed during proof',error.getvalue())
+            self.assertNotIn('Revalidated exact PR validation',output.getvalue())
+            self.assertEqual(t.base_ref_reads,2)
+
+    def test_stale_snapshot_requires_the_exact_live_base_merge(self):
+        t=Transcript()
+        actual='d'*40
+        t.base_ref['object']['sha']=actual
+        t.merge['parents'][0]['sha']=actual
+        proof=t.prove()
+        self.assertEqual(proof['base'],actual)
+        self.assertEqual(proof['event_base'],BASE)
+        self.assertEqual(proof['tree'],TREE)
+
+    def test_live_base_parent_tree_and_native_merge_mismatches_reject(self):
+        mutations=[lambda t:t.base_ref['object'].update(sha='d'*40),
+                   lambda t:t.base_ref['object'].update(type='tag'),
+                   lambda t:t.base_ref.update(ref='refs/heads/other'),
+                   lambda t:t.merge['tree'].update(sha=''),
+                   lambda t:t.checkout.update(tree='f'*40),
+                   lambda t:t.checkout.update(commit=HEAD),
+                   lambda t:t.pr.update(merge_commit_sha='d'*40),
+                   lambda t:t.pr['base'].update(ref='other')]
+        for index,mutate in enumerate(mutations):
+            t=Transcript();mutate(t)
+            with self.subTest(index=index),self.assertRaises(ValueError):t.prove()
+
+    def test_base_ref_move_retarget_and_native_merge_races_reject(self):
+        mutations=[lambda t:setattr(t,'base_ref_race',lambda r:r['object'].update(sha='d'*40)),
+                   lambda t:setattr(t,'pr_race',lambda p:p['base'].update(ref='other')),
+                   lambda t:setattr(t,'pr_race',lambda p:p.update(merge_commit_sha='d'*40))]
+        for mutate in mutations:
+            t=Transcript();mutate(t)
+            with self.assertRaises(ValueError):t.prove()
+        # A stale event snapshot is not permission to reuse an older tested base.
+        t=Transcript();t.base_ref['object']['sha']='d'*40;t.merge['parents'][0]['sha']='d'*40
+        t.base_ref_race=lambda r:r['object'].update(sha='f'*40)
+        with self.assertRaises(ValueError):t.prove()
 
     def test_failed_pending_cancelled_or_missing_validation_cannot_turn_green(self):
         for state,result in [('completed','failure'),('completed','cancelled'),('in_progress',None),('queued',None),('completed','skipped')]:

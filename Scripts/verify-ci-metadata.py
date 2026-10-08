@@ -10,6 +10,8 @@ import os
 from pathlib import Path
 import re
 import sys
+import subprocess
+from urllib.parse import quote
 from urllib.request import Request, build_opener, HTTPRedirectHandler
 
 CONFIG = {'repository': 'InnoSquadCorp/InnoNetwork-Stream', 'workflow': '.github/workflows/ci.yml', 'labels': ['release-validation'], 'checks': ['CI Required']}
@@ -82,7 +84,25 @@ def belongs_to_other_pr(run, number):
                 for pr in associated) and all(pr['number'] != number for pr in associated))
 
 
-def prove(api, event, env, check_name='CI Required'):
+def live_base(api, route, branch):
+    require(isinstance(branch, str) and 0 < len(branch) <= 1024, 'invalid base branch')
+    ref = api.get(route + 'git/ref/heads/' + quote(branch, safe=''))
+    obj = ref.get('object', {})
+    require(ref.get('ref') == 'refs/heads/' + branch and obj.get('type') == 'commit' and
+            re.fullmatch('[0-9a-f]{40}', obj.get('sha', '')), 'invalid live base ref')
+    return obj['sha']
+
+
+def checkout_identity(root="."):
+    require(not subprocess.check_output(
+        ['git', '--no-optional-locks', '-C', str(root), 'status', '--porcelain', '--untracked-files=all'], text=True),
+        'checkout contains uncommitted changes')
+    values = subprocess.check_output(['git', '-C', str(root), 'rev-parse', 'HEAD', 'HEAD^{tree}'], text=True).splitlines()
+    require(len(values) == 2, 'missing checkout identity')
+    return dict(commit=values[0], tree=values[1])
+
+
+def prove(api, event, env, check_name='CI Required', *, checkout):
     repo = CONFIG['repository']
     route = 'repos/' + repo + '/'
     require(env.get('GITHUB_REPOSITORY') == repo and env.get('GITHUB_EVENT_NAME') == 'pull_request',
@@ -100,7 +120,11 @@ def prove(api, event, env, check_name='CI Required'):
     require(check_name in CONFIG['checks'], 'unknown required check')
     current = api.get(route + f'pulls/{number}')
     require(current.get('state') == 'open' and binding(current) == binding(pr), 'PR changed before validation')
-    require(current['base']['repo']['full_name'] == repo, 'foreign base repository')
+    branch = pr['base']['ref']
+    require(current['base']['repo']['full_name'] == repo and pr['base']['repo']['full_name'] == repo,
+            'foreign base repository')
+    require(current['base']['ref'] == branch, 'PR base branch changed')
+    actual_base = live_base(api, route, branch)
     own_id = int(env['GITHUB_RUN_ID'])
     own = api.get(route + f'actions/runs/{own_id}')
     source = env['GITHUB_SHA']
@@ -110,8 +134,15 @@ def prove(api, event, env, check_name='CI Required'):
     require(own.get('run_attempt') == int(env['GITHUB_RUN_ATTEMPT']), 'current attempt changed')
     workflow = own['workflow_id']
     merge = api.get(route + 'git/commits/' + source)
-    require(merge.get('sha') == source and [p['sha'] for p in merge.get('parents', [])] == [base, head],
-            'checkout does not combine the current base and head')
+    # PR/event base.sha can retain an earlier snapshot after the base branch
+    # advances. Keep that event binding, but prove the actual tested merge
+    # against the live named branch and its immutable checkout tree.
+    tree = merge.get('tree', {}).get('sha', '')
+    require(merge.get('sha') == source and re.fullmatch('[0-9a-f]{40}', tree) and
+            [p['sha'] for p in merge.get('parents', [])] == [actual_base, head],
+            'checkout does not combine the live base and head')
+    require(current.get('merge_commit_sha') == source and
+            checkout == dict(commit=source, tree=tree), 'checkout commit/tree differs from native PR merge')
     runs = api.pages(route + f'actions/workflows/{workflow}/runs?head_sha={head}', 'workflow_runs')
     validations = [r for r in runs if r.get('id') != own_id and
                    not str(r.get('display_title', '')).startswith(METADATA_PREFIX) and
@@ -169,8 +200,12 @@ def prove(api, event, env, check_name='CI Required'):
                     not belongs_to_other_pr(r, number) for r in latest),
             'newer real validation appeared')
     final_pr = api.get(route + f'pulls/{number}')
-    require(final_pr.get('state') == 'open' and binding(final_pr) == binding(pr), 'PR changed during proof')
-    return dict(run=run['id'], attempt=attempt, head=head, base=base, source=source, check=check_name)
+    require(final_pr.get('state') == 'open' and binding(final_pr) == binding(pr) and
+            final_pr['base']['ref'] == branch and final_pr['base']['repo']['full_name'] == repo and
+            final_pr.get('merge_commit_sha') == source, 'PR changed during proof')
+    require(live_base(api, route, branch) == actual_base, 'live base changed during proof')
+    return dict(run=run['id'], attempt=attempt, head=head, base=actual_base, event_base=base,
+                base_ref=branch, source=source, tree=tree, check=check_name)
 
 
 def main():
@@ -179,7 +214,10 @@ def main():
     args = parser.parse_args()
     try:
         event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())
-        proof = prove(API(CONFIG['repository'], os.environ['GH_TOKEN']), event, os.environ, args.check)
+        checkout = checkout_identity()
+        proof = prove(API(CONFIG['repository'], os.environ['GH_TOKEN']), event, os.environ, args.check,
+                      checkout=checkout)
+        require(checkout_identity() == checkout, 'checkout changed during proof')
         message = 'Revalidated exact PR validation: ' + json.dumps(proof, sort_keys=True)
         print(message)
         if os.environ.get('GITHUB_STEP_SUMMARY'):
