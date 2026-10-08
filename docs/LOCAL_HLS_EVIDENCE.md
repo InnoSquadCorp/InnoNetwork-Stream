@@ -119,9 +119,10 @@ provided.
 
 No official Apple execution has been performed for this implementation draft.
 Python fixtures are explicitly synthetic validator-protocol tests and must never
-be used as release evidence. Actual SDK-output generation is wired into both Xcode CI lanes. This VM has no
-Swift/Xcode; the revised generator still needs an authorized Apple CI run.
-Synthetic orchestration controls do not establish successful SDK execution.
+be used as release evidence. Actual SDK-output generation is wired into both Xcode CI lanes. The six SDK output cases passed both Xcode lanes in
+[PR #4 validation](https://github.com/InnoSquadCorp/InnoNetwork-Stream/actions/runs/37776311885).
+That validates generation, not execution of the official Apple validators or
+the eventual release commit. Synthetic controls alone are not SDK execution.
 
 If no authorized environment can execute the tools, evidence cannot be invented.
 The owner must decide a documented release-policy exception rather than marking
