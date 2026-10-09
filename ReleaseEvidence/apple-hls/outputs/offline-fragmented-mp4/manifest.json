@@ -1,0 +1,39 @@
+{
+  "entryPlaylistPath" : "media\/primary\/index.m3u8",
+  "files" : [
+    {
+      "byteCount" : 254,
+      "path" : "media\/primary\/index.m3u8",
+      "sha256" : "964f4f606da3cc80e7cf6551ca74409b790428cc7bab31d7e70c595f6266bd86"
+    },
+    {
+      "byteCount" : 826,
+      "path" : "media\/primary\/resources\/00000.mp4",
+      "sha256" : "9d5dfad0b34d79e363976edeea823601ad7527d5c03ff6a793213e2a46aac44b"
+    },
+    {
+      "byteCount" : 1432,
+      "path" : "media\/primary\/resources\/00001.m4s",
+      "sha256" : "42d991769870848bed1818b8a7b437835178cdf8b9da4ce7381f05df3cc732dd"
+    },
+    {
+      "byteCount" : 745,
+      "path" : "media\/primary\/resources\/00002.m4s",
+      "sha256" : "c773e6bb59a394fa3874624a3c2a540337dcb2d781fa52c33e90abf6cb902454"
+    }
+  ],
+  "resumedResourceTransferCount" : 0,
+  "schemaVersion" : 3,
+  "tracks" : [
+    {
+      "characteristics" : [
+
+      ],
+      "isAutoselect" : true,
+      "isDefault" : true,
+      "isForced" : false,
+      "kind" : "primary",
+      "playlistPath" : "media\/primary\/index.m3u8"
+    }
+  ]
+}

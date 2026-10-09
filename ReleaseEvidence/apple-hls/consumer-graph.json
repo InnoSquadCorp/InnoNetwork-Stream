@@ -1,0 +1,100 @@
+{
+  "identity": "hlsreleaseevidence",
+  "name": "HLSReleaseEvidence",
+  "url": "/private/tmp/stream-final-6.1.1-3a8bdbc/Tests/HLSReleaseEvidence",
+  "version": "unspecified",
+  "path": "/private/tmp/stream-final-6.1.1-3a8bdbc/Tests/HLSReleaseEvidence",
+  "traits": [
+    "default"
+  ],
+  "dependencies": [
+    {
+      "identity": "stream-final-6.1.1-3a8bdbc",
+      "name": "InnoNetwork-Stream",
+      "url": "/private/tmp/stream-final-6.1.1-3a8bdbc",
+      "version": "unspecified",
+      "path": "/private/tmp/stream-final-6.1.1-3a8bdbc",
+      "traits": [
+        "default"
+      ],
+      "dependencies": [
+        {
+          "identity": "innonetwork",
+          "name": "InnoNetwork",
+          "url": "https://github.com/InnoSquadCorp/InnoNetwork.git",
+          "version": "6.1.1",
+          "path": "/private/tmp/stream-final-6.1.1-3a8bdbc/.build/release-evidence-exporter/scope-6e093fa666b899a2b91767a3/checkouts/InnoNetwork",
+          "traits": [
+            "Macros"
+          ],
+          "dependencies": [
+            {
+              "identity": "swift-http-types",
+              "name": "swift-http-types",
+              "url": "https://github.com/apple/swift-http-types",
+              "version": "1.6.0",
+              "path": "/private/tmp/stream-final-6.1.1-3a8bdbc/.build/release-evidence-exporter/scope-6e093fa666b899a2b91767a3/checkouts/swift-http-types",
+              "traits": [
+                "FoundationURL"
+              ],
+              "dependencies": [
+
+              ]
+            },
+            {
+              "identity": "swift-openapi-runtime",
+              "name": "swift-openapi-runtime",
+              "url": "https://github.com/apple/swift-openapi-runtime",
+              "version": "1.12.1",
+              "path": "/private/tmp/stream-final-6.1.1-3a8bdbc/.build/release-evidence-exporter/scope-6e093fa666b899a2b91767a3/checkouts/swift-openapi-runtime",
+              "traits": [
+                "FullFoundation"
+              ],
+              "dependencies": [
+                {
+                  "identity": "swift-http-types",
+                  "name": "swift-http-types",
+                  "url": "https://github.com/apple/swift-http-types",
+                  "version": "1.6.0",
+                  "path": "/private/tmp/stream-final-6.1.1-3a8bdbc/.build/release-evidence-exporter/scope-6e093fa666b899a2b91767a3/checkouts/swift-http-types",
+                  "traits": [
+                    "FoundationURL"
+                  ],
+                  "dependencies": [
+
+                  ]
+                }
+              ]
+            },
+            {
+              "identity": "swift-crypto",
+              "name": "swift-crypto",
+              "url": "https://github.com/apple/swift-crypto",
+              "version": "5.0.0",
+              "path": "/private/tmp/stream-final-6.1.1-3a8bdbc/.build/release-evidence-exporter/scope-6e093fa666b899a2b91767a3/checkouts/swift-crypto",
+              "traits": [
+                "default"
+              ],
+              "dependencies": [
+                {
+                  "identity": "swift-asn1",
+                  "name": "swift-asn1",
+                  "url": "https://github.com/apple/swift-asn1.git",
+                  "version": "1.7.2",
+                  "path": "/private/tmp/stream-final-6.1.1-3a8bdbc/.build/release-evidence-exporter/scope-6e093fa666b899a2b91767a3/checkouts/swift-asn1",
+                  "traits": [
+                    "default"
+                  ],
+                  "dependencies": [
+
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+
