@@ -6075,10 +6075,40 @@ extension HLSLivePlaylistClientTests {
             #expect(
                 assets.compactMap { $0["URI"] as? String }
                     == [
-                        "asset-00000/index.m3u8",
-                        "asset-00001/index.m3u8",
+                        "asset-00000/media/primary/index.m3u8",
+                        "asset-00001/media/primary/index.m3u8",
                     ]
             )
+            try #require(assets.count == 2)
+            for (index, expectedBytes) in [Data("first".utf8), Data("second".utf8)].enumerated() {
+                let assetName = String(format: "asset-%05d", index)
+                let assetPackageURL = localListURL.deletingLastPathComponent()
+                    .appendingPathComponent(assetName, isDirectory: true)
+                let reopened = try HLSOfflinePackageStore().open(at: assetPackageURL)
+                let uri = try #require(assets[index]["URI"] as? String)
+                #expect(
+                    reopened.entryPlaylistURL
+                        == localListURL.deletingLastPathComponent().appendingPathComponent(uri)
+                )
+                let contents = try String(contentsOf: reopened.entryPlaylistURL, encoding: .utf8)
+                let entry = try HLSPlaylistParser().parse(
+                    contents,
+                    relativeTo: reopened.entryPlaylistURL
+                )
+                guard case .media(let media) = entry else {
+                    Issue.record("expected an offline media entry for the interstitial asset")
+                    continue
+                }
+                #expect(media.segmentCount == 1)
+                #expect(media.hasEndList)
+                let segmentURIs = contents.split(whereSeparator: \.isNewline)
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty && !$0.hasPrefix("#") }
+                #expect(segmentURIs.count == 1)
+                let segmentURI = try #require(segmentURIs.first)
+                let segmentURL = try #require(URL(string: segmentURI, relativeTo: reopened.entryPlaylistURL))
+                #expect(try Data(contentsOf: segmentURL) == expectedBytes)
+            }
         } else {
             Issue.record("expected one local interstitial asset list")
         }
