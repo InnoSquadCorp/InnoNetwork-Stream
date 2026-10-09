@@ -1180,8 +1180,9 @@ extension HLSDownloaderTests {
         #expect(receipt.selectedVariant == nil)
     }
 
-    @Test("media entries reject unmatched entry, extra tracks and variant metadata",
-          arguments: ["entry", "track", "variant", "iframe"])
+    @Test(
+        "media entries reject unmatched entry, extra tracks and variant metadata",
+        arguments: ["entry", "track", "variant", "iframe"])
     func mediaEntryRejectsUnboundManifest(mutation: String) throws {
         let parentURL = try makeOfflineTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: parentURL) }
