@@ -1,0 +1,130 @@
+{
+  "dataID" : 0,
+  "dataStatus" : 1,
+  "dataVersion" : 1.3,
+  "discontinuities" : [
+    {
+      "measurements" : {
+        "measuredMaxBitrate" : 68521,
+        "measuredMeanBitrate" : 68285,
+        "measuredSegments" : 3
+      },
+      "segments" : [
+        {
+          "dataID" : 1,
+          "dataStatus" : 1,
+          "discontinuityDomain" : 0,
+          "format" : "fragmentedMP4",
+          "mediaSequence" : 0,
+          "mimeType" : "null",
+          "segmentByteRangeLength" : 8588,
+          "segmentByteRangeOffset" : 0,
+          "segmentDurationTag" : 1.00267,
+          "sslContentDeliveredSecurely" : false,
+          "startTime" : 0,
+          "url" : "resources\/00001.m4s"
+        },
+        {
+          "dataID" : 2,
+          "dataStatus" : 1,
+          "discontinuityDomain" : 0,
+          "format" : "fragmentedMP4",
+          "mediaSequence" : 1,
+          "mimeType" : "null",
+          "segmentByteRangeLength" : 8385,
+          "segmentByteRangeOffset" : 0,
+          "segmentDurationTag" : 1.00267,
+          "sslContentDeliveredSecurely" : false,
+          "startTime" : 1.00267,
+          "url" : "resources\/00002.m4s"
+        },
+        {
+          "dataID" : 3,
+          "dataStatus" : 1,
+          "discontinuityDomain" : 0,
+          "format" : "fragmentedMP4",
+          "mediaSequence" : 2,
+          "mimeType" : "null",
+          "segmentByteRangeLength" : 326,
+          "segmentByteRangeOffset" : 0,
+          "segmentDurationTag" : 0.021333,
+          "sslContentDeliveredSecurely" : false,
+          "startTime" : 2.00533,
+          "url" : "resources\/00003.m4s"
+        }
+      ],
+      "tracks" : [
+        {
+          "trackAudioChannelCount" : 1,
+          "trackAudioChannelLayout" : "Mono",
+          "trackAudioSampleRate" : 48000,
+          "trackId" : 1,
+          "trackMediaSubType" : "aac ",
+          "trackMediaType" : "soun"
+        }
+      ]
+    }
+  ],
+  "fetchCount" : 1,
+  "gzipEncoded" : false,
+  "hasDiscSequenceTag" : false,
+  "hasEndTag" : true,
+  "iframeOnly" : false,
+  "independentSegments" : true,
+  "integerDurations" : true,
+  "listDataStatus" : 3,
+  "measuredMaxBitrate" : 68521,
+  "measuredMeanBitrate" : 68285,
+  "mimeType" : "null",
+  "parsedSegmentsCount" : 3,
+  "playlistKind" : "media",
+  "playlistTargetDuration" : 1,
+  "playlistType" : "VOD",
+  "processedSegmentsCount" : 3,
+  "settings" : {
+    "compatible" : [
+
+    ],
+    "export-settings" : {
+      "compatible-output" : [
+        "v1.x"
+      ],
+      "continuous-output" : false,
+      "debug" : false,
+      "exit-code" : {
+        "threshold" : "none"
+      },
+      "output" : {
+        "cache-period" : 5
+      },
+      "parse-playlist-only" : false,
+      "rate" : 1000,
+      "skip-interstitials" : false,
+      "skip-partial-segments" : false,
+      "skip-steering-manifests" : false,
+      "url" : "\/private\/tmp\/stream-final-6.1.1-3a8bdbc\/ReleaseEvidence\/apple-hls\/outputs\/offline-audio-fmp4\/media\/primary\/index.m3u8",
+      "validation-data-path" : "\/private\/tmp\/stream-final-6.1.1-3a8bdbc\/ReleaseEvidence\/apple-hls\/reports\/offline-audio-fmp4.json"
+    },
+    "fetch" : {
+      "userAgent" : "AppleCoreMedia\/1.0.0.12A365 (iPad; U; CPU OS 8_0 like Mac OS X; en_us)"
+    },
+    "ignoredErrors" : [
+      "1016",
+      "1030",
+      "1034",
+      "1037",
+      "1054",
+      "121007",
+      "121034-121035",
+      "335046"
+    ],
+    "timeLimits" : {
+      "runtime" : 300
+    }
+  },
+  "sslContentDeliveredSecurely" : false,
+  "url" : "\/private\/tmp\/stream-final-6.1.1-3a8bdbc\/ReleaseEvidence\/apple-hls\/outputs\/offline-audio-fmp4\/media\/primary\/index.m3u8",
+  "validatorName" : "mediastreamvalidator",
+  "validatorTimestamp" : "2026-10-09T15:26:16+00:00",
+  "validatorVersion" : "2.0.284 (2.0.284-260930)"
+}

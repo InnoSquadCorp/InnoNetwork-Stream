@@ -1,0 +1,106 @@
+{
+  "dataID" : 0,
+  "dataStatus" : 1,
+  "dataVersion" : 1.3,
+  "discontinuities" : [
+    {
+      "measurements" : {
+        "measuredMaxBitrate" : 46624,
+        "measuredMeanBitrate" : 46624,
+        "measuredSegments" : 1
+      },
+      "segments" : [
+        {
+          "dataID" : 1,
+          "dataStatus" : 1,
+          "discontinuityDomain" : 0,
+          "format" : "transport",
+          "mediaSequence" : 0,
+          "mimeType" : "null",
+          "segmentByteRangeLength" : 5828,
+          "segmentByteRangeOffset" : 0,
+          "segmentDurationTag" : 1,
+          "sslContentDeliveredSecurely" : false,
+          "startTime" : 1.48333,
+          "url" : "resources\/00000.ts",
+          "videoFrameRate" : 24,
+          "videoStartsWithIDR" : true
+        }
+      ],
+      "tracks" : [
+        {
+          "trackId" : 1,
+          "trackMediaSubType" : "avc1",
+          "trackMediaType" : "vide",
+          "trackVideoHeight" : 16,
+          "trackVideoIsInterlaced" : false,
+          "trackVideoLevel" : 10,
+          "trackVideoProfile" : 100,
+          "trackVideoWidth" : 16
+        }
+      ]
+    }
+  ],
+  "fetchCount" : 1,
+  "gzipEncoded" : false,
+  "hasDiscSequenceTag" : false,
+  "hasEndTag" : true,
+  "iframeOnly" : false,
+  "independentSegments" : true,
+  "integerDurations" : true,
+  "listDataStatus" : 3,
+  "measuredMaxBitrate" : 46624,
+  "measuredMeanBitrate" : 46624,
+  "mimeType" : "null",
+  "parsedSegmentsCount" : 1,
+  "playlistKind" : "media",
+  "playlistTargetDuration" : 1,
+  "playlistType" : "VOD",
+  "processedSegmentsCount" : 1,
+  "settings" : {
+    "compatible" : [
+
+    ],
+    "export-settings" : {
+      "compatible-output" : [
+        "v1.x"
+      ],
+      "continuous-output" : false,
+      "debug" : false,
+      "exit-code" : {
+        "threshold" : "none"
+      },
+      "output" : {
+        "cache-period" : 5
+      },
+      "parse-playlist-only" : false,
+      "rate" : 1000,
+      "skip-interstitials" : false,
+      "skip-partial-segments" : false,
+      "skip-steering-manifests" : false,
+      "url" : "\/private\/tmp\/stream-final-6.1.1-3a8bdbc\/ReleaseEvidence\/apple-hls\/outputs\/offline-transport-stream\/media\/primary\/index.m3u8",
+      "validation-data-path" : "\/private\/tmp\/stream-final-6.1.1-3a8bdbc\/ReleaseEvidence\/apple-hls\/reports\/offline-transport-stream.json"
+    },
+    "fetch" : {
+      "userAgent" : "AppleCoreMedia\/1.0.0.12A365 (iPad; U; CPU OS 8_0 like Mac OS X; en_us)"
+    },
+    "ignoredErrors" : [
+      "1016",
+      "1030",
+      "1034",
+      "1037",
+      "1054",
+      "121007",
+      "121034-121035",
+      "335046"
+    ],
+    "timeLimits" : {
+      "runtime" : 300
+    }
+  },
+  "sslContentDeliveredSecurely" : false,
+  "url" : "\/private\/tmp\/stream-final-6.1.1-3a8bdbc\/ReleaseEvidence\/apple-hls\/outputs\/offline-transport-stream\/media\/primary\/index.m3u8",
+  "validatorName" : "mediastreamvalidator",
+  "validatorTimestamp" : "2026-10-09T15:26:16+00:00",
+  "validatorVersion" : "2.0.284 (2.0.284-260930)"
+}

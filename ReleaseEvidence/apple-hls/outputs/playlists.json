@@ -1,0 +1,8 @@
+{
+  "dvr-audio-fmp4" : "dvr-audio-fmp4\/index.m3u8",
+  "dvr-fragmented-mp4" : "dvr-fragmented-mp4\/index.m3u8",
+  "dvr-transport-stream" : "dvr-transport-stream\/index.m3u8",
+  "offline-audio-fmp4" : "offline-audio-fmp4\/media\/primary\/index.m3u8",
+  "offline-fragmented-mp4" : "offline-fragmented-mp4\/media\/primary\/index.m3u8",
+  "offline-transport-stream" : "offline-transport-stream\/media\/primary\/index.m3u8"
+}

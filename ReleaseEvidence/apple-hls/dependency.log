@@ -1,0 +1,25 @@
+Fetching https://github.com/apple/swift-http-types from cache
+Fetching https://github.com/apple/swift-asn1.git from cache
+Fetching https://github.com/InnoSquadCorp/InnoNetwork.git from cache
+Fetching https://github.com/swiftlang/swift-syntax.git from cache
+Fetching https://github.com/apple/swift-openapi-runtime from cache
+Fetching https://github.com/apple/swift-crypto from cache
+Fetched https://github.com/InnoSquadCorp/InnoNetwork.git from cache (0.21s)
+Fetched https://github.com/apple/swift-http-types from cache (0.46s)
+Fetched https://github.com/apple/swift-asn1.git from cache (0.50s)
+Fetched https://github.com/swiftlang/swift-syntax.git from cache (0.53s)
+Fetched https://github.com/apple/swift-crypto from cache (0.59s)
+Fetched https://github.com/apple/swift-openapi-runtime from cache (0.61s)
+Creating working copy for https://github.com/apple/swift-http-types
+Creating working copy for https://github.com/apple/swift-openapi-runtime
+Creating working copy for https://github.com/InnoSquadCorp/InnoNetwork.git
+Creating working copy for https://github.com/swiftlang/swift-syntax.git
+Creating working copy for https://github.com/apple/swift-crypto
+Creating working copy for https://github.com/apple/swift-asn1.git
+Working copy of https://github.com/apple/swift-http-types resolved at 1.6.0
+Working copy of https://github.com/apple/swift-openapi-runtime resolved at 1.12.1
+Working copy of https://github.com/apple/swift-asn1.git resolved at 1.7.2
+Working copy of https://github.com/InnoSquadCorp/InnoNetwork.git resolved at 6.1.1
+Working copy of https://github.com/swiftlang/swift-syntax.git resolved at 604.0.0
+Working copy of https://github.com/apple/swift-crypto resolved at 5.0.0
+innonetwork-dependency: OK (published / 6.1.1 / 44e4ca28c50c03f817231a077c0f3bdfdbc859c8)

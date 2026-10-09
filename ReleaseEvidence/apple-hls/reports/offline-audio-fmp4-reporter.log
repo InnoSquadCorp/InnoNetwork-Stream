@@ -1,0 +1,5 @@
+hlsreport - Version: 2.0.284 (2.0.284-260930)
+Create an HTML report using the JSON output of mediastreamvalidator.
+Additional checks against the HLS Authoring Specification for Apple Devices may be included.
+Use 'hlsreport --help' for more information
+
