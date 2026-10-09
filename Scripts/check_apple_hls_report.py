@@ -94,7 +94,8 @@ def validate_data(data: object) -> float:
     if (data.get("validatorName") != "mediastreamvalidator"
             or not isinstance(data.get("validatorVersion"), str) or not data["validatorVersion"]
             or data.get("playlistKind") not in ("media", "multivariant")
-            or not isinstance(data.get("messages"), list)
+            # Apple omits messages entirely when validation has no issues.
+            or not isinstance(data.get("messages", []), list)
             or type(data.get("dataStatus")) is not int or data["dataStatus"] != 1):
         fail("unrecognized validator JSON structure")
     content_key = "discontinuities" if data["playlistKind"] == "media" else "variants"

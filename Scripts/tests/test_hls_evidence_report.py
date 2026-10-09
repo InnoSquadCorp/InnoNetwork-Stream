@@ -87,6 +87,13 @@ class ValidatorDataTests(unittest.TestCase):
         data['messages'] = [{'errorStatusCode': 135048}, {'errorStatusCode': 235042}]
         self.assertEqual(checker.validate_data(data), 1.3)
 
+    def test_no_issue_json_may_omit_messages_but_invalid_message_type_fails(self):
+        data = self.data(); del data['messages']
+        self.assertEqual(checker.validate_data(data), 1.3)
+        for value in [None, {}, '']:
+            data['messages'] = value
+            with self.subTest(value=value), self.assertRaises(SystemExit): checker.validate_data(data)
+
     def test_duplicate_json_key_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)/'validator.json'
