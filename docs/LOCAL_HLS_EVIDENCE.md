@@ -97,9 +97,10 @@ Actions variables (not files supplied inside the report bundle):
 
 This is a repository-administration trust boundary, not an Apple attestation or
 cryptographic signature of the operator. Preserve the approval/audit record and
-restrict variable changes to trusted release maintainers. These variables have
-not been configured by this draft. Configuring access or approvals requires the
-owner's authorization. Reports should contain synthetic media only; review them
+restrict variable changes to trusted release maintainers. Approval is never
+inferred from this document. Configuring access or approvals requires the owner's
+authorization and the recorded maintainer review. Reports should contain
+synthetic media only; review them
 before committing or publishing. Never commit Apple binaries, credentials, DRM
 payloads, or private production streams.
 
@@ -130,12 +131,15 @@ provided.
 
 ## Remaining boundaries
 
-No official Apple execution has been performed for this implementation draft.
-Python fixtures are explicitly synthetic validator-protocol tests and must never
-be used as release evidence. Actual SDK-output generation is wired into both Xcode CI lanes. The six SDK output cases passed both Xcode lanes in
-[PR #4 validation](https://github.com/InnoSquadCorp/InnoNetwork-Stream/actions/runs/37776311885).
-That validates generation, not execution of the official Apple validators or
-the eventual release commit. Synthetic controls alone are not SDK execution.
+Only the immutable bundle bound to the finalized candidate can qualify official
+Apple execution for release. Inspect its source commit, fingerprint, version
+logs, raw results and independent approval. Python fixtures remain synthetic
+validator-protocol tests and must never be used as release evidence.
+Actual SDK-output generation is wired into both Xcode CI lanes. The six cases
+passed both lanes in [PR #11 validation](https://github.com/InnoSquadCorp/InnoNetwork-Stream/actions/runs/37941806451)
+at `005ff03ba0f5ba925302b2b1dbbddf250874d0e1`. That historical run validates
+generation and runtime behavior; its CI runner did not execute the official
+Apple validators, and later source changes require new release evidence.
 
 If no authorized environment can execute the tools, evidence cannot be invented.
 The owner must decide a documented release-policy exception rather than marking

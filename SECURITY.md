@@ -29,7 +29,7 @@ Whichever channel you use, please include:
 
 ## Supported Versions
 
-- No stable InnoNetwork-Stream tag exists yet. Reports against `main` are assessed as
+- Until the first `6.1.1` tag is published, reports against `main` are assessed as
   prerelease findings.
 - After publication, the latest `6.x` minor is the actively supported line.
 - HLS code previously published by InnoNetwork follows InnoNetwork's support

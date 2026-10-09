@@ -7,8 +7,8 @@ InnoNetwork-Stream (formerly InnoStream) is the media-streaming companion split
 from InnoNetwork 6. It keeps the existing module and product names so
 application imports do not change.
 
-`6.1.1` is an unpublished release candidate. The dependency declaration below is
-the intended post-release form, not evidence that the tag is available today.
+`6.1.1` is ready for publication. The dependency declaration below becomes
+available after the validated release workflow publishes the tag.
 Local official-tool acceptance is documented in [Local HLS evidence](docs/LOCAL_HLS_EVIDENCE.md);
 real-device prerequisites are in [Device acceptance](docs/DEVICE_ACCEPTANCE.md).
 
@@ -69,8 +69,8 @@ INNONETWORK_LOCAL_PATH=/path/to/InnoNetwork bash Scripts/swiftpm.sh test
 ```
 
 Unset `INNONETWORK_LOCAL_PATH` before validating the published graph. A local
-path or branch cannot satisfy release validation. Stream `6.1.1` remains an
-unpublished candidate; Core publication does not authorize a Stream release. See the
+path or branch cannot satisfy release validation. Stream publication requires
+its own approved evidence and complete release validation. See the
 [Core dependency contract](docs/CORE_DEVELOPMENT.md).
 
 Consumers of the earlier unreleased `InnoStream` checkout must update its
