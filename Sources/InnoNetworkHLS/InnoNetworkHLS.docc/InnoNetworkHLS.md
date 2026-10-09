@@ -214,8 +214,10 @@ default preserves the existing playlist-order behavior.
 Use ``HLSOfflinePackageDownloader`` when external audio, video, subtitles, or
 I-frame trick-play streams must be retained without remuxing. It downloads
 each selected playlist's resources,
-rewrites byte-range and resource references to package-local paths, creates a
-local multivariant `index.m3u8`, and commits the complete directory atomically.
+rewrites byte-range and resource references to package-local paths, and commits
+the complete directory atomically. A multivariant source retains a local
+multivariant `index.m3u8`; a direct media source uses its localized primary media
+playlist as the receipt's entry point without inventing variant metadata.
 The package manifest records only local paths and selection metadata; source
 URLs and signed query values are not persisted.
 

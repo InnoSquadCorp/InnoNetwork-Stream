@@ -119,7 +119,7 @@ for fixture_name in transport-stream fragmented-mp4 audio-fmp4; do
   validation_json="$report_directory/$fixture_name.json"
   validator_log="$report_directory/$fixture_name-validator.log"
 
-  if ! "$validator" -O "$validation_json" "$playlist" >"$validator_log" 2>&1; then
+  if ! "$validator" --compatible-output=v1.x -O "$validation_json" "$playlist" >"$validator_log" 2>&1; then
     cat "$validator_log" >&2
     echo "apple-hls-conformance: validator failed for $fixture_name" >&2
     exit 1
@@ -130,8 +130,8 @@ for fixture_name in transport-stream fragmented-mp4 audio-fmp4; do
     echo "apple-hls-conformance: validator omitted JSON for $fixture_name" >&2
     exit 1
   fi
-  if ! python3 -m json.tool "$validation_json" >/dev/null; then
-    echo "apple-hls-conformance: validator emitted invalid JSON for $fixture_name" >&2
+  if ! python3 Scripts/check_apple_hls_report.py --validation-json "$validation_json"; then
+    echo "apple-hls-conformance: validator emitted unsupported or blocking JSON for $fixture_name" >&2
     exit 1
   fi
   if grep -Eiq '(^|[[:space:]])error([[:space:]:]|$)|must[[:space:]]+fix' \
@@ -149,7 +149,7 @@ for fixture_name in transport-stream fragmented-mp4 audio-fmp4; do
       exit 1
     fi
     cat "$reporter_log"
-    python3 Scripts/check_apple_hls_report.py "$report_html"
+    python3 Scripts/check_apple_hls_report.py "$report_html" --validation-json "$validation_json"
   else
     echo "apple-hls-conformance: hlsreport NOT RUN; validator result only"
   fi

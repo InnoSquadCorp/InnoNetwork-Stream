@@ -49,17 +49,17 @@ expect_hash \
   "c773e6bb59a394fa3874624a3c2a540337dcb2d781fa52c33e90abf6cb902454"
 
 cat >"$work_dir/report-ok.html" <<'EOF'
-<html><body><h2>Should Fix Issues</h2><p>Target duration advice.</p><h2>Report Information</h2></body></html>
+<html><body><h2>HLS Validation Report</h2><h2>Should Fix Issues</h2><p>Target duration advice.</p><h2>Report Information</h2><p>JSON format version: 1.3</p></body></html>
 EOF
 python3 "$report_checker" "$work_dir/report-ok.html"
 
 cat >"$work_dir/report-none.html" <<'EOF'
-<html><body><h2>Must Fix Issues</h2><p>None</p><h2>Report Information</h2></body></html>
+<html><body><h2>HLS Validation Report</h2><h2>Must Fix Issues</h2><p>None</p><h2>Report Information</h2><p>JSON format version: 1.3</p></body></html>
 EOF
 python3 "$report_checker" "$work_dir/report-none.html"
 
 cat >"$work_dir/report-failed.html" <<'EOF'
-<html><body><h2>Must Fix Issues</h2><ol><li>Invalid segment.</li></ol><h2>Should Fix Issues</h2></body></html>
+<html><body><h2>HLS Validation Report</h2><h2>Must Fix Issues</h2><ol><li>Invalid segment.</li></ol><h2>Should Fix Issues</h2></body></html>
 EOF
 if python3 "$report_checker" "$work_dir/report-failed.html" >/dev/null 2>&1; then
   echo "Expected Must Fix report validation to fail." >&2
@@ -83,8 +83,10 @@ fi
 cat >"$work_dir/validator-ok" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
+test "$1" = "--compatible-output=v1.x"
+shift
 test "$1" = "-O"
-printf '{"validated":true}\n' >"$2"
+printf '{"synthetic_test_fixture":true,"dataVersion":1.3,"dataStatus":1,"validatorName":"mediastreamvalidator","validatorVersion":"UNIT-TEST-NOT-APPLE","playlistKind":"media","messages":[],"processedSegmentsCount":1,"discontinuities":[{"segments":[{}]}]}\n' >"$2"
 printf 'Validated %s\n' "$3"
 EOF
 chmod +x "$work_dir/validator-ok"
@@ -93,7 +95,7 @@ cat >"$work_dir/reporter-ok" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 test "$1" = "-o"
-printf '<html><body><h2>Should Fix Issues</h2><h2>Report Information</h2></body></html>\n' >"$2"
+printf '<html><body><h2>HLS Validation Report</h2><h2>Should Fix Issues</h2><h2>Report Information</h2><p>JSON format version: 1.3</p></body></html>\n' >"$2"
 test -s "$3"
 printf 'Reported %s\n' "$3"
 EOF
@@ -118,6 +120,7 @@ test -s "$retained_directory/audio-fmp4.html"
 cat >"$work_dir/validator-error-output" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
+shift
 printf '{"validated":false}\n' >"$2"
 echo 'error: invalid segment'
 EOF
@@ -158,6 +161,7 @@ fi
 
 cat >"$work_dir/validator-invalid-json" <<'EOF'
 #!/usr/bin/env bash
+shift
 printf 'not-json\n' >"$2"
 echo 'Validation completed.'
 EOF

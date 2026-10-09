@@ -204,6 +204,8 @@ def generate_sdk_outputs(root, bundle):
     execute(command, root, bundle / 'generation.log', env, timeout=3600)
     execute(['bash', 'Scripts/check_hls_evidence_consumer.sh', 'verify'], root, bundle / 'consumer-post-generation.log', env, timeout=3600)
     provenance = load_json(root / '.build/release-evidence-consumer-provenance.json')
+    shutil.copyfile(root / '.build/release-evidence-consumer-graph.json',
+                    bundle / 'consumer-graph.json')
     provenance.pop('binary_path', None)  # Local paths are not needed by release reviewers.
     (bundle / 'consumer-provenance.json').write_text(json.dumps(provenance, sort_keys=True) + '\n')
     playlists = load_json(outputs / 'playlists.json')
@@ -235,18 +237,22 @@ def collect(args):
     bundle.mkdir(parents=True)
     inputs, outputs, reports = (bundle / p for p in ('inputs', 'outputs', 'reports'))
     inputs.mkdir(); outputs.mkdir(); reports.mkdir()
+    for name, tool in tools.items():
+        execute([tool['path'], '--version'], root, bundle / f'{name}-version.log')
     playlists = generate_sdk_outputs(root, bundle)
     checker, results = report_checker(root), []
     for case in CASES:
         playlist = safe_file(outputs, playlists[case])
         json_path, html_path = reports / f'{case}.json', reports / f'{case}.html'
         validator_log, reporter_log = reports / f'{case}-validator.log', reports / f'{case}-reporter.log'
-        execute([tools['validator']['path'], '-O', str(json_path), str(playlist)], root, validator_log)
-        load_json(json_path)
+        execute([tools['validator']['path'], '--compatible-output=v1.x',
+                 '-O', str(json_path), str(playlist)], root, validator_log)
+        validation_data = load_json(json_path)
+        checker.validate_data(validation_data)
         if re.search(r'\berror\b|must\s+fix', validator_log.read_text(), re.I):
             fail('validator reported a blocking issue')
         execute([tools['reporter']['path'], '-o', str(html_path), str(json_path)], root, reporter_log)
-        checker.validate(html_path)
+        checker.validate(html_path, validation_data)
         results.append({'case': case, 'playlist': 'outputs/' + playlists[case],
                         'json': f'reports/{case}.json', 'html': f'reports/{case}.html',
                         'validator_log': f'reports/{case}-validator.log',
@@ -353,8 +359,8 @@ def verify(args):
             safe_file(bundle, relative)
         if not result['playlist'].startswith(f'outputs/{case}/'):
             fail('case points outside its SDK output')
-        load_json(safe_file(bundle, result['json']))
-        checker.validate(safe_file(bundle, result['html']))
+        validation_data = load_json(safe_file(bundle, result['json']))
+        checker.validate(safe_file(bundle, result['html']), validation_data)
         if re.search(r'\berror\b|must\s+fix', safe_file(bundle, result['validator_log']).read_text(), re.I):
             fail('validator reported a blocking issue')
     candidate_lock = load_json(safe_file(bundle, 'candidate-Package.resolved'))
@@ -366,6 +372,8 @@ def verify(args):
     provenance = load_json(safe_file(bundle, 'consumer-provenance.json'))
     if not re.fullmatch(r'[0-9a-f]{64}', provenance.get('binary_sha256', '')):
         fail('missing executed exporter binary hash')
+    if provenance.get('graph_sha256') != sha(safe_file(bundle, 'consumer-graph.json').read_bytes()):
+        fail('exporter dependency graph fingerprint differs')
     for key, filename in (('candidate_lock_sha256', 'candidate-Package.resolved'),
                           ('consumer_lock_sha256', 'consumer-Package.resolved')):
         if provenance.get(key) != sha(safe_file(bundle, filename).read_bytes()):
@@ -377,9 +385,9 @@ def verify(args):
         fail('active consumer graph omits Core')
     if any(pins.get(p.get('identity')) != p for p in provenance['active_clean_pins']):
         fail('active consumer graph differs from candidate lock')
-    for log in ('dependency.log', 'consumer-resolution.log', 'consumer-post-generation.log', 'generation.log', 'materialization.log', 'swift-version.log', 'xcode-version.log'):
-
-
+    for log in ('dependency.log', 'consumer-resolution.log', 'consumer-post-generation.log',
+                'generation.log', 'materialization.log', 'swift-version.log', 'xcode-version.log',
+                'validator-version.log', 'reporter-version.log'):
         safe_file(bundle, log)
     print(f'apple-hls-evidence: APPROVED LOCAL EXECUTION (reviewer {args.approved_by}; source {commit})')
     print('The tools were not executed on this CI runner. Approval attests provenance; hashes bind bytes.')

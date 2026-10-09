@@ -71,6 +71,7 @@ class GenerationTests(unittest.TestCase):
                 target.write_text('{"pins":[]}')
             (root/'.build/release-evidence-prepared.json').write_text('{"binary_path":"/synthetic/exporter"}')
             (root/'.build/release-evidence-consumer-provenance.json').write_text('{}')
+            (root/'.build/release-evidence-consumer-graph.json').write_text('{"synthetic_test_fixture":true}')
             for name in ('inputs','outputs'): (bundle/name).mkdir(parents=True)
             calls=[]
             def execute(command, cwd, log, env=None, timeout=None):
@@ -90,3 +91,5 @@ class GenerationTests(unittest.TestCase):
             self.assertEqual(sum(c[0]=='/synthetic/exporter' for c in calls),1)
             self.assertFalse(any('run' in c and 'Scripts/swiftpm.sh' in c for c in calls))
             self.assertFalse((bundle/'manifest.json').exists())
+            self.assertEqual((bundle/'consumer-graph.json').read_bytes(),
+                             (root/'.build/release-evidence-consumer-graph.json').read_bytes())

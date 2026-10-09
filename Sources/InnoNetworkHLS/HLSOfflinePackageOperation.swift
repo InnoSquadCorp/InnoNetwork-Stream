@@ -280,15 +280,28 @@ struct HLSOfflinePackageOperation: Sendable {
             }
             await budget.finish()
 
-            let entryPlaylistName = "index.m3u8"
-            let masterPlaylist =
-                try HLSPackageMasterPlaylistWriter.make(plan: plan)
-            try Data(masterPlaylist.utf8).write(
-                to: preparedWorkspace.packageURL.appendingPathComponent(
-                    entryPlaylistName
-                ),
-                options: .atomic
-            )
+            let entryPlaylistName: String
+            if plan.selectedVariant == nil {
+                guard plan.tracks.count == 1,
+                    let primary = plan.tracks.first,
+                    primary.descriptor.kind == .primary
+                else {
+                    throw HLSDownloadError.invalidOfflinePackage
+                }
+                // A media source has no variant metadata. Keep its localized
+                // media entry rather than inventing a multivariant wrapper.
+                entryPlaylistName = primary.descriptor.relativePlaylistPath
+            } else {
+                entryPlaylistName = "index.m3u8"
+                let masterPlaylist =
+                    try HLSPackageMasterPlaylistWriter.make(plan: plan)
+                try Data(masterPlaylist.utf8).write(
+                    to: preparedWorkspace.packageURL.appendingPathComponent(
+                        entryPlaylistName
+                    ),
+                    options: .atomic
+                )
+            }
             try writeManifest(
                 plan: plan,
                 entryPlaylistName: entryPlaylistName,

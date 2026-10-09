@@ -44,8 +44,14 @@ class EvidenceTests(unittest.TestCase):
         reports = self.bundle / 'reports'; reports.mkdir()
         results = []
         for case in e.CASES:
-            (reports / f'{case}.json').write_text('{"synthetic_test_fixture":true}')
-            (reports / f'{case}.html').write_text('<h2>Must Fix Issues</h2>None<h2>Report Information</h2>')
+            (reports / f'{case}.json').write_text(json.dumps({
+                'synthetic_test_fixture': True, 'dataVersion': 1.3, 'dataStatus': 1,
+                'validatorName': 'mediastreamvalidator', 'validatorVersion': 'UNIT-TEST-NOT-APPLE',
+                'playlistKind': 'media', 'messages': [], 'processedSegmentsCount': 1,
+                'discontinuities': [{'segments': [{}]}]}))
+            (reports / f'{case}.html').write_text(
+                '<h2>HLS Validation Report</h2><h3>Must Fix Issues</h3>None'
+                '<h3>Report Information</h3>JSON format version: 1.3')
             for name in ('validator', 'reporter'):
                 (reports / f'{case}-{name}.log').write_text('Synthetic unit-test control, not official output.\n')
             results.append({'case':case,'playlist':'outputs/' + playlists[case],
@@ -54,14 +60,16 @@ class EvidenceTests(unittest.TestCase):
                 'validator_exit':0,'reporter_exit':0})
         for lock in ('candidate-Package.resolved','consumer-Package.resolved'):
             shutil.copyfile(self.root/'Package.resolved',self.bundle/lock)
+        (self.bundle/'consumer-graph.json').write_text('{"synthetic_test_fixture":true}')
         (self.bundle/'consumer-provenance.json').write_text(json.dumps({
             'source_commit':self.commit, 'binary_sha256':'0'*64,
+            'graph_sha256':e.sha((self.bundle/'consumer-graph.json').read_bytes()),
             'candidate_lock_sha256':e.sha((self.root/'Package.resolved').read_bytes()),
             'consumer_lock_sha256':e.sha((self.root/'Package.resolved').read_bytes()),
             'active_clean_pins':json.loads((self.root/'Package.resolved').read_text())['pins']}))
-        for log in ('dependency.log', 'consumer-resolution.log', 'consumer-post-generation.log', 'generation.log', 'materialization.log', 'swift-version.log', 'xcode-version.log'):
-
-
+        for log in ('dependency.log', 'consumer-resolution.log', 'consumer-post-generation.log',
+                    'generation.log', 'materialization.log', 'swift-version.log', 'xcode-version.log',
+                    'validator-version.log', 'reporter-version.log'):
             (self.bundle / log).write_text('synthetic test control\n')
         self.manifest = {'schema':1,'status':'executed','scope':'sdk-generated-offline-dvr',
             'source_commit':self.commit,'source_fingerprint':e.source_fingerprint(self.root,'HEAD'),
@@ -134,7 +142,7 @@ class EvidenceTests(unittest.TestCase):
     def test_approved_manifest_still_requires_complete_exporter_provenance(self):
         file=self.bundle/'consumer-provenance.json'
         original=json.loads(file.read_text())
-        for key,value in [('binary_sha256',''),('candidate_lock_sha256','0'*64),
+        for key,value in [('binary_sha256',''),('graph_sha256','0'*64),('candidate_lock_sha256','0'*64),
                           ('consumer_lock_sha256','0'*64),('source_commit','0'*40),
                           ('active_clean_pins',[])]:
             changed=dict(original);changed[key]=value
@@ -163,8 +171,48 @@ class EvidenceTests(unittest.TestCase):
         saved=self.manifest['results'].pop(); self.approve(); self.reject()
         self.manifest['results'].append(saved)
         (self.bundle/'reports/offline-transport-stream.html').write_text(
-            '<h2>Must Fix Issues</h2>Invalid media<h2>Report Information</h2>')
+            '<h2>HLS Validation Report</h2><h3>Must Fix Issues</h3>Invalid media'
+            '<h3>Report Information</h3>JSON format version: 1.3')
         self.approve(); self.reject()
+
+    def test_approved_hash_does_not_accept_unsupported_validator_schema(self):
+        file = self.bundle/'reports/offline-transport-stream.json'
+        data = json.loads(file.read_text()); data['dataVersion'] = 3.1
+        file.write_text(json.dumps(data)); self.approve(); self.reject()
+
+    def test_approved_hash_does_not_accept_unsupported_html(self):
+        file = self.bundle/'reports/offline-transport-stream.html'
+        file.write_text('<h2>HLS Validation Report</h2>Version 3 output is not understood.'
+                        '<h3>Report Information</h3>JSON format version: 1.3')
+        self.approve(); self.reject()
+
+    def test_json_blocking_issue_is_rejected_without_stdout_or_html_issue(self):
+        file = self.bundle/'reports/offline-transport-stream.json'
+        data = json.loads(file.read_text())
+        data['discontinuities'][0]['segments'][0]['messages'] = [{'errorStatusCode': 435018}]
+        file.write_text(json.dumps(data)); self.approve(); self.reject()
+
+    def test_collector_requests_compatible_output_and_rejects_unknown_schema(self):
+        target = self.bundle/'unsupported-collection'
+        args = argparse.Namespace(root=self.root, bundle=target, submitter='fixture',
+                                  tool_release='UNIT-TEST-NOT-APPLE', validator='/usr/bin/true',
+                                  reporter='/usr/bin/true')
+        def generate(root, bundle):
+            mapping = {case: case+'/index.m3u8' for case in e.CASES}
+            for relative in mapping.values():
+                path = bundle/'outputs'/relative
+                path.parent.mkdir(parents=True); path.write_text('#EXTM3U\n')
+            return mapping
+        def execute(command, root, log):
+            log.write_text('Synthetic unit-test control, not official output.\n')
+            if '-O' in command:
+                Path(command[command.index('-O')+1]).write_text('{"dataVersion":3.1}')
+        with patch.object(e, 'generate_sdk_outputs', side_effect=generate), \
+                patch.object(e, 'execute', side_effect=execute) as calls:
+            with self.assertRaises(SystemExit): e.collect(args)
+        validator_command = calls.call_args_list[-1].args[0]
+        self.assertIn('--compatible-output=v1.x', validator_command)
+        self.assertFalse((target/'manifest.json').exists())
 
     def test_duplicate_json_keys_and_symlinks_rejected(self):
         file=self.bundle/'manifest.json'; text=file.read_text()

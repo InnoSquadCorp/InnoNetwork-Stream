@@ -243,7 +243,7 @@ public struct HLSOfflinePackageReceipt: Equatable, Sendable {
     /// The atomically committed package directory.
     public let directoryURL: URL
 
-    /// The local multivariant playlist used as the package entry point.
+    /// The local media or multivariant playlist used as the package entry point.
     ///
     /// AVFoundation does not directly play arbitrary local `file://` HLS
     /// playlists. Use ``playbackSource`` with `HLSLocalPlaybackAsset` from
