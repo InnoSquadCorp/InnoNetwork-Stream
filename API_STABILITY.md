@@ -1,10 +1,10 @@
-# API Stability (6.x candidate)
+# API Stability (6.x)
 
-`6.1.1` is the first planned stable Stream release. Nothing in this document
-asserts that its tag has been published. The release contract below takes effect
-only after the maintainer approves and publishes that candidate.
+`6.1.1` is the first stable Stream release prepared for publication. The reviewed
+release contract below takes effect when the maintainer publishes the validated
+tag. This document does not assert that publication has already completed.
 
-## Proposed 6.1.1 supported surface
+## 6.1.1 supported surface
 
 The reviewed `Scripts/symbols/*.allowlist` and `public-signatures.tsv` define the
 public declaration baseline: 2,149 name rows and 2,154 semantic signatures.

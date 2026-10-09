@@ -1,6 +1,6 @@
 # Changelog
 
-## 6.1.1 Candidate (unpublished)
+## [6.1.1] - 2026-10-09
 
 - Add the library-owned `innonetwork-stream` AI skill for planned stable 6.1.x,
   with exact candidate/Core pins, shared Codex/Claude guidance and an external
@@ -17,7 +17,16 @@
   completion initializer and main-actor restoration method, using Xcode 27
   generated declarations without weakening the API drift gate.
 
-## Unreleased bounded-lifecycle hardening
+- Preserve direct-media Offline entries without inventing master bandwidth;
+  reopen child interstitial packages through their localized media entries.
+- Validate actual Apple JSON/report 1.3 using compatible output, reject
+  unsupported or blocking reports, and retain tool/graph provenance.
+
+The pre-release development history below is included in this first stable
+candidate. Publication requires the independently reviewed source-bound evidence
+and the complete release workflow.
+
+### Pre-release bounded-lifecycle hardening
 
 - Bound Content Steering clone/output records and generated URL/group text;
   bound original-pathway fallback without losing ordinary ordered failover.
@@ -33,7 +42,7 @@
   compile a real UIKit background callback fixture on both Swift CI toolchains.
   Keep dependency object-store corruption controls isolated from SwiftPM caches.
 
-## Unreleased Core 6.1.1 integration
+### Pre-release Core 6.1.1 integration
 
 - Pin both Stream and its external consumer to published InnoNetwork `6.1.1`
   at `44e4ca28c50c03f817231a077c0f3bdfdbc859c8`, and align the compiler plugin
@@ -42,7 +51,7 @@
   preserving selective CI, metadata revalidation and immutable release checks.
 - Fix bounded variable-output initialization on the supported Swift 6.2 lane.
 
-## Unreleased iterative hardening
+### Pre-release iterative hardening
 
 - Start Steering TTL and Retry-After waits after receipt, share same-context
   manifest loads with independent cancellation, and bound waiters/producers.
@@ -54,7 +63,7 @@
 - Exercise registered waiter cancellation, capacity reuse and finish races with
   actual registration barriers rather than scheduling assumptions.
 
-## Unreleased
+### Earlier pre-release development
 
 - Add macro-first atomic offline packages with `@HLSOfflinePackageDefinition`,
   validated dynamic settings and equivalent manual workflows. Cancellation is
@@ -106,8 +115,8 @@
   effective limits. Add a foreground watch owner and independent bounded DVR
   observations/receipts while preserving native background and audio ownership.
 
-These changes have not been tagged. `6.1.1` remains a draft until the release
-state, remote dependency, Apple-platform, and HLS conformance gates pass.
+The release workflow checks release state, remote dependency, Apple platforms,
+and independently approved HLS conformance before publishing the tag.
 
 - Breaking pre-release change: make contradictory flat playlist construction
   internal. Parse into typed documents, then select and plan from those
