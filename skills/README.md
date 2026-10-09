@@ -26,3 +26,11 @@ python3 skills/innonetwork-stream/scripts/validate_consumer.py --scratch-path /t
 The validator needs an Apple Swift development host, Python 3 and remote package
 access on a cold cache. It retains logs and evidence externally. See
 [validation](validation.md) for actual coverage and remaining boundaries.
+
+## Consumer command diagnostics
+
+The validator parses dependency-graph JSON from stdout only. SwiftPM warnings
+are retained in `graph.stderr.log`,
+linked by each command's `stderr_log` evidence field. Malformed or empty stdout
+and nonzero command exits still fail validation. Other commands retain combined
+text logs, including Swift Testing summaries written to stderr.
