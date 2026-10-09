@@ -1003,7 +1003,7 @@ extension HLSDownloaderTests {
         #expect(HLSURLProtocol.capturedRequests().count == 1)
     }
 
-    @Test("the committed local playlists round-trip through the parser")
+    @Test("direct media packages retain a media entry and reopen without invented variant metadata")
     func packagePlaylistsRoundTrip() async throws {
         let playlistURL = try #require(
             URL(string: "https://media.example/vod.m3u8")
@@ -1069,21 +1069,22 @@ extension HLSDownloaderTests {
                 )
         )
 
-        let masterText = try String(
+        let entryText = try String(
             contentsOf: receipt.entryPlaylistURL,
             encoding: .utf8
         )
-        let master = try PlaylistResolver().resolve(
-            masterText,
+        let entry = try PlaylistResolver().resolve(
+            entryText,
             relativeTo: receipt.entryPlaylistURL
         )
-        #expect(master.kind == .multivariant)
-        #expect(master.protocolVersion == 7)
+        #expect(entry.kind == .media)
+        #expect(receipt.selectedVariant == nil)
+        #expect(!entryText.contains("#EXT-X-STREAM-INF"))
         let primaryPlaylistURL =
             receipt.directoryURL.appendingPathComponent(
                 receipt.tracks[0].relativePlaylistPath
             )
-        #expect(master.variants.first?.url == primaryPlaylistURL)
+        #expect(receipt.entryPlaylistURL == primaryPlaylistURL)
 
         let primaryText = try String(
             contentsOf: primaryPlaylistURL,
@@ -1101,13 +1102,17 @@ extension HLSDownloaderTests {
                     && $0.url.path.hasPrefix(receipt.directoryURL.path)
             } == true
         )
+        let reopened = try HLSOfflinePackageStore().open(at: receipt.directoryURL)
+        #expect(reopened.entryPlaylistURL == receipt.entryPlaylistURL)
+        #expect(reopened.tracks == receipt.tracks)
+        #expect(reopened.selectedVariant == nil)
     }
 
-    @Test("offline package validation detects resource corruption")
-    func offlinePackageValidationDetectsCorruption() throws {
+    @Test("offline package validation detects resource corruption", arguments: [false, true])
+    func offlinePackageValidationDetectsCorruption(directMediaEntry: Bool) throws {
         let parentURL = try makeOfflineTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: parentURL) }
-        let packageURL = try makeLocalOfflinePackage(in: parentURL)
+        let packageURL = try makeLocalOfflinePackage(in: parentURL, directMediaEntry: directMediaEntry)
         let resourceURL = packageURL.appendingPathComponent(
             "media/primary/resources/00000.ts"
         )
@@ -1118,11 +1123,11 @@ extension HLSDownloaderTests {
         }
     }
 
-    @Test("offline package validation rejects path traversal")
-    func offlinePackageValidationRejectsPathTraversal() throws {
+    @Test("offline package validation rejects path traversal", arguments: [false, true])
+    func offlinePackageValidationRejectsPathTraversal(directMediaEntry: Bool) throws {
         let parentURL = try makeOfflineTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: parentURL) }
-        let packageURL = try makeLocalOfflinePackage(in: parentURL)
+        let packageURL = try makeLocalOfflinePackage(in: parentURL, directMediaEntry: directMediaEntry)
         try mutateOfflineManifest(at: packageURL) { manifest in
             var tracks = try #require(manifest["tracks"] as? [[String: Any]])
             tracks[0]["playlistPath"] = "../outside.m3u8"
@@ -1134,11 +1139,11 @@ extension HLSDownloaderTests {
         }
     }
 
-    @Test("offline package validation rejects symbolic links")
-    func offlinePackageValidationRejectsSymbolicLinks() throws {
+    @Test("offline package validation rejects symbolic links", arguments: [false, true])
+    func offlinePackageValidationRejectsSymbolicLinks(directMediaEntry: Bool) throws {
         let parentURL = try makeOfflineTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: parentURL) }
-        let packageURL = try makeLocalOfflinePackage(in: parentURL)
+        let packageURL = try makeLocalOfflinePackage(in: parentURL, directMediaEntry: directMediaEntry)
         let resourceURL = packageURL.appendingPathComponent(
             "media/primary/resources/00000.ts"
         )
@@ -1155,20 +1160,70 @@ extension HLSDownloaderTests {
         }
     }
 
-    @Test("legacy schema 2 packages reopen with structural validation")
-    func legacyOfflinePackageReopens() throws {
+    @Test("legacy multivariant wrappers reopen", arguments: [2, 3])
+    func legacyOfflinePackageReopens(schemaVersion: Int) throws {
         let parentURL = try makeOfflineTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: parentURL) }
         let packageURL = try makeLocalOfflinePackage(in: parentURL)
         try mutateOfflineManifest(at: packageURL) { manifest in
-            manifest["schemaVersion"] = 2
-            manifest.removeValue(forKey: "files")
+            manifest["schemaVersion"] = schemaVersion
+            if schemaVersion == 2 {
+                manifest.removeValue(forKey: "files")
+            }
         }
 
         let receipt = try HLSOfflinePackageStore().open(at: packageURL)
 
         #expect(receipt.tracks.map(\.kind) == [.primary])
         #expect(receipt.entryPlaylistURL.lastPathComponent == "index.m3u8")
+        #expect(receipt.entryPlaylistURL.deletingLastPathComponent() == packageURL)
+        #expect(receipt.selectedVariant == nil)
+    }
+
+    @Test(
+        "media entries reject unmatched entry, extra tracks and variant metadata",
+        arguments: ["entry", "track", "variant", "iframe"])
+    func mediaEntryRejectsUnboundManifest(mutation: String) throws {
+        let parentURL = try makeOfflineTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: parentURL) }
+        let packageURL = try makeLocalOfflinePackage(in: parentURL, directMediaEntry: true)
+        let primaryPath = "media/primary/index.m3u8"
+        #expect(try HLSOfflinePackageStore().open(at: packageURL).selectedVariant == nil)
+        if mutation == "entry" || mutation == "track" {
+            let copyPath = mutation == "entry" ? "media/primary/entry.m3u8" : "media/primary/audio.m3u8"
+            try FileManager.default.copyItem(
+                at: packageURL.appendingPathComponent(primaryPath),
+                to: packageURL.appendingPathComponent(copyPath)
+            )
+        }
+        // Refresh legitimate file hashes so rejection exercises manifest/entry
+        // binding rather than an unrelated stale inventory.
+        let records = try HLSOfflinePackageIntegrity.scan(
+            directoryURL: packageURL, hashingFiles: true,
+            recordExclusions: ["manifest.json"]
+        ).records
+        let encodedRecords = try JSONSerialization.jsonObject(with: JSONEncoder().encode(records))
+        try mutateOfflineManifest(at: packageURL) { manifest in
+            manifest["files"] = encodedRecords
+            switch mutation {
+            case "entry":
+                manifest["entryPlaylistPath"] = "media/primary/entry.m3u8"
+            case "track":
+                var tracks = try #require(manifest["tracks"] as? [[String: Any]])
+                var audio = tracks[0]
+                audio["kind"] = "audio"
+                audio["playlistPath"] = "media/primary/audio.m3u8"
+                tracks.append(audio)
+                manifest["tracks"] = tracks
+            case "variant":
+                manifest["selectedVariant"] = ["bandwidth": 1000]
+            default:
+                manifest["selectedIFrameVariant"] = ["bandwidth": 1000]
+            }
+        }
+        #expect(throws: HLSDownloadError.invalidOfflinePackage) {
+            try HLSOfflinePackageStore().open(at: packageURL)
+        }
     }
 
     @Test("unknown offline package schemas retain their version")
@@ -1277,7 +1332,8 @@ extension HLSDownloaderTests {
     }
 
     private func makeLocalOfflinePackage(
-        in parentURL: URL
+        in parentURL: URL,
+        directMediaEntry: Bool = false
     ) throws -> URL {
         let packageURL = parentURL.appendingPathComponent(
             "local.hlspkg",
@@ -1308,14 +1364,16 @@ extension HLSDownloaderTests {
 
             """.utf8
         ).write(to: primaryURL.appendingPathComponent("index.m3u8"))
-        try Data(
-            """
-            #EXTM3U
-            #EXT-X-STREAM-INF:BANDWIDTH=1000
-            media/primary/index.m3u8
+        if !directMediaEntry {
+            try Data(
+                """
+                #EXTM3U
+                #EXT-X-STREAM-INF:BANDWIDTH=1000
+                media/primary/index.m3u8
 
-            """.utf8
-        ).write(to: packageURL.appendingPathComponent("index.m3u8"))
+                """.utf8
+            ).write(to: packageURL.appendingPathComponent("index.m3u8"))
+        }
 
         let track = HLSOfflinePackageTrack(
             kind: .primary,
@@ -1331,7 +1389,7 @@ extension HLSDownloaderTests {
             hashingFiles: true
         ).records
         let manifest = HLSOfflinePackageManifest(
-            entryPlaylistPath: "index.m3u8",
+            entryPlaylistPath: directMediaEntry ? "media/primary/index.m3u8" : "index.m3u8",
             tracks: [track],
             selectedVariant: nil,
             files: records

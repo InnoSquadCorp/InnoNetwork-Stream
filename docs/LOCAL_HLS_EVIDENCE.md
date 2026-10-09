@@ -48,6 +48,19 @@ and retains raw JSON/HTML/stdout plus original inputs and SDK outputs. It also
 records the exact source commit, all tracked source-tree entries, input hashes,
 tool executable hashes/version label, platform, and execution time.
 
+The validator explicitly runs with `--compatible-output=v1.x`. The verified
+JSON/report format is 1.3; unsupported schemas or an HTML notice such as
+"Version 3 output is not understood" fail even when both tools exit zero.
+JSON completion, nested blocking messages and every HTML Must Fix section are
+checked. Raw Should Fix issues and advisories remain visible for review. Actual
+`--version` output from both installed tools is retained with the package label
+and executable hashes.
+
+For direct media inputs, offline packages use the localized primary media
+playlist as their entry. A master wrapper cannot safely invent bandwidth,
+codec or rendition metadata absent from the source. Multivariant source inputs
+still retain their selected multivariant entry and existing packages reopen.
+
 ## SDK output smoke without Apple tools
 
 Both Xcode lanes use the same generation path as collection. To exercise it

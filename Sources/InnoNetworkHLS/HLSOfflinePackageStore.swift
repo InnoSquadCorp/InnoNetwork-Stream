@@ -321,28 +321,48 @@ enum HLSOfflinePackageValidator {
         }
 
         let entryPlaylist = try parsePlaylist(at: entryPlaylistURL)
-        guard entryPlaylist.kind == .multivariant,
-            entryPlaylist.variants.count == 1,
-            let entryVariant = entryPlaylist.variants.first,
-            let primaryTrack = tracks.first(where: { $0.kind == .primary }),
-            let primaryURL = trackURLs[primaryTrack.relativePlaylistPath],
-            sameFile(entryVariant.url, primaryURL)
+        guard let primaryTrack = tracks.first(where: { $0.kind == .primary }),
+            let primaryURL = trackURLs[primaryTrack.relativePlaylistPath]
         else {
             throw HLSDownloadError.invalidOfflinePackage
         }
-        try validateEntryRenditions(
-            entryPlaylist,
-            tracks: tracks,
-            trackURLs: trackURLs,
-            strictMetadata:
-                manifest.schemaVersion
-                == HLSOfflinePackageManifest.currentSchemaVersion
-        )
-        let entryIFrameVariant = try validateEntryIFrameVariant(
-            entryPlaylist,
-            tracks: tracks,
-            trackURLs: trackURLs
-        )
+        let entryVariant: HLSVariant?
+        let entryIFrameVariant: HLSVariant?
+        if entryPlaylist.kind == .media {
+            guard manifest.selectedVariant == nil,
+                manifest.selectedIFrameVariant == nil,
+                tracks.count == 1,
+                sameFile(entryPlaylistURL, primaryURL)
+            else {
+                throw HLSDownloadError.invalidOfflinePackage
+            }
+            entryVariant = nil
+            entryIFrameVariant = nil
+        } else {
+            // Retain compatibility with existing multivariant packages,
+            // including older wrappers around direct media inputs.
+            guard entryPlaylist.kind == .multivariant,
+                entryPlaylist.variants.count == 1,
+                let variant = entryPlaylist.variants.first,
+                sameFile(variant.url, primaryURL)
+            else {
+                throw HLSDownloadError.invalidOfflinePackage
+            }
+            entryVariant = variant
+            try validateEntryRenditions(
+                entryPlaylist,
+                tracks: tracks,
+                trackURLs: trackURLs,
+                strictMetadata:
+                    manifest.schemaVersion
+                    == HLSOfflinePackageManifest.currentSchemaVersion
+            )
+            entryIFrameVariant = try validateEntryIFrameVariant(
+                entryPlaylist,
+                tracks: tracks,
+                trackURLs: trackURLs
+            )
+        }
 
         var expectedPaths: Set<String> = [
             manifestPath,
@@ -401,6 +421,9 @@ enum HLSOfflinePackageValidator {
         }
 
         let selectedVariant = try manifest.selectedVariant.map { variant in
+            guard let entryVariant else {
+                throw HLSDownloadError.invalidOfflinePackage
+            }
             if manifest.schemaVersion
                 == HLSOfflinePackageManifest.currentSchemaVersion
             {
