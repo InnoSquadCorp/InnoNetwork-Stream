@@ -1,0 +1,70 @@
+Fetching https://github.com/InnoSquadCorp/InnoNetwork.git from cache
+Fetching https://github.com/apple/swift-http-types from cache
+Fetching https://github.com/apple/swift-openapi-runtime from cache
+Fetching https://github.com/apple/swift-asn1.git from cache
+Fetching https://github.com/swiftlang/swift-syntax.git from cache
+Fetching https://github.com/apple/swift-crypto from cache
+Fetched https://github.com/InnoSquadCorp/InnoNetwork.git from cache (0.72s)
+Fetched https://github.com/apple/swift-http-types from cache (0.79s)
+Fetched https://github.com/apple/swift-asn1.git from cache (0.86s)
+Fetched https://github.com/apple/swift-crypto from cache (0.94s)
+Fetched https://github.com/apple/swift-openapi-runtime from cache (0.97s)
+Fetched https://github.com/swiftlang/swift-syntax.git from cache (1.10s)
+Computing version for https://github.com/swiftlang/swift-syntax.git
+Computed https://github.com/swiftlang/swift-syntax.git at 604.0.0 (1.83s)
+Computing version for https://github.com/InnoSquadCorp/InnoNetwork.git
+Computed https://github.com/InnoSquadCorp/InnoNetwork.git at 6.1.1 (0.54s)
+Computing version for https://github.com/apple/swift-crypto
+Computed https://github.com/apple/swift-crypto at 5.0.0 (0.83s)
+Computing version for https://github.com/apple/swift-openapi-runtime
+Computed https://github.com/apple/swift-openapi-runtime at 1.12.1 (0.46s)
+Computing version for https://github.com/apple/swift-http-types
+Computed https://github.com/apple/swift-http-types at 1.6.0 (0.48s)
+Computing version for https://github.com/apple/swift-asn1.git
+Computed https://github.com/apple/swift-asn1.git at 1.7.2 (0.53s)
+Creating working copy for https://github.com/InnoSquadCorp/InnoNetwork.git
+Working copy of https://github.com/InnoSquadCorp/InnoNetwork.git resolved at 6.1.1
+Creating working copy for https://github.com/apple/swift-openapi-runtime
+Working copy of https://github.com/apple/swift-openapi-runtime resolved at 1.12.1
+Creating working copy for https://github.com/apple/swift-asn1.git
+Working copy of https://github.com/apple/swift-asn1.git resolved at 1.7.2
+Creating working copy for https://github.com/apple/swift-http-types
+Working copy of https://github.com/apple/swift-http-types resolved at 1.6.0
+Creating working copy for https://github.com/swiftlang/swift-syntax.git
+Working copy of https://github.com/swiftlang/swift-syntax.git resolved at 604.0.0
+Creating working copy for https://github.com/apple/swift-crypto
+Working copy of https://github.com/apple/swift-crypto resolved at 5.0.0
+Building for production...
+[Pre-planning 1 / 272]
+[Planning deferred tasks]
+[66 / 113] InnoNetwork_InnoNetwork
+[66 / 113]
+[68 / 115] InnoNetworkStreamMacros
+[78 / 142]
+[82 / 142]
+[90 / 154]
+[91 / 154]
+[95 / 154]
+[98 / 154]
+[104 / 154]
+[105 / 154]
+[107 / 154]
+[108 / 154]
+[111 / 154] InnoNetworkStreamMacros
+[112 / 154] InnoNetworkStreamMacros
+[113 / 154] InnoNetworkMacroSupport
+[124 / 155] InnoNetworkMacros
+[128 / 156] InnoNetworkMacros
+[129 / 156] InnoNetworkMacros
+[131 / 157] InnoNetwork
+[137 / 163]
+[138 / 163] InnoNetwork
+[145 / 164] InnoNetworkHLS
+[148 / 166] InnoNetworkHLS
+[155 / 167] InnoNetworkHLSLive
+[157 / 168] InnoNetworkHLSLive
+[164 / 169] HLSReleaseEvidence-product
+[166 / 170] HLSReleaseEvidence-product
+[168 / 170] HLSReleaseEvidence-product
+[169 / 170] HLSReleaseEvidence-product
+Build complete! (67.43초)

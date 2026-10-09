@@ -1,0 +1,46 @@
+mediastreamvalidator - Version: 2.0.284 (2.0.284-260930)
+Validate HTTP Live Streaming (HLS) playlists and media streams for compliance with specifications.
+Use 'mediastreamvalidator --help' for more information
+
+----------------------------------------------------------------------------------------------------
+                                          Settings Summary
+----------------------------------------------------------------------------------------------------
+Ignored Errors: (User_Guide/Error_Codes.md)
+  121007, 121034-121035, 335046
+Time Limits: 
+  Runtime: 300s
+Fetch: 
+  User Agent: AppleCoreMedia/1.0.0.12A365 (iPad; U; CPU OS 8_0 like Mac OS X; en_us)
+Compatible: 
+  
+----------------------------------------------------------------------------------------------------
+
+/M01:Validate file:///private/tmp/stream-final-6.1.1-3a8bd.../offline-audio-fmp4/media/primary/index.m3u8
+/M01:Started root playlist download
+/M01/P01:Started media playlist download
+/M01/P01:Fetch media playlist
+/M01/P01:All media files delivered and have end tag, stopping
+====================================================================================================
+                                              Summary
+====================================================================================================
+Validation Type: media  Validations:  1
+====================================================================================================
+Main: /private/tmp/stream-final-6.1.1-3a8bdbc/ReleaseEvidence/apple-hls/outputs/offline-audio-fmp4/media/primary/index.m3u8
+----------------------------------------------------------------------------------------------------
+Type      : media
+Playlists : Total:   1  Type(s): VOD  Parse errors:    0  Load Failure:    0
+Segments  : Processed: 3 (100.00%)  Total: 3  Target Duration: 1s-1s
+Codecs    : Video:             Audio: aac         Other:           
+Variants  : Stream/I-Frame: 0/0
+Renditions: 0
+----------------------------------------------------------------------------------------------------
+                                  No Validation Messages to report
+====================================================================================================
+
+----------------------------------------------------------------------------------------------------
+                                              CAUTION
+----------------------------------------------------------------------------------------------------
+MediaStreamValidator only checks for violations of the HLS specification.
+For a more comprehensive check against the HLS Authoring Specification,
+please run hlsreport on the JSON output.
+
