@@ -1,5 +1,10 @@
 # Core branch integration and streaming-key cancellation
 
+> Historical record — retained for the source, date and environment below.
+> For the published 6.1.1 contract, use the [current quick start](../README.md)
+> and [documentation map](README.md). Unexecuted checks are not implied passes.
+
+
 ## Baseline and scope
 
 - Stream baseline: `971750d664643fb888937242aa130537daf8bb0f`; development

@@ -1,4 +1,9 @@
 ---
+
+> Historical record — retained for the source, date and environment below.
+> For the published 6.1.1 contract, use the [current quick start](../README.md)
+> and [documentation map](README.md). Unexecuted checks are not implied passes.
+
 date: 2026-09-30
 status: Draft
 owner: Codex

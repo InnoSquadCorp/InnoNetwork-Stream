@@ -1,5 +1,10 @@
 # Iterative Stream hardening
 
+> Historical record — retained for the source, date and environment below.
+> For the published 6.1.1 contract, use the [current quick start](../README.md)
+> and [documentation map](README.md). Unexecuted checks are not implied passes.
+
+
 Baseline: `15c03db3327fd850015b65971684dc1a61fc81a1`, tracked clean; preserve
 `Derived/` and `InnoStream.xcodeproj/`. Core stays locked at `91b4b41`.
 The owner authorized fixes, local commits and repeat review. No push or release.

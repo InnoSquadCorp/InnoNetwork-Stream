@@ -1,6 +1,7 @@
 # Package and repository naming
 
-The unreleased `InnoStream` package is now named `InnoNetwork-Stream`.
+The former unreleased `InnoStream` package is now published as
+`InnoNetwork-Stream` 6.1.1. The rename history below remains historical evidence.
 The canonical public GitHub repository URL is:
 
 ```text

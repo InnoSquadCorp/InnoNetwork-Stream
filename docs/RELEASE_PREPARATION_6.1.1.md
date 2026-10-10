@@ -1,5 +1,10 @@
 # Stream 6.1.1 release execution checklist
 
+> Historical record — retained for the source, date and environment below.
+> For the published 6.1.1 contract, use the [current quick start](../README.md)
+> and [documentation map](README.md). Unexecuted checks are not implied passes.
+
+
 Prepared 2026-10-08 UTC from main `81f945f751090aed7c696e4c453816e01df5dd93`.
 Status: preparation only; official HLS acceptance, applicable device acceptance
 and the full release gate have not passed. No release tag exists at this check.

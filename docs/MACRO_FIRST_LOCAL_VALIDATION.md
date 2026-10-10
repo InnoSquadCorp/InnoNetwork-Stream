@@ -1,5 +1,10 @@
 # Macro-first redesign: local validation record
 
+> Historical record — retained for the source, date and environment below.
+> For the published 6.1.1 contract, use the [current quick start](../README.md)
+> and [documentation map](README.md). Unexecuted checks are not implied passes.
+
+
 Date: 2026-09-30. Toolchain: Xcode 27.0 / Swift 6.4, macOS 27.
 Scope: baseline `1604b16a12a03bc3213d72bb20a134eba4f211a1` through the
 authorized ten-slice local redesign. No push, PR, automation, tag, publication,

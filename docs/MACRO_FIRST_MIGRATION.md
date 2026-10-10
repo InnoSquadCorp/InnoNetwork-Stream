@@ -1,4 +1,4 @@
-# Macro-first migration (unpublished 6.1.1 candidate)
+# Macro-first migration to stable 6.1.1
 
 ## Live, DVR and native playback
 
@@ -20,8 +20,8 @@ not an actor hop or generated foreground lifetime.
 
 ## Parser and VOD migration
 
-There is no previously published stable Stream API to rewrite. These breaking migrations apply
-to local/pre-release adopters; Core source and media/checkpoint schemas do
+6.1.1 is the first published stable Stream line. These breaking migrations apply
+to the earlier local/pre-release APIs; Core source and media/checkpoint schemas do
 not change; the dependency separately moves to published Core 6.1.1. No application source migration is performed by this repository.
 
 | Previous path | Primary path | Ownership and failure contract |

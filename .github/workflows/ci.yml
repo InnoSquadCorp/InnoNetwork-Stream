@@ -48,6 +48,7 @@ jobs:
         run: |
           python3 -B -m unittest discover -s Scripts/automation-tests -v
           python3 -B Scripts/check-ci-workflows.py
+          python3 -B Scripts/check_readme_parity.py
 
   dependency-review:
     needs: ci-plan

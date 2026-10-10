@@ -15,6 +15,22 @@ for state in draft ready; do
   if bash "$fixture/Scripts/validate_docs_release_state.sh" --expect "$other" >/dev/null 2>&1; then
     echo 'wrong release state accepted' >&2; exit 1
   fi
+  if [[ "$state" == ready ]]; then
+    cp "$fixture/README.md" "$scratch/original-readme"
+    printf '[Roadmap](docs/ROADMAP.md)\n`6.1.1` is published.\nhttps://github.com/InnoSquadCorp/InnoNetwork-Stream/releases/tag/6.1.1\n' > "$fixture/README.md"
+    bash "$fixture/Scripts/validate_docs_release_state.sh" --expect ready
+    sed 's@/tag/6.1.1@/tag/6.1.0@' "$fixture/README.md" > "$scratch/wrong-tag"
+    cp "$scratch/wrong-tag" "$fixture/README.md"
+    if bash "$fixture/Scripts/validate_docs_release_state.sh" --expect ready >/dev/null 2>&1; then
+      echo 'published README with wrong tag accepted' >&2; exit 1
+    fi
+    sed 's@/tag/6.1.0@/tag/6.1.10@' "$fixture/README.md" > "$scratch/prefix-collision"
+    cp "$scratch/prefix-collision" "$fixture/README.md"
+    if bash "$fixture/Scripts/validate_docs_release_state.sh" --expect ready >/dev/null 2>&1; then
+      echo 'published README with prefix-collision tag accepted' >&2; exit 1
+    fi
+    cp "$scratch/original-readme" "$fixture/README.md"
+  fi
   cp "$fixture/docs/releases/6.1.1.md" "$scratch/original-notes"
   printf '\nStatus: contradictory\n' >> "$fixture/docs/releases/6.1.1.md"
   if bash "$fixture/Scripts/validate_docs_release_state.sh" >/dev/null 2>&1; then
