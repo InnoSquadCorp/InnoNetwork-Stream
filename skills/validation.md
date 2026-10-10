@@ -1,4 +1,36 @@
-# Stream skill validation — 2026-10-09
+# Stream skill validation — 2026-10-10
+
+The skill supports stable **6.1.x** and validates the published **6.1.1** tag at
+`2af03b24cfc8f11442a3b9ba2fd8adcfe58d8116`. The manifest requires Core **exact
+6.1.1**, `44e4ca28c50c03f817231a077c0f3bdfdbc859c8`. Skill-source revision and
+library baseline remain independent. This change does not alter runtime code.
+
+## Fresh released-consumer evidence
+
+- Xcode 27 / Swift 6.4, macOS 27 arm64: **13 Swift Testing tests passed** with
+  strict concurrency complete and warnings as errors. All four module imports,
+  six macros, manual equivalents, MainActor playback and guarded audio compile.
+- Exact seven remote pins, active graph, workspace/prebuilt entries and clean
+  checkout SHAs verified before tests; unchanged pins, source hashes and checkout
+  heads/status verified afterwards. SwiftSyntax 604.0.0 uses a verified prebuilt.
+- Remote annotated tag object `c8b74e3fd2f009276b47a5f4c4cee885e0c871bc` and peeled
+  commit verified both before and after the run. Missing, mismatched or moved
+  tags fail validation.
+- **Six automation tests passed**, covering stderr warning separation, command
+  failure, malformed JSON, dependency drift and release-tag rejection controls.
+- Skill frontmatter/discovery metadata validated. Sanitized command hashes,
+  dependency identities and results: [release-6.1.1-evidence.json](validation/release-6.1.1-evidence.json).
+
+The fixture uses mocked URLProtocol responses and temporary output. This is not
+fresh device playback, FairPlay, background restoration, PCM delivery, full HLS
+conformance, other-toolchain or five-platform release qualification. AI host
+selection/generation evidence belongs to the central plugin and is unchanged.
+Other 6.1.x patches require their own tag/diff and consumer check when used.
+
+## Historical pre-release validation — 2026-10-09
+
+The following records the earlier unpublished baseline; it does not describe
+current release availability. Its original evidence is retained unchanged.
 
 The skill supports planned stable **6.1.x**, but validates unpublished main
 `bd50e877644ded1b739f66bdd8fb604908606e4b`, intended for 6.1.1. No Stream tag or
@@ -6,7 +38,7 @@ GitHub Release existed at check. The manifest requires published Core **exact
 6.1.1**, `44e4ca28c50c03f817231a077c0f3bdfdbc859c8`. Skill-source revision and
 library baseline are independent. No runtime library implementation is changed.
 
-## Fresh local evidence
+### Historical local evidence
 
 - Xcode 27 / Swift 6.4, macOS 27 arm64; all four module imports, all six macros,
   manual equivalents, MainActor playback and guarded audio compile externally.
@@ -31,7 +63,7 @@ Audio settings construction is not actual PCM delivery. No private library API
 or local dependency substitution is used. AI host evaluations belong to the
 central plugin and are separate from this authored fixture.
 
-## Boundaries
+### Historical boundaries
 
 This is skill and consumer validation, not a complete library regression/release
 run. Other toolchains, five-platform builds, native background restoration,

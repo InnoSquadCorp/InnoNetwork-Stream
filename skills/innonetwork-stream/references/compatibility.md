@@ -1,22 +1,20 @@
 # Version and package contract
 
-Checked 2026-10-09: Stream origin/main is
-`bd50e877644ded1b739f66bdd8fb604908606e4b`; no Stream 6.1.1 tag or GitHub Release
-was found. Planned support is stable `>=6.1.0 <6.2.0`. The exact validated
-library version is null, planned version 6.1.1. No earlier 6.1.0 tag is assumed.
+Checked 2026-10-10: published Stream **6.1.1** points to
+`2af03b24cfc8f11442a3b9ba2fd8adcfe58d8116`. The GitHub Release was published on
+2026-10-09 UTC. Stable support is `>=6.1.0 <6.2.0`; the exact validated baseline
+is 6.1.1, not every patch in that range. No earlier 6.1.0 tag is assumed.
 
-For the explicitly requested candidate, use the immutable remote revision:
+The reproducible fixture pins the release exactly:
 
 ```swift
 .package(url: "https://github.com/InnoSquadCorp/InnoNetwork-Stream.git",
-         revision: "bd50e877644ded1b739f66bdd8fb604908606e4b")
+         exact: "6.1.1")
 ```
 
-Once released, verify the actual tag commit, inspect differences and rerun an
-exact-tag consumer before qualifying that release. For a stable 6.1.x consumer,
-retain its patch and review that revision's API and Core constraint. Use
-`.upToNextMinor(from: "6.1.1")` only after that tag exists when the caller wants
-this patch line; `from:` alone permits later 6.x minors beyond this support range.
+For a stable 6.1.x consumer, retain its patch and review that revision's API and
+Core constraint. Use `.upToNextMinor(from: "6.1.1")` when the caller wants this
+patch line; `from:` alone permits later 6.x minors beyond this support range.
 Do not downgrade an existing supported patch to the fixture baseline or apply
 this guidance to 6.2+, prereleases, or a different moving branch without review.
 
@@ -42,7 +40,7 @@ normal local trust approval and do not change global trust settings.
 
 ## Immutable sources
 
-At the [captured source](https://github.com/InnoSquadCorp/InnoNetwork-Stream/tree/bd50e877644ded1b739f66bdd8fb604908606e4b), consult:
+At the [captured source](https://github.com/InnoSquadCorp/InnoNetwork-Stream/tree/2af03b24cfc8f11442a3b9ba2fd8adcfe58d8116), consult:
 `Package.swift`, `README.md`, `docs/MACRO_FIRST_MIGRATION.md`,
 `docs/FAILURE_AND_INCIDENT_CONTRACT.md`, `docs/MEDIA_CATALOG.md`,
 `docs/DEVICE_ACCEPTANCE.md`, `Sources/` and `Tests/PackageIdentity/`.

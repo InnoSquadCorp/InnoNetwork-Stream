@@ -1,6 +1,6 @@
 interface:
   display_name: "InnoNetwork Stream"
-  short_description: "HLS workflows for planned Stream 6.1.x"
+  short_description: "HLS workflows for stable Stream 6.1.x"
   default_prompt: "Use $innonetwork-stream to implement or validate this HLS workflow against the consumer's exact Stream and Core versions."
 policy:
   allow_implicit_invocation: true

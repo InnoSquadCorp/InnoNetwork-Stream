@@ -57,7 +57,8 @@ enum OfflineMovie {}
 `try await OfflineMovie.downloadPackage(sourceURL:destinationDirectoryURL:session:)`
 is task-owned. It preserves selected audio/subtitle timelines and returns an
 `HLSOfflinePackageReceipt` after atomic publication, never overwriting an
-existing destination. Default recovery preserves resumable checkpoints rather
+existing destination. The receipt entry may be a media or multivariant playlist;
+use `receipt.entryPlaylistURL` instead of assuming a root `index.m3u8`. Default recovery preserves resumable checkpoints rather
 than exposing an incomplete destination. Reopen using
 `try HLSOfflinePackageStore().open(at: receipt.directoryURL)`.
 
