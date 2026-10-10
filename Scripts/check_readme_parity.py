@@ -8,6 +8,13 @@ import re
 import sys
 
 root = Path(__file__).resolve().parents[1]
+try:
+    release_version = (root / 'RELEASE_VERSION').read_text(encoding='utf-8').strip()
+except OSError:
+    sys.exit('readme parity: cannot read RELEASE_VERSION')
+if not re.fullmatch(r'(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)', release_version):
+    sys.exit('readme parity: invalid RELEASE_VERSION')
+expected_release = f'https://github.com/InnoSquadCorp/InnoNetwork-Stream/releases/tag/{release_version}'
 files = [root / name for name in ('README.md', 'README.ko.md', 'README.es.md',
     'README.de.md', 'README.zh-Hans.md', 'README.ja.md', 'README.ru.md')]
 errors = []
@@ -24,7 +31,8 @@ for path in files:
     for sibling in files:
         if f']({sibling.name})' not in text:
             errors.append(f'{path.name}: missing language link {sibling.name}')
-    if '/releases/tag/6.1.1' not in text:
+    destinations = re.findall(r'\]\(([^)\s]+)(?:\s+"[^"]*")?\)', text)
+    if expected_release not in destinations:
         errors.append(f'{path.name}: missing stable release link')
 # Check all Markdown paths, including historical evidence. External reachability
 # and DocC symbol resolution are deliberately outside this no-network check.
