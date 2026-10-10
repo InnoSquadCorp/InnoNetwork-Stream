@@ -26,7 +26,9 @@ conformance evidence, and five SDK builds. Run macro-first aggregate and individ
 consumers in Debug and Release. The full contract requires Xcode 27 / Swift 6.4;
 the separate Xcode 26 / Swift 6.2 lane must also remain green.
 
-Core publication does not publish Stream. Stream 6.1.1 remains an unpublished candidate, and a clean tagged Stream consumer remains a release gate. Dedicated
+Core and Stream 6.1.1 are separately published. A clean consumer must resolve both
+published tags without a local override; qualification of future changes still
+requires exact-revision checks. Dedicated
 FairPlay service, locked-device restoration and production CDN acceptance still
 require the application owner's environment.
 

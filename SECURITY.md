@@ -31,7 +31,7 @@ Whichever channel you use, please include:
 
 - Until the first `6.1.1` tag is published, reports against `main` are assessed as
   prerelease findings.
-- After publication, the latest `6.x` minor is the actively supported line.
+- The latest `6.x` minor is the actively supported line.
 - HLS code previously published by InnoNetwork follows InnoNetwork's support
   policy until applications migrate to InnoNetwork-Stream.
 

@@ -1,5 +1,9 @@
 # Stream skill validation — 2026-10-09
 
+> Historical fixture evidence. Stream 6.1.1 is now published; the results below
+> remain tied to their recorded earlier commit and have not been rerun by this
+> documentation change. See the [current quick start](../README.md).
+
 The skill supports planned stable **6.1.x**, but validates unpublished main
 `bd50e877644ded1b739f66bdd8fb604908606e4b`, intended for 6.1.1. No Stream tag or
 GitHub Release existed at check. The manifest requires published Core **exact

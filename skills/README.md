@@ -7,10 +7,12 @@ API changes. The central
 [InnoSquad plugin](https://github.com/InnoSquadCorp/innosquad-agent-skills)
 collects exact snapshots and owns Codex/Claude catalogs and host evaluations.
 
-Planned stable support: `>=6.1.0 <6.2.0` (6.1.x patches, excluding prereleases).
-The exact baseline is unpublished main `bd50e877644ded1b739f66bdd8fb604908606e4b`,
-intended for 6.1.1, with exact published Core 6.1.1. A later tag must be checked
-and tested independently; source merge does not establish release qualification.
+Declared support range: `>=6.1.0 <6.2.0` (6.1.x patches, excluding prereleases).
+The bundled fixture was validated against then-unpublished main `bd50e877644ded1b739f66bdd8fb604908606e4b`,
+intended for 6.1.1, with exact published Core 6.1.1. Stream
+[6.1.1 is now published](https://github.com/InnoSquadCorp/InnoNetwork-Stream/releases/tag/6.1.1);
+the bundled validation record remains historical and does not claim that this
+fixture has been rerun against the tag. Check the current tag independently.
 
 For standalone use, copy the **complete** `innonetwork-stream/` directory to
 `.agents/skills/innonetwork-stream` (Codex) or

@@ -67,8 +67,14 @@ else
   [[ -n "$release_date" ]] || fail 'ready notes require release date'
   python3 -c 'import datetime,sys; datetime.date.fromisoformat(sys.argv[1])' "$release_date"
   grep -Fqx "# API Stability ($major.x)" "$api"
-  grep -Fq "\`$version\` is ready for publication." "$readme"
+  # Preserve historical Ready release notes after the tag is published.
+  # A published quick start must identify the exact version and release URL.
+  if ! grep -Fq "\`$version\` is ready for publication." "$readme"; then
+    grep -Fq "\`$version\` is published." "$readme"
+    grep -Eo 'https://[^[:space:])>]+' "$readme" \
+      | grep -Fxq "https://github.com/InnoSquadCorp/InnoNetwork-Stream/releases/tag/$version"
+  fi
   grep -Fqx "## [$version] - $release_date" "$changelog"
-  grep -Fq "After publication, the latest \`$major.x\` minor is the actively supported line." "$security"
+  grep -Fiq "the latest \`$major.x\` minor is the actively supported line." "$security"
 fi
 echo "docs-release-state: OK ($version $state${git_ref:+ at $git_ref})"

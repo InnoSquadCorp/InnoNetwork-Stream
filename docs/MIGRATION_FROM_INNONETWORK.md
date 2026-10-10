@@ -69,7 +69,7 @@ arguments to the new name. No old published tag or GitHub redirect is assumed.
 
 1. Remove stale SwiftPM pins and generated project state using the consuming
    project's documented regeneration workflow.
-2. Resolve InnoNetwork 6 and InnoNetwork-Stream 1 from their published tags without a
+2. Resolve InnoNetwork 6.1.1 and InnoNetwork-Stream 6.1.1 from their published tags without a
    local path override.
 3. Build every target that imports an HLS module on its supported Apple
    platform.

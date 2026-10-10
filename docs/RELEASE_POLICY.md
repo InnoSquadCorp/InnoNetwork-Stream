@@ -2,9 +2,12 @@
 
 ## Version and API boundary
 
-`RELEASE_VERSION` is the single candidate version: `6.1.1`. The owner chose this
+`RELEASE_VERSION` records the release line: `6.1.1`, now published. The
+release-note `ready` marker preserves the pre-publication qualification state.
+A published README links the stable tag; it does not rewrite historical evidence.
+For the next release, update the version and repeat the sequence below. The owner chose this
 number to align with Network; Stream is still independently versioned. It has
-no prior stable 1.0.0 tag. The proposed 6.x public contract and pre-release breaking
+no prior stable 1.0.0 tag. The released 6.x public contract and pre-release breaking
 migrations are in [API Stability](../API_STABILITY.md). Major incompatible changes
 after publication need a Stream major version. Optional roadmap work is not a
 release blocker.

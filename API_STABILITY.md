@@ -56,4 +56,5 @@ recovery and migration review.
 A green PR run is development evidence. Final publication additionally requires
 coherent release-state documents, a canonical-main candidate, approved local
 Apple-tool evidence for actual SDK outputs, and post-tag remote consumer checks.
-The new Core 6.1.1 candidate has not inherited the older 6.1.0 run's acceptance.
+Published Core and Stream 6.1.1 do not transfer acceptance to later changes.
+The older Core 6.1.0 run remains evidence for its own revision only.
