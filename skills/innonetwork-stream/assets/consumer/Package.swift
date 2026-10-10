@@ -5,7 +5,7 @@ let package = Package(
     platforms: [.macOS(.v14)],
     dependencies: [
         .package(url: "https://github.com/InnoSquadCorp/InnoNetwork-Stream.git",
-                 revision: "bd50e877644ded1b739f66bdd8fb604908606e4b"),
+                 exact: "6.1.1"),
         .package(url: "https://github.com/InnoSquadCorp/InnoNetwork.git", exact: "6.1.1")
     ],
     targets: [

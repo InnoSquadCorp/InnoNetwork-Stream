@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate an isolated exact-revision consumer and record reproducible evidence."""
+"""Validate an isolated exact-release consumer and record reproducible evidence."""
 
 import argparse
 from contextlib import ExitStack
@@ -74,6 +74,16 @@ def main():
             check(pin["kind"] == "remoteSourceControl" and pin["location"] == baseline["repository"]
                   and pin["state"] == {k: baseline[k] for k in ("version", "revision") if k in baseline},
                   f"{identity} fixture pin differs from support record")
+        def verify_release_tag(label):
+            ref = "refs/tags/" + support["tag"]
+            output = command(label, ["git", "ls-remote", support["repository"], ref, ref + "^{}"])
+            refs = {name: sha for sha, name in (line.split() for line in output.splitlines())}
+            check(ref in refs and refs.get(ref + "^{}", refs.get(ref)) == support["revision"],
+                  "Official release tag differs from reviewed baseline")
+            return refs
+
+        release_refs = verify_release_tag("release-tag-before")
+        evidence["release_identity"] = {"tag": support["tag"], "revision": support["revision"], "refs": release_refs}
         evidence["swift"] = command("swift-version", ["swift", "--version"])
         evidence["xcode"] = command("xcode-version", ["xcodebuild", "-version"])
         evidence["source_sha256"] = {
@@ -141,6 +151,7 @@ def main():
                   f"{identity} revision changed during build")
             check(not command(identity + "-final-status", ["git", "-C", checkout, "status", "--porcelain", "--untracked-files=all"]),
                   f"{identity} changed during build")
+        check(verify_release_tag("release-tag-after") == release_refs, "Release tag changed during validation")
         evidence["status"] = "passed"
     except (OSError, RuntimeError, ValueError, KeyError) as error:
         evidence["status"] = "failed"

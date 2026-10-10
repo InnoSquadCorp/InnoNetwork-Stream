@@ -32,8 +32,10 @@ class ConsumerOutputTests(unittest.TestCase):
         real_popen = subprocess.Popen
         with tempfile.TemporaryDirectory() as directory:
             scratch = Path(directory).resolve()
+            tag_queries = 0
 
             def popen(argv, *args, **kwargs):
+                nonlocal tag_queries
                 argv = [str(value) for value in argv]
                 stdout, stderr, exit_code = "", "", 0
                 if argv[:2] == ["swift", "--version"]:
@@ -69,7 +71,13 @@ class ConsumerOutputTests(unittest.TestCase):
                     elif case == "failure":
                         exit_code = 23
                 elif argv[:2] == ["git", "ls-remote"]:
-                    stdout = support["revision"] + "\t" + argv[3] + "\n"
+                    tag_queries += 1
+                    revision = support["revision"]
+                    if case == "wrong-tag" or (case == "moved-tag" and tag_queries == 2):
+                        revision = "0" * 40
+                    stdout = revision + "\t" + argv[3] + "\n"
+                    if case == "missing-tag":
+                        stdout = ""
                 elif argv[:2] == ["git", "-C"]:
                     if argv[3:] == ["rev-parse", "HEAD"]:
                         stdout = expected[Path(argv[2]).name]["revision"] + "\n"
@@ -93,10 +101,29 @@ class ConsumerOutputTests(unittest.TestCase):
                 result = validator.main()
             evidence = json.loads(Path(json.loads(output.getvalue())["evidence"]).read_text())
             logs = {Path(entry["log"]).stem: Path(entry["log"]).read_text() for entry in evidence["commands"]}
-            graph_entry, = [entry for entry in evidence["commands"] if "show-dependencies" in entry["argv"]]
-            graph_log = Path(graph_entry["log"]).read_text()
-            error_log = Path(graph_entry["stderr_log"]).read_text() if "stderr_log" in graph_entry else None
+            graph_entry = next((entry for entry in evidence["commands"] if "show-dependencies" in entry["argv"]), None)
+            graph_log = Path(graph_entry["log"]).read_text() if graph_entry else ""
+            error_log = Path(graph_entry["stderr_log"]).read_text() if graph_entry and "stderr_log" in graph_entry else None
             return result, evidence, logs, graph_entry, graph_log, error_log
+
+    def test_missing_or_changed_release_is_rejected_before_swift(self):
+        for script in SCRIPTS:
+            for case in ("missing-tag", "wrong-tag"):
+                with self.subTest(skill=script.parents[1].name, case=case):
+                    result, evidence, logs, _, _, _ = self.validate(script, case)
+                    self.assertEqual((result, evidence["status"]), (1, "failed"))
+                    self.assertIn("Official release tag differs", evidence["error"])
+                    self.assertNotIn("swift-version", logs)
+                    self.assertNotIn("swift-test", logs)
+
+    def test_tag_moved_during_validation_is_rejected(self):
+        for script in SCRIPTS:
+            with self.subTest(skill=script.parents[1].name):
+                result, evidence, logs, _, _, _ = self.validate(script, "moved-tag")
+                self.assertEqual((result, evidence["status"]), (1, "failed"))
+                self.assertIn("Official release tag differs", evidence["error"])
+                self.assertIn("swift-test", logs)
+                self.assertIn("release-tag-after", logs)
 
     def test_clean_graph_control(self):
         self.assertTrue(SCRIPTS)
