@@ -1,0 +1,269 @@
+{
+  "status": "passed",
+  "started_at": "2026-10-09T23:56:19.873830+00:00",
+  "supported_range": ">=6.1.0 <6.2.0",
+  "include_prereleases": false,
+  "validation_scope": "verified_release_tag",
+  "release_identity": {
+    "tag": "6.1.1",
+    "revision": "2af03b24cfc8f11442a3b9ba2fd8adcfe58d8116",
+    "refs": {
+      "refs/tags/6.1.1": "c8b74e3fd2f009276b47a5f4c4cee885e0c871bc",
+      "refs/tags/6.1.1^{}": "2af03b24cfc8f11442a3b9ba2fd8adcfe58d8116"
+    }
+  },
+  "swift": "swift-driver version: 1.168.6 Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)\nTarget: arm64-apple-macosx27.0.0",
+  "xcode": "Xcode 27.0\nBuild version 27A266a",
+  "source_sha256": {
+    "Package.resolved": "47e6cf6a0a7897fc085e0f103447142b7e449d420ae595944d1e398b0823a91f",
+    "Package.swift": "d7f9042929e96c794dfbd00f0516ed865db8a7b7c1ae4fcd2c28c61cc7e8b704",
+    "Sources/StreamSkillExample/Workflows.swift": "d0e40009b83cc66db81b3b7ba7b03e47b6debf6ab161c61aa530ff6224963979",
+    "Tests/StreamSkillExampleTests/ConsumerTests.swift": "941af07d940838135943b79894a766ab6044c38451faed51353c625e332b5dd1"
+  },
+  "dependencies": {
+    "innonetwork": {
+      "version": "6.1.1",
+      "revision": "44e4ca28c50c03f817231a077c0f3bdfdbc859c8",
+      "clean": true,
+      "prebuilt_selected": false
+    },
+    "innonetwork-stream": {
+      "version": "6.1.1",
+      "revision": "2af03b24cfc8f11442a3b9ba2fd8adcfe58d8116",
+      "clean": true,
+      "prebuilt_selected": false
+    },
+    "swift-asn1": {
+      "version": "1.7.3",
+      "revision": "3b6410f7dee09eb33cdd26260c5fd47fda19b0e2",
+      "clean": true,
+      "prebuilt_selected": false
+    },
+    "swift-crypto": {
+      "version": "5.0.0",
+      "revision": "a9d1d5ab8951ada40cafff8c8e2b551dfde4f390",
+      "clean": true,
+      "prebuilt_selected": false
+    },
+    "swift-http-types": {
+      "version": "1.8.0",
+      "revision": "bff4b6903cdc99dda49649dd52f46c11cfd3ed50",
+      "clean": true,
+      "prebuilt_selected": false
+    },
+    "swift-openapi-runtime": {
+      "version": "1.13.0",
+      "revision": "50ad7976f18fec6c09466d2aebf7be3dc9476cfb",
+      "clean": true,
+      "prebuilt_selected": false
+    },
+    "swift-syntax": {
+      "version": "604.0.0",
+      "revision": "050f1a346fbbac0ca2cfb15a95274f7bd1cf0ccf",
+      "clean": true,
+      "prebuilt_selected": true
+    }
+  },
+  "swift_test_result": {
+    "tests": 13,
+    "suites": 1,
+    "failures": 0,
+    "strict_concurrency": "complete",
+    "warnings_as_errors": true
+  },
+  "finished_at": "2026-10-09T23:57:03.306869+00:00",
+  "command_logs": [
+    {
+      "name": "release-tag-before.log",
+      "exit_code": 0,
+      "sha256": "55606dff3e269d8bed7ccdb345749eab352cb16b54212ca98759f95bcde20f7a"
+    },
+    {
+      "name": "swift-version.log",
+      "exit_code": 0,
+      "sha256": "30bb0d72a580e8e936ab32e24cab2876f82fa6b06d66fef876fe21a47e828acc"
+    },
+    {
+      "name": "xcode-version.log",
+      "exit_code": 0,
+      "sha256": "694b44731d0b415c5b11d844151e466d7f5e200a95627efda377f232f1a6ab77"
+    },
+    {
+      "name": "resolve.log",
+      "exit_code": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "graph.log",
+      "exit_code": 0,
+      "sha256": "7acb38feb273818afb8e28f4b732c9de0eb3082ef5befffb6216f1c2ff6f139c",
+      "stderr": {
+        "name": "graph.stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "innonetwork-head.log",
+      "exit_code": 0,
+      "sha256": "738e4ccb65ce67eb009bf95fc7aa7bea7353cd964c2e9e31253d271e821c6b96"
+    },
+    {
+      "name": "innonetwork-status.log",
+      "exit_code": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "innonetwork-stream-head.log",
+      "exit_code": 0,
+      "sha256": "b7c4464660c55c7e5839eed6bed28d9089d1f9a277a4c18504bd071208ea2cc1"
+    },
+    {
+      "name": "innonetwork-stream-status.log",
+      "exit_code": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "swift-asn1-head.log",
+      "exit_code": 0,
+      "sha256": "e628c4d76bb4548181639c9d9abd6bb33cf2f5fa507a1873bbf9fecb57498606"
+    },
+    {
+      "name": "swift-asn1-status.log",
+      "exit_code": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "swift-crypto-head.log",
+      "exit_code": 0,
+      "sha256": "d8cac86613928ddaddb103914d72162653f06e32610731f629e77529cd95adef"
+    },
+    {
+      "name": "swift-crypto-status.log",
+      "exit_code": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "swift-http-types-head.log",
+      "exit_code": 0,
+      "sha256": "3217c7fc5f8f8cdcd4b4274c1009c4129c9ea1931d28c430540ec7f7fe7cceca"
+    },
+    {
+      "name": "swift-http-types-status.log",
+      "exit_code": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "swift-openapi-runtime-head.log",
+      "exit_code": 0,
+      "sha256": "f9918815e00735a83c2fcfde85ded046be7e5a10fc58618785656f73b1786b2b"
+    },
+    {
+      "name": "swift-openapi-runtime-status.log",
+      "exit_code": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "swift-syntax-head.log",
+      "exit_code": 0,
+      "sha256": "e7af342444e6f9861a06f82ed356996a45cde905b59ca73f3f63ae397a8ee46d"
+    },
+    {
+      "name": "swift-syntax-status.log",
+      "exit_code": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "swift-test.log",
+      "exit_code": 0,
+      "sha256": "0c6e0f0e1d17f7f1d88a3f4d00b575a3fbbe133b2d174f884fae5ddfc5bcf34e"
+    },
+    {
+      "name": "innonetwork-final-head.log",
+      "exit_code": 0,
+      "sha256": "738e4ccb65ce67eb009bf95fc7aa7bea7353cd964c2e9e31253d271e821c6b96"
+    },
+    {
+      "name": "innonetwork-final-status.log",
+      "exit_code": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "innonetwork-stream-final-head.log",
+      "exit_code": 0,
+      "sha256": "b7c4464660c55c7e5839eed6bed28d9089d1f9a277a4c18504bd071208ea2cc1"
+    },
+    {
+      "name": "innonetwork-stream-final-status.log",
+      "exit_code": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "swift-asn1-final-head.log",
+      "exit_code": 0,
+      "sha256": "e628c4d76bb4548181639c9d9abd6bb33cf2f5fa507a1873bbf9fecb57498606"
+    },
+    {
+      "name": "swift-asn1-final-status.log",
+      "exit_code": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "swift-crypto-final-head.log",
+      "exit_code": 0,
+      "sha256": "d8cac86613928ddaddb103914d72162653f06e32610731f629e77529cd95adef"
+    },
+    {
+      "name": "swift-crypto-final-status.log",
+      "exit_code": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "swift-http-types-final-head.log",
+      "exit_code": 0,
+      "sha256": "3217c7fc5f8f8cdcd4b4274c1009c4129c9ea1931d28c430540ec7f7fe7cceca"
+    },
+    {
+      "name": "swift-http-types-final-status.log",
+      "exit_code": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "swift-openapi-runtime-final-head.log",
+      "exit_code": 0,
+      "sha256": "f9918815e00735a83c2fcfde85ded046be7e5a10fc58618785656f73b1786b2b"
+    },
+    {
+      "name": "swift-openapi-runtime-final-status.log",
+      "exit_code": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "swift-syntax-final-head.log",
+      "exit_code": 0,
+      "sha256": "e7af342444e6f9861a06f82ed356996a45cde905b59ca73f3f63ae397a8ee46d"
+    },
+    {
+      "name": "swift-syntax-final-status.log",
+      "exit_code": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "release-tag-after.log",
+      "exit_code": 0,
+      "sha256": "55606dff3e269d8bed7ccdb345749eab352cb16b54212ca98759f95bcde20f7a"
+    }
+  ],
+  "automation_tests": {
+    "command": "python3 -B Scripts/automation-tests/test_skill_consumer_output.py",
+    "tests": 6,
+    "failures": 0,
+    "controls": [
+      "warning-bearing JSON succeeds",
+      "nonzero JSON command fails",
+      "malformed JSON fails",
+      "drifted dependency graph fails",
+      "missing/wrong release tag fails before Swift",
+      "tag changed after tests fails"
+    ]
+  }
+}

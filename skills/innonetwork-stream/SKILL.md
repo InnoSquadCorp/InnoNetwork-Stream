@@ -5,12 +5,11 @@ description: Implement, test, diagnose, or migrate Swift HLS media workflows wit
 
 # InnoNetwork-Stream
 
-Use this skill for the four Stream modules on Apple platforms. Planned stable
-support is **6.1.x (`>=6.1.0 <6.2.0`, excluding prereleases)**. The checked API is
-unreleased main `bd50e877644ded1b739f66bdd8fb604908606e4b`, intended for 6.1.1;
-no Stream release tag was present at the check. Core is independently published
-and required at **exact 6.1.1**. Do not invent a Stream tag or claim all patches
-were tested. Read [compatibility](references/compatibility.md) when selecting,
+Use this skill for the four Stream modules on Apple platforms. Stable support
+is **6.1.x (`>=6.1.0 <6.2.0`, excluding prereleases)**. The exact checked baseline
+is published **6.1.1**, tag commit `2af03b24cfc8f11442a3b9ba2fd8adcfe58d8116`.
+Core is independently published and required at **exact 6.1.1**. Do not claim
+that every supported patch has been tested. Read [compatibility](references/compatibility.md) when selecting,
 upgrading or qualifying a dependency; machine-readable facts live in
 [support.json](references/support.json).
 
@@ -70,7 +69,7 @@ python3 scripts/validate_consumer.py --scratch-path /tmp/innonetwork-stream-skil
 
 Run the command from this skill directory. The helper copies the fixture outside
 it, verifies the exact remote lock/graph/checkouts, and uses Swift 6 strict
-concurrency plus warnings-as-errors. It validates the captured main commit,
-not a future tag or the consumer app's integration. Adapt tests to the app's
+concurrency plus warnings-as-errors. It verifies the official 6.1.1 tag before
+and after validating the exact release consumer; application integration is separate. Adapt tests to the app's
 actual resolved patch. Separate fixture success, AI-generated compilation,
 native device/service acceptance, source merge and public release.

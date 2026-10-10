@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Validate an isolated exact-revision consumer and record reproducible evidence."""
+"""Validate an isolated exact-release consumer and record reproducible evidence."""
 
 import argparse
+from contextlib import ExitStack
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -32,12 +33,17 @@ def main():
         if not condition:
             raise RuntimeError(message)
 
-    def command(label, argv):
+    def command(label, argv, structured_output=False):
         log = run / (label + ".log")
         entry = {"argv": [str(a) for a in argv], "log": str(log)}
         evidence["commands"].append(entry)
-        with log.open("w") as output:
-            result = subprocess.run(entry["argv"], stdout=output, stderr=subprocess.STDOUT, check=False)
+        with log.open("w") as output, ExitStack() as stack:
+            error_output = subprocess.STDOUT
+            if structured_output:
+                error_log = run / (label + ".stderr.log")
+                entry["stderr_log"] = str(error_log)
+                error_output = stack.enter_context(error_log.open("w"))
+            result = subprocess.run(entry["argv"], stdout=output, stderr=error_output, check=False)
         entry["exit_code"] = result.returncode
         check(result.returncode == 0, f"{label} failed ({result.returncode}); see {log}")
         return log.read_text(errors="replace").strip()
@@ -68,6 +74,16 @@ def main():
             check(pin["kind"] == "remoteSourceControl" and pin["location"] == baseline["repository"]
                   and pin["state"] == {k: baseline[k] for k in ("version", "revision") if k in baseline},
                   f"{identity} fixture pin differs from support record")
+        def verify_release_tag(label):
+            ref = "refs/tags/" + support["tag"]
+            output = command(label, ["git", "ls-remote", support["repository"], ref, ref + "^{}"])
+            refs = {name: sha for sha, name in (line.split() for line in output.splitlines())}
+            check(ref in refs and refs.get(ref + "^{}", refs.get(ref)) == support["revision"],
+                  "Official release tag differs from reviewed baseline")
+            return refs
+
+        release_refs = verify_release_tag("release-tag-before")
+        evidence["release_identity"] = {"tag": support["tag"], "revision": support["revision"], "refs": release_refs}
         evidence["swift"] = command("swift-version", ["swift", "--version"])
         evidence["xcode"] = command("xcode-version", ["xcodebuild", "-version"])
         evidence["source_sha256"] = {
@@ -80,7 +96,7 @@ def main():
         options = ["--package-path", package, "--scratch-path", scratch]
         command("resolve", ["swift", "package", *options, "resolve"])
         check(pins(package / "Package.resolved") == original_pins, "Resolution changed the fixture's exact pins")
-        graph = json.loads(command("graph", ["swift", "package", *options, "show-dependencies", "--format", "json"]))
+        graph = json.loads(command("graph", ["swift", "package", *options, "show-dependencies", "--format", "json"], structured_output=True))
         nodes = {n["identity"]: n for n in flatten(graph)}
         # SwiftPM can omit SwiftSyntax from show-dependencies when using a prebuilt.
         # Verify its resolved checkout through workspace state instead of ignoring it.
@@ -135,6 +151,7 @@ def main():
                   f"{identity} revision changed during build")
             check(not command(identity + "-final-status", ["git", "-C", checkout, "status", "--porcelain", "--untracked-files=all"]),
                   f"{identity} changed during build")
+        check(verify_release_tag("release-tag-after") == release_refs, "Release tag changed during validation")
         evidence["status"] = "passed"
     except (OSError, RuntimeError, ValueError, KeyError) as error:
         evidence["status"] = "failed"
