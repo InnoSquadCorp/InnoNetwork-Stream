@@ -11,12 +11,12 @@ root = Path(__file__).resolve().parents[1]
 files = [root / name for name in ('README.md', 'README.ko.md', 'README.es.md',
     'README.de.md', 'README.zh-Hans.md', 'README.ja.md', 'README.ru.md')]
 errors = []
-canonical = re.findall(r'```(?:swift|bash)\n(.*?)```', files[0].read_text(), re.S)
+canonical = re.findall(r'```(?:swift|bash)\n(.*?)```', files[0].read_text(encoding='utf-8'), re.S)
 for path in files:
     if not path.exists():
         errors.append(f'Missing {path.name}')
         continue
-    text = path.read_text()
+    text = path.read_text(encoding='utf-8')
     if re.findall(r'<!-- section:(\d+) -->', text) != [str(i) for i in range(1, 8)]:
         errors.append(f'{path.name}: expected seven ordered sections')
     if re.findall(r'```(?:swift|bash)\n(.*?)```', text, re.S) != canonical:
@@ -30,7 +30,7 @@ for path in files:
 # and DocC symbol resolution are deliberately outside this no-network check.
 count = 0
 for path in list(root.glob('*.md')) + list((root / 'docs').rglob('*.md')):
-    for target in re.findall(r'\]\(([^)\s]+)(?:\s+"[^"]*")?\)', path.read_text()):
+    for target in re.findall(r'\]\(([^)\s]+)(?:\s+"[^"]*")?\)', path.read_text(encoding='utf-8')):
         if re.match(r'[a-zA-Z][\w+.-]*:', target) or target.startswith('#'):
             continue
         target = target.split('#', 1)[0]
