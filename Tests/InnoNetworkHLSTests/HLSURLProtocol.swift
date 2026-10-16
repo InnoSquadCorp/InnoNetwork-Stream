@@ -33,6 +33,11 @@ final class HLSURLProtocol: URLProtocol, @unchecked Sendable {
         case redirect(statusCode: Int, location: URL)
     }
 
+    private struct LoadingAdmission {
+        let response: ResponseSpec?
+        let handler: (@Sendable (URL) -> Void)?
+    }
+
     nonisolated(unsafe) private static var responses: [String: [ResponseSpec]] = [:]
     nonisolated(unsafe) private static var capturedRequestsStorage: [URLRequest] = []
     nonisolated(unsafe) private static var onStartLoading: (@Sendable (URL) -> Void)?
@@ -42,8 +47,14 @@ final class HLSURLProtocol: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) private static var requestGeneration = UUID()
     private static let lock = NSLock()
     private let lifecycleLock = NSLock()
+    private let generation: UUID
     private var isActive = false
-    private var activeGeneration: UUID?
+    private var hasFinished = false
+
+    override init(request: URLRequest, cachedResponse: CachedURLResponse?, client: (any URLProtocolClient)?) {
+        generation = Self.lock.withLock { Self.requestGeneration }
+        super.init(request: request, cachedResponse: cachedResponse, client: client)
+    }
 
     static func register(
         _ response: ResponseSpec,
@@ -117,22 +128,10 @@ final class HLSURLProtocol: URLProtocol, @unchecked Sendable {
             return
         }
 
-        Self.lock.lock()
-        Self.capturedRequestsStorage.append(request)
-        var queuedResponses =
-            Self.responses[url.absoluteString] ?? []
-        let responseSpec = queuedResponses.first
-        if queuedResponses.count > 1 {
-            queuedResponses.removeFirst()
-            Self.responses[url.absoluteString] = queuedResponses
-        }
-        let startLoadingHandler = Self.onStartLoading
-        let generation = Self.requestGeneration
-        Self.lock.unlock()
-        guard markActive(generation: generation) else { return }
-        startLoadingHandler?(url)
+        guard let admission = beginLoading(url: url) else { return }
+        admission.handler?(url)
 
-        switch responseSpec {
+        switch admission.response {
         case .success(let statusCode, let data, let headers):
             deliver(
                 statusCode: statusCode,
@@ -159,6 +158,7 @@ final class HLSURLProtocol: URLProtocol, @unchecked Sendable {
                 headers: headers,
                 finishesLoading: false
             )
+            guard isRequestActive() else { return }
             client?.urlProtocol(
                 self,
                 didFailWithError: URLError(errorCode)
@@ -207,6 +207,7 @@ final class HLSURLProtocol: URLProtocol, @unchecked Sendable {
                 markFinished()
                 return
             }
+            guard isRequestActive() else { return }
             var redirectedRequest = URLRequest(url: location)
             redirectedRequest.httpMethod = request.httpMethod
             client?.urlProtocol(
@@ -218,6 +219,7 @@ final class HLSURLProtocol: URLProtocol, @unchecked Sendable {
             // A subsequent failure races that handoff and cancels the new task.
             markFinished()
         case .none:
+            guard isRequestActive() else { return }
             client?.urlProtocol(
                 self,
                 didFailWithError: URLError(.unknown)
@@ -230,11 +232,8 @@ final class HLSURLProtocol: URLProtocol, @unchecked Sendable {
         guard let url = request.url else {
             return
         }
-        Self.lock.lock()
-        let handler = Self.onStopLoading
-        Self.lock.unlock()
+        let handler = markFinished(stopped: true)
         handler?(url)
-        markFinished()
     }
 
     private func deliver(
@@ -274,58 +273,70 @@ final class HLSURLProtocol: URLProtocol, @unchecked Sendable {
             didReceive: response,
             cacheStoragePolicy: .notAllowed
         )
+        guard isRequestActive() else { return }
         client?.urlProtocol(self, didLoad: data)
         if finishesLoading {
+            guard isRequestActive() else { return }
             client?.urlProtocolDidFinishLoading(self)
             markFinished()
         }
     }
 
-    private func markActive(generation: UUID) -> Bool {
+    private func beginLoading(url: URL) -> LoadingAdmission? {
         lifecycleLock.lock()
         Self.lock.lock()
         defer {
             Self.lock.unlock()
             lifecycleLock.unlock()
         }
-        guard generation == Self.requestGeneration else { return false }
+        // URLSession can schedule start/stop callbacks after invalidation.
+        // Admit and record together, using the registry that created this
+        // instance, so cancelled work cannot enter the next test's registry.
+        guard !isActive, !hasFinished, generation == Self.requestGeneration else { return nil }
         isActive = true
-        activeGeneration = generation
+        Self.capturedRequestsStorage.append(request)
+        var queuedResponses = Self.responses[url.absoluteString] ?? []
+        let response = queuedResponses.first
+        if queuedResponses.count > 1 {
+            queuedResponses.removeFirst()
+            Self.responses[url.absoluteString] = queuedResponses
+        }
         Self.activeRequestCount += 1
         Self.maximumActiveRequestCountStorage = max(
             Self.maximumActiveRequestCountStorage,
             Self.activeRequestCount
         )
-        return true
+        return LoadingAdmission(response: response, handler: Self.onStartLoading)
     }
 
     private func isRequestActive() -> Bool {
         lifecycleLock.lock()
+        Self.lock.lock()
         defer {
+            Self.lock.unlock()
             lifecycleLock.unlock()
         }
-        return isActive
+        return isActive && generation == Self.requestGeneration
     }
 
-    private func markFinished() {
+    @discardableResult
+    private func markFinished(stopped: Bool = false) -> (@Sendable (URL) -> Void)? {
         lifecycleLock.lock()
-        let wasActive = isActive
-        let generation = activeGeneration
-        isActive = false
-        activeGeneration = nil
-        lifecycleLock.unlock()
-        guard wasActive else {
-            return
-        }
         Self.lock.lock()
-        // Session invalidation can deliver an old stop after the next test
-        // resets the registry. It must not decrement the new test's count.
-        if generation == Self.requestGeneration {
+        defer {
+            Self.lock.unlock()
+            lifecycleLock.unlock()
+        }
+        let isCurrent = generation == Self.requestGeneration
+        let handler = stopped && !hasFinished && isCurrent ? Self.onStopLoading : nil
+        if isActive && isCurrent {
             Self.activeRequestCount = max(
                 0,
                 Self.activeRequestCount - 1
             )
         }
-        Self.lock.unlock()
+        isActive = false
+        hasFinished = true
+        return handler
     }
 }
