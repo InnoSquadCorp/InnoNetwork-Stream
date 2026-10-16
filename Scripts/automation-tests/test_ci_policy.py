@@ -12,8 +12,8 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 ACTION_PINS = {
     'actions/checkout': '3d3c42e5aac5ba805825da76410c181273ba90b1',
-    'github/codeql-action/init': '2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2',
-    'github/codeql-action/analyze': '2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2',
+    'github/codeql-action/init': '24c54180a607b1449ed407dd24f251e4e9147c8d',
+    'github/codeql-action/analyze': '24c54180a607b1449ed407dd24f251e4e9147c8d',
 }
 
 
