@@ -11,6 +11,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 ACTION_PINS = {
+    'actions/upload-artifact': 'cf430e030ddbb5b0abf93d22962f4752f3646cd9',
     'actions/checkout': '3d3c42e5aac5ba805825da76410c181273ba90b1',
     'github/codeql-action/init': '2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2',
     'github/codeql-action/analyze': '2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2',
@@ -31,7 +32,7 @@ def failure_artifact(name):
     return {
         'name': 'Preserve HLS startup and runtime failures',
         'if': 'failure()',
-        'uses': 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
+        'uses': 'actions/upload-artifact@' + ACTION_PINS['actions/upload-artifact'],
         'with': {'name': name, 'path': '.build/hls-runtime-diagnostics/',
                  'if-no-files-found': 'ignore'},
     }
@@ -163,7 +164,7 @@ class WorkflowTests(unittest.TestCase):
                      'run': 'mkdir -p .build/format-diagnostics\nbash Scripts/format.sh\n'
                             'git diff -- Sources Tests > .build/format-diagnostics/swift-format.patch\n'},
                     {'name': 'Preserve formatting diagnostics', 'if': 'failure()',
-                     'uses': 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
+                     'uses': 'actions/upload-artifact@' + ACTION_PINS['actions/upload-artifact'],
                      'with': {'name': 'swift-format-diagnostics', 'path': '.build/format-diagnostics/',
                               'if-no-files-found': 'ignore'}},
                 ])
@@ -180,7 +181,7 @@ class WorkflowTests(unittest.TestCase):
                 })
                 old_steps.append({
                     'name': 'Preserve SDK output diagnostics', 'if': 'failure()',
-                    'uses': 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
+                    'uses': 'actions/upload-artifact@' + ACTION_PINS['actions/upload-artifact'],
                     'with': {'name': 'hls-sdk-output-${{ matrix.xcode.label }}',
                              'path': '.build/hls-sdk-output-smoke/', 'if-no-files-found': 'ignore'},
                 })
@@ -204,7 +205,7 @@ class WorkflowTests(unittest.TestCase):
                     'bash Scripts/check_docc.sh --skip-build\n')
                 old_steps.append({
                     'name': 'Preserve generated API diagnostics', 'if': 'always()',
-                    'uses': 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
+                    'uses': 'actions/upload-artifact@' + ACTION_PINS['actions/upload-artifact'],
                     'with': {'name': 'public-api-diagnostics', 'path': '.build/api-contract-diagnostics/',
                              'if-no-files-found': 'ignore'},
                 })
@@ -229,7 +230,7 @@ class WorkflowTests(unittest.TestCase):
                 names = [s['name'] for s in new_steps]
                 self.assertLess(names.index('Verify published InnoNetwork dependency'),
                                 names.index('Build with xcodebuild'))
-            self.assertEqual(new_steps,old_steps,key)
+            self.assertEqual(new_steps,reviewed_action_pins(old_steps),key)
     def test_xcodebuild_reuses_the_dependency_gates_scoped_checkouts(self):
         # Exercise the actual workflow command and wrapper with a controlled
         # toolchain identity. This is argument forwarding, not an Apple build.
