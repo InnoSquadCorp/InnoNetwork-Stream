@@ -13,8 +13,8 @@ ROOT = Path(__file__).resolve().parents[2]
 ACTION_PINS = {
     'actions/upload-artifact': 'cf430e030ddbb5b0abf93d22962f4752f3646cd9',
     'actions/checkout': '3d3c42e5aac5ba805825da76410c181273ba90b1',
-    'github/codeql-action/init': '24c54180a607b1449ed407dd24f251e4e9147c8d',
-    'github/codeql-action/analyze': '24c54180a607b1449ed407dd24f251e4e9147c8d',
+    'github/codeql-action/init': '6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee',
+    'github/codeql-action/analyze': '6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee',
 }
 
 
